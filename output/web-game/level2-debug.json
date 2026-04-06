@@ -1,0 +1,335 @@
+{
+  "layout": {
+    "cellSize": 22,
+    "fieldCols": 25,
+    "fieldRows": 25
+  },
+  "activeTargetCount": 1,
+  "activeTargetsSample": [
+    {
+      "id": 313,
+      "color": "red",
+      "row": 12,
+      "col": 12,
+      "allowedProbes": [
+        "top",
+        "left",
+        "bottom",
+        "right"
+      ],
+      "regionTags": [
+        "all"
+      ]
+    }
+  ],
+  "frontCards": [
+    {
+      "index": 0,
+      "color": "red",
+      "ammo": 132,
+      "used": false,
+      "label": 1
+    },
+    {
+      "index": 1,
+      "color": "black",
+      "ammo": 90,
+      "used": false,
+      "label": 2
+    }
+  ],
+  "byColor": {
+    "red": {
+      "hasTargetForColor": true,
+      "nextTargetExists": true,
+      "hits": [
+        {
+          "distance": 0,
+          "region": "top-left",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 4.394450082984791,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 8.788900165969581,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 13.183350248954373,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 17.577800331939162,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 21.972250414923955,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 26.366700497908745,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 30.76115058089354,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 35.155600663878324,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 39.550050746863114,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 43.94450082984791,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 48.3389509128327,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 52.73340099581749,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 57.12785107880227,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 61.52230116178708,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 65.91675124477186,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 70.31120132775665,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 74.70565141074144,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 79.10010149372623,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        },
+        {
+          "distance": 83.49455157671103,
+          "region": "top",
+          "side": "top",
+          "targetId": 313,
+          "row": 12,
+          "col": 12
+        }
+      ]
+    }
+  },
+  "textState": {
+    "mode": "playing",
+    "scene": "procedural_reskin",
+    "source": "procedural",
+    "levelId": "2",
+    "themeId": "classic",
+    "generatedLevel": null,
+    "unitTheme": "numbered_slimes",
+    "coordinateSystem": {
+      "origin": "top-left",
+      "xDirection": "right",
+      "yDirection": "down",
+      "units": "canvas pixels"
+    },
+    "remainingBlocks": 625,
+    "blocksTotal": 625,
+    "queueCards": 7,
+    "blocksByColor": {
+      "black": 269,
+      "green": 151,
+      "red": 132,
+      "peach": 29,
+      "white": 44
+    },
+    "units": [],
+    "slimeCards": [
+      {
+        "index": 0,
+        "lane": 0,
+        "row": 0,
+        "color": "red",
+        "styleKey": "rose",
+        "label": 1,
+        "ammo": 132,
+        "used": false,
+        "x": 316,
+        "y": 1484,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 1,
+        "lane": 1,
+        "row": 0,
+        "color": "black",
+        "styleKey": "gold",
+        "label": 2,
+        "ammo": 90,
+        "used": false,
+        "x": 552,
+        "y": 1484,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 2,
+        "lane": 0,
+        "row": 1,
+        "color": "green",
+        "styleKey": "mint",
+        "label": 3,
+        "ammo": 151,
+        "used": false,
+        "x": 316,
+        "y": 1651,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 3,
+        "lane": 1,
+        "row": 1,
+        "color": "black",
+        "styleKey": "coral",
+        "label": 4,
+        "ammo": 89,
+        "used": false,
+        "x": 552,
+        "y": 1651,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 4,
+        "lane": 0,
+        "row": 2,
+        "color": "black",
+        "styleKey": "coral",
+        "label": 5,
+        "ammo": 90,
+        "used": false,
+        "x": 316,
+        "y": 1818,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 5,
+        "lane": 1,
+        "row": 2,
+        "color": "peach",
+        "styleKey": "mint",
+        "label": 6,
+        "ammo": 29,
+        "used": false,
+        "x": 552,
+        "y": 1818,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 6,
+        "lane": 0,
+        "row": 3,
+        "color": "white",
+        "styleKey": "pearl",
+        "label": 7,
+        "ammo": 44,
+        "used": false,
+        "x": 316,
+        "y": 1985,
+        "w": 158,
+        "h": 199
+      }
+    ]
+  }
+}

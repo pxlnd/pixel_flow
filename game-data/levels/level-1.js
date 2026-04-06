@@ -1,0 +1,148 @@
+window.PIXELFLOW_LEVEL_1 = {
+  "id": "1",
+  "name": "Level 1",
+  "fallbackFieldPattern": [
+    "GGGGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGGGG",
+    "GGBBBBGGGGGGBBBBGG",
+    "GGBBBBGGGGGGBBBBGG",
+    "GGBBBBGGGGGGBBBBGG",
+    "GGBBBBGGGGGGBBBBGG",
+    "GGGGGGBBBBBBGGGGGG",
+    "GGGGGGBBBBBBGGGGGG",
+    "GGGGBBBBBBBBBBGGGG",
+    "GGGGBBBBBBBBBBGGGG",
+    "GGGGBBBBBBBBBBGGGG",
+    "GGGGBBBBBBBBBBGGGG",
+    "GGGGBBGGGGGGBBGGGG",
+    "GGGGBBGGGGGGBBGGGG",
+    "GGGGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGGGG"
+  ],
+  "referenceGrid": {
+    "x": 220,
+    "y": 216,
+    "step": 32,
+    "cellSize": 30
+  },
+  "layout": {
+    "fieldX": 220,
+    "fieldY": 329,
+    "fieldStep": 32,
+    "cellSize": 32,
+    "fieldCols": 18,
+    "fieldRows": 18,
+    "track": {
+      "x": 106,
+      "y": 189,
+      "w": 808,
+      "h": 856,
+      "r": 50
+    },
+    "spawnPoint": {
+      "x": 152,
+      "y": 979
+    },
+    "cards": [
+      {
+        "lane": 0,
+        "row": 0,
+        "x": 312,
+        "y": 1230,
+        "w": 160,
+        "h": 200,
+        "color": "green",
+        "styleKey": "mint",
+        "label": 1,
+        "ammo": 40
+      },
+      {
+        "lane": 1,
+        "row": 0,
+        "x": 552,
+        "y": 1230,
+        "w": 160,
+        "h": 200,
+        "color": "black",
+        "styleKey": "coral",
+        "label": 2,
+        "ammo": 40
+      },
+      {
+        "lane": 0,
+        "row": 1,
+        "x": 312,
+        "y": 1432,
+        "w": 160,
+        "h": 200,
+        "color": "green",
+        "styleKey": "sky",
+        "label": 3,
+        "ammo": 40
+      },
+      {
+        "lane": 1,
+        "row": 1,
+        "x": 552,
+        "y": 1432,
+        "w": 160,
+        "h": 200,
+        "color": "black",
+        "styleKey": "gold",
+        "label": 4,
+        "ammo": 40
+      }
+    ],
+    "slots": [
+      {
+        "x": 98,
+        "y": 1130,
+        "w": 194,
+        "h": 126
+      },
+      {
+        "x": 311,
+        "y": 1130,
+        "w": 194,
+        "h": 126
+      },
+      {
+        "x": 520,
+        "y": 1130,
+        "w": 194,
+        "h": 126
+      },
+      {
+        "x": 729,
+        "y": 1130,
+        "w": 194,
+        "h": 126
+      }
+    ],
+    "wagonSprite": {
+      "x": 44,
+      "y": 840,
+      "w": 148,
+      "h": 116,
+      "anchorX": 52,
+      "anchorY": 96,
+      "seatOffsetX": 0,
+      "seatOffsetY": -52
+    },
+    "wagonMask": {
+      "x": 0,
+      "y": 820,
+      "w": 260,
+      "h": 200
+    },
+    "boardMask": {
+      "x": 0,
+      "y": 0,
+      "w": 1024,
+      "h": 1600,
+      "r": 0
+    }
+  }
+};

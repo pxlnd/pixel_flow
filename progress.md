@@ -1,0 +1,316 @@
+Original prompt: Твоя задача: создать полностью рабочий мини-клон мобильной 2D puzzle-game по приложенному референс-скриншоту. Нужен один локально запускаемый HTML/CSS/JS vertical slice с уровнем, конвейером, автоатакой, победой и restart.
+
+- 2026-04-04: restricted rail shooting to the unit's current side/corner of the active build contour.
+- `main.js`: added `getTrackRegionForPoint()` and contour-region tagging for active targets, then filtered `findTargetOnLine()` so straight segments shoot only same-side targets and corner arcs shoot only matching corner targets.
+- Added a narrow fallback for fully degenerate `1x1` active contour (`targetTags: ["all"]`) so the final center cell still remains finishable instead of deadlocking.
+- Follow-up fix after regression report: straight-side travel (`top/right/bottom/left`) now still accepts corner targets on that same side; only the actual corner rail positions stay corner-exclusive. This fixes the case where a bird filled the first cross, then incorrectly parked while the next black ghost blocks were diagonals on the matching side.
+- Verification:
+- `node --check main.js`
+- required `develop-web-game` client rerun: `output/web-game/target-side-client-final/state-0.json`, `errors-0.json`
+- direct Playwright verification: `output/web-game/target-side-verify/results.json`, `shot.png`
+- Result: recorded live shots only on matching regions (`bottom: 2, right: 1, top: 1, left: 1`), `mismatches: 0`, `remainingBlocks: 441 -> 436`.
+- Regression verification:
+- direct Playwright debug replay: `output/web-game/black-stop-debug.json`
+- Result: black unit no longer parks after the first 5 shots; the same replay now continues to 43 black shots total, unit remains `state: "moving"`, and the remaining active targets are already green-only.
+- 2026-04-04: follow-up fix for intermittent same-side misses and level-2 late stalls.
+- Root cause: runtime firing still depended on the exact sampled rail point lining up with a target column/row. With side-restricted targeting this could miss a valid top/left/right/bottom target on the current pass and only hit it on a later lap; on denser boards it could also make some contours feel non-shootable.
+- Fix: kept the existing precise line-hit path as primary behavior, but added `findTargetOnCurrentRegion()` fallback in `main.js`. If the current sampled point has no direct line hit, the bird now still acquires the nearest valid target on its current rail side/region, using the same side restriction and real track-window checks.
+- Verification:
+- `node --check main.js`
+- level 2 targetability probe: `output/web-game/level2-debug.json`
+- level 2 autoplay smoke: `output/web-game/level2-autoplay/results.json`, `shot.png`
+- Result: level 2 initial red target remains reachable (`hasTargetForColor: true`, 20 sampled hits on track), and autoplay now makes visible progress (`remainingBlocks: 625 -> 545`) instead of a no-shot stall.
+- 2026-04-04: cadence tightened after user report that birds were instantly dumping an entire side.
+- Root cause: even after side-restricted targeting, `Unit.update()` could still chain targets too aggressively across consecutive samples, and `FIRE_INTERVAL` was low enough that the side filled almost instantly.
+- Fix: limited runtime firing to a single resolved target per update sweep and increased `FIRE_INTERVAL` in `main.js` from `0.02` to `0.08`, so filling now reads as stepwise layering instead of a single burst.
+- Verification:
+- `node --check main.js`
+- cadence smoke: `output/web-game/shot-cadence-check/results.json`
+- Result: level 1 same-side pass slowed from the prior near-burst behavior to 31 shots over the 3s probe window (`remainingBlocks: 441 -> 410`) instead of the previous more aggressive side dump.
+
+- 2026-04-03: swapped level order so the Minecraft creeper face is now level 1 and the previous level 1 moved to level 8.
+- Kept the tutorial behavior intact by moving the level data instead of touching tutorial logic; tutorial remains bound to `levelId === "1"`, so it now runs on the creeper level automatically.
+- Verification: `game-data/levels/1.json` now contains the creeper pattern, `game-data/levels/8.json` contains the old first level pattern, and `main.js` still uses `LEVEL_ONE_TUTORIAL_ID = "1"`.
+
+- 2026-04-03: restored the missing Minecraft creeper face as level 8.
+- Added `/game-data/levels/8.json` in the same autoloaded JSON format as the existing levels, using a 20x20 green/black creeper-face pattern so it appears automatically as the eighth level.
+- Verification: parsed `8.json` successfully and confirmed the autoload path now contains `1.json` through `8.json`.
+
+- 2026-04-03: fixed the remaining rail deadlock that still left units looping/parking instead of finishing the drawing.
+- Root cause: shot side detection was anchored to the playfield rectangle instead of the actual rounded rail, and `getAllowedReachableProbesForTarget()` still collapsed valid shot windows to a subset of sides. On inner-corner endgame blocks this produced false negatives: real windows existed on the rail, but runtime classified those positions under the wrong side and never fired.
+- Fix:
+- `getInwardShootDirection()` in `main.js` now resolves from the nearest side of `conveyor.trackRect`, so top/left/right/bottom firing uses the real rail geometry instead of the field box.
+- `getAllowedReachableProbesForTarget()` now keeps every probe side that has a real sampled rail window instead of artificially reducing the target to one axis.
+- Verification:
+- `node --check main.js`
+- deterministic Playwright solve: `/tmp/pixelflow-playwright/solve_no_tutorial.js` now reaches `FINAL {"remaining":0,...}` and ends in `victory` instead of stalling at `remaining=176` / `320`.
+- targeted replay: `/tmp/pixelflow-playwright/trace_target43_runtime.js` previously reproduced the last inner-corner deadlock; after the fix the same setup no longer reaches that stuck state and reports immediate `remaining: 0, state: "victory"`.
+
+- 2026-04-03: fixed another rail deadlock where units could keep qualifying for "one more lap" without any real firing window on the actual track.
+- Root cause: `canColorShootNextSpiralTarget()` only used abstract side probes from the field, so in some layouts it reported a reachable target even though no sampled point on the rounded rail could ever produce `findTargetOnLine()`.
+- Fix: added `canColorShootNextSpiralTargetFromTrack()` in `main.js`; now the keep-loop decision is confirmed against full-loop track samples using the same inward-direction and target-line checks as runtime firing.
+- Verification: `node --check main.js` passed. Deterministic Playwright relaunch scenario (`/tmp/pixelflow-playwright/repro_relaunch.js`) after the fix shows moving black units still firing (`remaining 299 -> 255`) and then parking instead of getting stuck in a false endless travel state.
+
+- 2026-04-03: fixed rail-shot reachability regression for stacked targets in `main.js`.
+- Root cause: `getInwardShootDirection()` and `hasTargetForColor()` only considered the bottom lane. After the first placed block, the next spiral target could become unreachable from bottom even though it was still reachable from top/left/right, so later birds made a full lap and parked.
+- Fix: inward shooting now resolves from the nearest aligned side of the field, and `canColorShootNextSpiralTarget()` probes all four inward lanes before deciding a color has no valid target.
+- 2026-04-03: refined the above fix after visual regression report. Corner targets were being shot too early from the side rail. Added preferred-side ordering per target position (`top`, `bottom`, `left`, `right` with top/bottom tie priority) and real shots are now allowed only from the first reachable preferred side.
+- 2026-04-03: ghost visibility tuning per user feedback. In `drawTargetSilhouette()` non-black target tiles now use a stronger alpha multiplier (`0.58`) for fill/glow/outline so colored ghost blocks are noticeably more transparent and closer to black ghost contrast.
+- 2026-04-03: fixed “units loop forever without shooting” regression after side-priority targeting.
+- Root cause: preferred side could be chosen from abstract field probes even when that side was not physically reachable by the rounded rail path.
+- Fix: `getPreferredReachableProbeForTarget()` now filters probes through `isSideReachableForTargetByTrack()` (track straight-segment reach check with rail radius), enabling fallback to the next valid side instead of deadlocking shots.
+- Verification: `output/web-game/loop-no-shot-fix/state-summary.json` shows shots resumed (`remainingBlocks 400 -> 392`, ammo drops on active units).
+- 2026-04-03: improved firing cadence on sparse/generated boards (e.g. `35x35` with tiny center art).
+- Root cause: target-side gating allowed only one probe side, so units often waited a full lap and appeared to "skip" blocks.
+- Fix: added `getAllowedReachableProbesForTarget()` and switched shooting checks to use it.
+- Rule: keep strict corner behavior (`top` only for top-left corner case), but when target is away from edges allow opposite side on the same axis (e.g. `top+bottom`) to avoid one-side-only stalls.
+- Verification: `output/web-game/shooting-speed-fix/results.json` (`corner.allowedSides: ["top"]`, `central.allowed: ["top","bottom"]`, and live run `remaining 398 -> 388` with ammo drop).
+- 2026-04-03: fixed "shoots only one block and skips on same-color side chains" regression for tiny cells / high speed.
+- Root cause: hit-check sampled only the unit's current point each frame; at high rail speed the unit could step over narrow fire windows between frames.
+- Fix: in `Unit.update()` fire resolution now sweeps along the full movement segment (`prevPosition -> position`) with sub-samples based on `LAYOUT.cellSize`, instead of a single-point check.
+- Verification:
+- `output/web-game/side-burst-fix/results.json` shows side chain cleared in one pass (`remaining 5 -> 0` by mid checkpoint, ammo `50 -> 45`).
+- Corner guard still holds (`remaining: 1`, no early shot at 2600ms).
+- 2026-04-03: target ghost restyled per request.
+- `drawTargetSilhouette()` no longer uses wave-head pulse for chain falloff.
+- New behavior: each next ghost toward the first target grows in size, while tail transparency smoothly fades to exact zero.
+- Verification screenshot: `output/web-game/ghost-grow-fade/shot.png`.
+- 2026-04-03: wave effect re-added on top of the new monotonic ghost gradient.
+- Kept current behavior (size grows toward first block + tail fades to full zero), and added a moving Gaussian wave boost for scale/alpha/glow.
+- Verification screenshot: `output/web-game/ghost-grow-fade-wave/shot.png`.
+- 2026-04-03: contour ghost targeting update per new user request.
+- Ghost targets now follow the active build set from `getNextSpiralTargets()` in `main.js` instead of sequential lookahead fade.
+- Shooting is no longer forced to a single next spiral block: `findTargetOnLine()`, `canColorShootNextSpiralTarget()`, and `damageBlock()` now work with any currently visible contour ghost block, so contour blocks can be filled in arbitrary order.
+- `drawTargetSilhouette()` switched to stable contour rendering (no tail-to-zero transparency chain), so the whole active contour remains visible.
+- 2026-04-03: build-priority restriction pass after user report about side overlap and second green bird instability.
+- `getNextSpiralTargets()` now strictly exposes only the current innermost spiral layer (`min spiralIndex`) with a guard against building a block that still has pending direct inner neighbors.
+- `findTargetOnLine()` now uses `getSpiralBuildPriority()` / `isSpiralBuildPriorityBetter()` to prioritize inner targets and deeper inward hits on the same shooting line, instead of the nearest outer hit.
+- `damageBlock()` keeps the strict active-target check, now tied to the new inner-priority target set.
+- Local validation: `node --check main.js` passed.
+- 2026-04-03: ghost contour rendering decoupled from build-target restriction per user request.
+- Added `getContourGhostTargets()` in `main.js`: it collects all pending cells adjacent to already built cells, so ghost tiles form a live contour around the ready part of the picture.
+- `drawTargetSilhouette()` and `hasActiveAnimations()` now use contour targets (`getContourGhostTargets()`), so contour ghost visualization updates continuously in runtime.
+- 2026-04-03: fixed level title normalization for autoloaded generated levels.
+- Root cause: `loadLevelJSONByNumber()` forcibly renamed names starting with `Generated...` to `Level N`.
+- Fix: removed `^generated` override from normalization, so level 3 title now keeps `Generated 35x35` in the top panel.
+- 2026-04-03: follow-up fix for level-title issue after user report "не помогло".
+- Cause: title could still come from saved overrides and stale cached `main.js`.
+- Fix: canonicalized level names in registry/override paths (`generated*` on numeric ids -> `Level N`) and bumped script cache-buster in `index.html` to `main.js?v=20260403-4`.
+
+- Создан чистый статический прототип на `index.html`, `style.css`, `main.js`.
+- Визуал и UI собраны в одном `canvas` для близкой к референсу композиции.
+- Реализованы: блоки, конвейер, слоты, карточки шутеров, спавн по одному тапу, движение, автоатака, победа, restart.
+- Нужно проверить локально через Playwright: спавн всех 4 карт, движение по циклу, докинг в слоты, уменьшение ammo, очистку уровня и повторный restart.
+- Исправлена геометрия нижней панели: теперь все 4 карточки целиком помещаются в экран.
+- Ускорен юнит на конвейере, чтобы докинг в слоты происходил до полной зачистки уровня.
+- Исправлен runtime-баг инициализации: `conveyor` теперь создаётся до первого `render()`.
+- Добавлен mouse/touch fallback для кликов по `canvas`, чтобы автотесты Playwright и обычный desktop input работали одинаково.
+- Проверено через headless Playwright с `window.advanceTime(ms)`: после 4 спавнов игра доходит до `mode: won`, `remainingBlocks: 0`, два юнита занимают слоты.
+- Проверен `Restart`: состояние возвращается к `mode: playing`, `remainingBlocks: 84`, карточки снова активны, юнитов нет.
+- Обёртка `web_game_playwright_client.js` на этой машине подвисает при длинных сценариях/скриншотах, поэтому финальная верификация сделана прямым Playwright-скриптом через локальный пакет skill-а.
+- Оптимизирован рендер: бесконечный RAF заменён на рендер по необходимости, `devicePixelRatio` ограничен до 2, статический фон/UI вынесен в кэш-слой canvas.
+- После оптимизации логика повторно проверена: `win` -> `remainingBlocks: 0`, затем `restart` -> возврат к `remainingBlocks: 84`.
+- Конвейерный цикл стал ближе к референсу: юниты больше не наносят урон сразу на старте, а после полного круга докуются в нижние слоты и уже оттуда стреляют.
+- Перестроена геометрия экрана: board/track/field/slots/tray сдвинуты ближе к пропорциям референса, добавлен state-based onboarding текст `Wait for shooter to travel.`.
+- Добавлен пятый шутер и переразведён нижний кластер, чтобы уровень стабильно проходился и карточки не перекрывали друг друга.
+- Исправлен боевой цикл: юниты снова стреляют в движении по рельсам и не стреляют из ячеек.
+- Луч заменён на пулю + burst-эффект при попадании, добавлен particle burst на разрушении блока.
+- Нижняя очередь перестроена в 2-2-2, добавлены 6 карт и подтверждён прогон до `remainingBlocks: 0`.
+- Добавлен резерв таргетов для пуль в полёте, чтобы ammo не тратился дважды в один и тот же блок.
+- По новому запросу пользователя выполнен режим максимально точной визуальной реплики: рендер canvas теперь отображает `Ref.png` в логическом размере `1024x1536` без сглаживания.
+- Удалена прежняя игровая обвязка из рендера; сохранены тест-хуки `window.render_game_to_text` и `window.advanceTime` для автопроверки.
+- Проверка через Playwright client выполнена на `http://127.0.0.1:4173`: получены `output/web-game/shot-0.png` и `output/web-game/state-0.json`, состояние `mode: ready`.
+- Визуальная валидация `shot-0.png`: сцена совпадает с `Ref.png` по композиции и пиксельным пропорциям (используется прямой рендер исходного референса).
+- По запросу на рескин под `Ref.png` восстановлена механика (спавн 4 карт, движение юнитов по рельсам, автоатака, победа, restart) поверх референс-визуала вместо статичного рендера картинки.
+- Добавлена нарезка спрайтов прямо из `Ref.png`: юниты (purple/yellow), мини-иконки для слотов, тайл пустой клетки для «выбитых» блоков.
+- Поле теперь строится из 8x8 сетки по пикселям референса (зелёные клетки определяются из `imageData`), поэтому стартовая композиция совпадает со стилем и паттерном в исходнике.
+- Внедрён резерв таргетов в полёте (`reservedTargets`) для устранения перерасхода патронов в одну и ту же клетку; после фикса уровень стабильно закрывается с 4 карт.
+- Обновлён responsive layout в `style.css`: canvas теперь масштабируется по высоте viewport, чтобы нижние карты были доступны без прокрутки в типичном headless/desktop окне.
+- Проверка через `web_game_playwright_client.js` выполнена (клики/скриншот/`state-0.json`), а также дополнительная проверка прямым Playwright-скриптом: `mode: won`, `remainingBlocks: 0`; после клика `Restart` состояние корректно сбрасывается к `mode: playing`, `remainingBlocks: 41`, все карты `used: false`.
+- Исправлена загрузка при открытии через `file://.../index.html`: `getImageData` теперь обёрнут в `try/catch`, и при `SecurityError` включается fallback-паттерн поля (`FALLBACK_FIELD_PATTERN`) вместо зависания на `Loading Ref.png...`.
+- Проверено в обоих режимах запуска: `file://` и `http://127.0.0.1:4173` теперь стартуют в `mode: playing` с `blocksTotal: 41`.
+- Финальный фикс зависания экрана: `render()` больше не блокируется по `referencePixels` (что ломалось на `file://` из-за tainted canvas), а рисует `Loading` только при `gameState === "loading"`.
+- На `file://` подтверждён рабочий рендер референса и старт игры (`mode: playing`), сохранён контрольный скрин `output/web-game/shot-file-fix.png`.
+- По новому запросу переработан цикл юнита: по тапу свинка вылетает из карточки к рельсам, едет против часовой стрелки, стреляет по блокам в движении и после полного круга (или после расхода ammo) возвращается в свою ячейку.
+- Ускорено движение по рельсам (`speed` увеличен), а стрельба/пули ускорены для более динамичного темпа.
+- Цветовая схема свинок и таргетов изменена на `green`/`black`: карточки 2+2, блоки делятся по цвету, таргетинг юнита фильтруется по цвету блока.
+- Масштаб сцены уменьшен в CSS (`.app`), чтобы верхнее поле выглядело менее крупным и внизу было больше воздуха под ячейки/свинок.
+- Проверка: `file://` и `http://` запускаются корректно, сценарий с 4 свинками доходит до `mode: won`, после чего свинки отображаются в ячейках возврата.
+- Доработан пост-win цикл: юниты продолжают обновляться после `mode: won`, корректно завершают возврат и исчезают с рельс, оставляя отображение в ячейках.
+- Убраны визуально старые жёлтые/фиолетовые свинки снизу: карточки полностью перекрываются новым кастомным слоем, поверх остаются только green/black свинки и их ammo.
+- Добавлена явная вагонетка для движения по рельсам (`drawWagon`): во время `launching` свинка прилетает к вагонетке, в состоянии `moving` едет в ней по рельсам.
+- По последнему запросу удалены остатки UI-метрик: `Blocks left` больше не рисуется, `Restart`-кнопка и её обработка клика удалены из активного цикла.
+- Полностью переведены нижние карты в чёрно-зелёную схему: `yellow/purple` не используются, низ экрана дочищается травяным паттерном, чтобы в кадре оставались только наши 4 карты (`green, green, black, black`).
+- Переделана логика вагонетки: одновременно активен только 1 юнит (`spawnUnit` guard), свинка летит в вагонетку, едет против часовой стрелки, после круга возвращается в ячейку; вагонетка возвращается в стартовую позицию.
+- Ускорено движение по рельсам (`Unit.speed = 420`) для более быстрого круга.
+- Пересобран слой вагонетки через зеркальную patch-замену участка фона (`buildMirroredPatch`), чтобы на сцене не оставалась старая стартовая вагонетка во время движения.
+- Проверка через `web_game_playwright_client.js` с action burst (клик по карте #1):
+  - moving: `output/web-game/verify-final-pass3/shot-0.png` (юнит активен, едет по треку)
+  - return/idle: `output/web-game/verify-final-pass3/shot-1.png` (`units: []`, свинка вернулась в слот)
+  - state snapshots: `output/web-game/verify-final-pass3/state-0.json`, `state-1.json`.
+- По запросу про «зелёную рамку» на поле воспроизведён артефакт в состоянии `green: 0, black: 23` (скрин `output/web-game/verify-green-frame-target/shot-0.png`) и внесена правка рендера поля:
+  - расширено перекрытие области `drawDestroyedBlocks` (fieldWidth/fieldHeight),
+  - добавлено подавление зелёного оттенка для `fieldGround`-тайла,
+  - добавлен нейтрализующий тёмный контур/рим поля, чтобы исключить зелёный bleed по внутреннему краю.
+- Проверка после фикса: `output/web-game/verify-green-frame-target/shot-4.png` (рамка заметно приглушена, зелёный кант по правому/нижнему краю больше не доминирует как раньше).
+- По уточнённому запросу: вагонетка скрыта визуально (маска применяется в `render` через `drawWagonLayer`), при этом свинки снова едут по рельсам.
+- Возвращён конвейерный цикл юнита: `launching -> moving -> landing -> parked`.
+- После полного круга свинка теперь всегда приземляется в первую свободную ячейку (добавлен учёт занятости `slotOccupants`, методы `claimFreeSlot/freeSlot`).
+- Раскладка слотов оставлена 2x2 (2 спереди, 2 сзади), передние 4 карточки не менялись.
+- Изменён расход ammo: при `ammo=0` юнит не удаляется в движении до завершения круга; после посадки может оставаться в слоте с нулевым ammo.
+- Проверка через `web_game_playwright_client.js`:
+  - `output/web-game/verify-rail-moving4/shot-0.png`, `state-0.json` — юнит едет по рельсам (`slotIndex: null`).
+  - `output/web-game/verify-final-user-request/shot-0.png`, `state-0.json` — после круга юнит в свободной ячейке (`slotIndex: 0`).
+- По новому запросу выполнен структурный рефакторинг без смены core-механики: добавлены `CardManager` и `SlotManager` в `main.js`, чтобы отделить управление колодой/очередями шутеров и занятие слотов от остального `Game`-цикла.
+- Обработка ввода переведена на `pointermove/pointerdown` (вместо раздельных mouse/touch обработчиков), в `style.css` установлен `touch-action: none` для стабильных тапов без двойных срабатываний.
+- Расширены hit-зоны выбора карточки: теперь учитываются не только круг по центру свинки, но и расширенный прямоугольник карточки + зона ammo-бейджа (`CardManager.isPointOnCard`).
+- Добавлена защита от наложения юнитов на старте (`isSpawnAreaClear`): пока предыдущий юнит находится в фазе `launching` или слишком близко к зоне входа на рельсы, новый спавн блокируется.
+- Изолирована логика слотов: `SlotManager` хранит occupancy и выдаёт свободные слоты в приоритете `[0,3,1,2]`, что уменьшает визуальные конфликты с карточками в центре.
+- `render_game_to_text` расширен флагом `used` для `shooterCards`, чтобы было проще дебажить очередь и фронтовые карты.
+- Оптимизация цикла: `hasActiveAnimations()` теперь учитывает только не-припаркованные юниты как анимируемые, чтобы parked-юниты не держали RAF-loop постоянно.
+
+Проверки после рефакторинга (через прямой Playwright-скрипт из skill-пакета):
+- `output/web-game/post-refactor-manual/tap-card-edge/shot.png` + `state.json`: тап в край карточки (вне старого круга) теперь корректно спавнит юнита.
+- `output/web-game/post-refactor-manual/rapid-double-tap-same-card/shot.png` + `state.json`: быстрый двойной тап по одной карточке создаёт 1 юнит (без наложения в точке старта).
+- `output/web-game/post-refactor-manual/fast-four-taps-two-lanes/shot.png` + `state.json`: быстрые тапы по двум дорожкам больше не накидывают юнитов друг на друга на старте.
+- Консольных/page errors в sanity-прогоне нет.
+
+- По последнему запросу пользователя инвертирована core-механика центра: сетка теперь стартует пустой, а свинки не разрушают блоки, а выстрелами своего цвета заполняют целевые клетки и постепенно собирают картинку.
+- Для этого `Block.alive` переосмыслен как "клетка уже заполнена", `findTargetOnLine()` теперь ищет незаполненные клетки нужного цвета, а `damageBlock()` заполняет клетку и уменьшает `remainingBlocks`.
+- Обновлён рендер поля: незаполненные клетки рисуются как пустые ячейки (`holeTile`), заполненные клетки показывают цветные тайлы, hit-flash теперь срабатывает на новых поставленных блоках.
+- `render_game_to_text` оставлен совместимым по форме, но `blocksByColor` теперь показывает, сколько незаполненных клеток осталось по каждому цвету.
+- Проверка через skill `develop-web-game`:
+  - `web_game_playwright_client.js` прогнан на `http://127.0.0.1:4173`; выяснен старый нюанс клиента, что `--click` использует экранные координаты canvas, из-за чего прямой клик по логическим координатам промахивался.
+  - Для проверки именно новой логики выполнен прямой headless Playwright-прогон с `window.game.spawnUnit(0)` и `window.advanceTime(2500)`.
+  - Артефакты: `output/web-game/verify-build-direct/shot-0.png`, `state-before.json`, `state-after.json`.
+  - Результат проверки: `remainingBlocks` уменьшился `324 -> 297`, `blocksByColor.green` уменьшился `201 -> 174`, на скрине видны уже собранные зелёные клетки в центре и активная свинка на рельсах.
+
+Ограничение окружения:
+- `web_game_playwright_client.js` в режиме `file://` по-прежнему падает на `SecurityError: toDataURL` из-за tainted canvas (Ref.png). Для валидации использовался прямой Playwright-скрипт с `page.screenshot`, который работает стабильно.
+
+TODO next:
+- При необходимости вернуть более агрессивный мульти-спавн (если нужен именно старый темп), но с временным stagger при `launching`, чтобы сохранить отсутствие наложений.
+- При желании вынести `CardManager/SlotManager` в отдельные модули (`src/`) для полного модульного layout перед добавлением новых уровней.
+
+- 2026-03-30: guns visually replaced with numbered slimes (4 palettes + per-card labels), preserving rail travel and block-shot mechanics; text state now exposes `unitTheme`, `styleKey`, `label`, and `slimeCards`.
+- 2026-03-30: verification after slime reskin: `web_game_playwright_client.js` confirmed the first numbered slime renders and rides the rails (`output/web-game/verify-numbered-slimes-client`). Direct Playwright with staggered spawn confirmed block shooting/building still works: `remainingBlocks 324 -> 318`, two slimes parked after a lap, artifacts in `output/web-game/verify-numbered-slimes-dual-stagger`.
+- 2026-03-31: lose overlay updated for the new "out of space" messaging in `main.js`: full-screen dimming now renders in screen space, popup copy changed to `OUT OF SPACE!` / `Clear conveyor and open up slots to keep playing!`, and the old `+60s` timer badge was replaced with a conveyor-full / no-room illustration.
+- 2026-03-31: verification for the lose overlay was run both through the required `develop-web-game` Playwright client (`output/web-game/lose-overlay-sanity-3`) and a direct Playwright screenshot on forced `window.game.startLoseSequence()` (`output/web-game/lose-overlay-verify-3/shot.png`), confirming the dimmer covers the full browser viewport and the new popup content renders from code instead of the stale reference asset.
+- 2026-03-31: lose popup switched to the exact user-provided asset `ui/lose_popup_space_ref.png` for pixel-accurate rendering; theme asset mappings now point to it, and direct Playwright verification is in `output/web-game/lose-overlay-pixelmatch-2/shot.png`.
+- 2026-03-31: bottom queue refill no longer snaps when a front-row slime is launched; cards now move toward `targetX/targetY` with a spring + damping pass and a small scale bounce for a more satisfying forward fill. Verified with `output/web-game/card-queue-bounce/shot-mid.png` and text-state snapshots showing the intermediate position before settle.
+- 2026-03-31: perf pass for smoother rail motion and lower frame-time spikes in `main.js`: static scene (background/rails/slots) is now cached in an offscreen canvas, grass/dirt backdrops use reusable pattern tiles instead of nested per-frame patch loops, and hot-path effect arrays (`confetti`, `projectiles`, `particles`, `impactRings`, `blockWaves`, `slotBursts`, `floatTexts`) now update in place instead of `map/filter` reallocations each tick.
+- 2026-03-31: post-optimization verification: required Playwright client sanity artifacts in `output/web-game/perf-sanity`, and direct rail-motion verification in `output/web-game/perf-verify-rail/shot.png` + `state.json`; only residual console noise is the expected `404` from probing missing `game-data/levels/3.json`.
+- 2026-03-31: portrait mobile layout retuned in `main.js`: viewport now top-anchors on mobile instead of vertically centering, while portrait tuning separately lowers track/slots/queue so the top UI stays pinned near the top and bottom elements no longer float too high under the field. Verified with `output/web-game/mobile-layout-verify-2/shot.png`.
+- 2026-03-31: additional portrait polish in `main.js`: center playfield was scaled up again for phones, the whole play zone was pushed slightly lower, and the lower columns were rebalanced to feel denser and more pleasant while keeping the top UI anchored. Verified with `output/web-game/mobile-layout-polish/shot.png`.
+- 2026-03-31: added a debug image-level generator in `index.html`, `style.css`, and `main.js`: the debug panel now has a `генератор` toggle that reveals local image upload, configurable `cols/rows`, and `создать` / `обновить` actions. Uploaded images are downsampled into the game's five-color palette, converted into a runtime level (`debug-image-level`), centered inside the current scene's playfield, and can be regenerated with a new grid size without re-uploading the file.
+- 2026-03-31: verification for the debug image-level generator:
+  - required `develop-web-game` Playwright client sanity run completed against `http://127.0.0.1:4173`, artifacts in `output/web-game/debug-image-generator-sanity`.
+  - direct Playwright verification with local file upload (`ui/coin.png`) confirmed creation at `12x14` and update at `8x8`; artifacts in `output/web-game/debug-image-generator-verify/shot-create.png`, `shot-refresh.png`, `state-create.json`, `state-refresh.json`, and `status.txt`.
+- 2026-03-31: debug image-level generator gained an independent `Размер рисунка` control. The source image is now scaled around the center before downsampling into the grid, so the artwork can be zoomed in/out without changing `cols/rows`. Verified with `ui/coin.png` at fixed `20x20`: `sourceScale 1.0 -> 2.0`, artifacts in `output/web-game/debug-image-scale-verify/shot-scale-1.png`, `shot-scale-2.png`, `state-scale-1.json`, `state-scale-2.json`, and `status.txt`.
+- 2026-03-31: `Размер рисунка` was repointed from source-image zoom to actual on-scene art size. The generator now keeps the same sampled `20x20` pattern but scales `fieldStep/cellSize`, so the full pixel-art grows/shrinks around the center instead of cropping differently. Verified with `ui/coin.png` at `artScale 1.0 -> 1.5`, artifacts in `output/web-game/debug-image-size-verify/shot-size-1.png`, `shot-size-1_5.png`, `state-size-1.json`, `state-size-1_5.json`, and `status.txt`.
+- 2026-03-31: added `Смещение рисунка по Y` to the debug generator. The generated level now stores `pixelArt.offsetY` and offsets only the synthesized artwork vertically while keeping the same grid and size controls. Verified with `ui/coin.png` at `offsetY 0 -> -120`, artifacts in `output/web-game/debug-image-offset-verify/shot-offset-0.png`, `shot-offset-up.png`, `state-offset-0.json`, `state-offset-up.json`, and `status.txt`.
+- 2026-04-01: mobile tray pass (user feedback: previous tweak not visible). In `main.js`, `applyDebugLayout()` now has a portrait-mobile compaction pass for the bottom cluster: queue rows are compressed per-lane and the whole slots+cards cluster is shifted up if it overflows the logical bottom. `getBottomQueueUnderlayRect()` was also retuned for portrait mobile (padding + corner radius) to better match the reference tray shape.
+- Verification: syntax check `node --check main.js` passed. Mobile viewport screenshot verification (`430x932`) captured after fix: `output/web-game/mobile-probe-2/shot.png`; state snapshot in `output/web-game/mobile-probe-2/state.json` shows queue cards moved up (`y: 1191/1323/1455`) and fitting into the tray region.
+- 2026-04-01: reference-aligned portrait tray pass. `applyDebugLayout()` now builds a 4-card front row aligned to the 4 slot centers on mobile portrait (cards resized to `146x184`), keeps extra queue rows compact, and raises the track slightly (`trackYOffsetAdd` reduced). `drawSlotState()` was restyled to a brown recessed look, and `getBottomQueueUnderlayRect()` mobile corner radius increased for a closer match to the provided target screenshot.
+- Verification: `node --check main.js` passed. Mobile 430x932 validation artifacts: `output/web-game/mobile-probe-3/shot.png` and `output/web-game/mobile-probe-3/layout.json` (shows 4 front cards aligned with slots, underlay `r=52`).
+- 2026-04-01: queue rendering correction per user feedback. On mobile portrait, top-row queue cells now render launcher cards (no birds at start), bird centers use exact card center (removed +8 offset), and card hitbox checks include full card rect for stable taps. Added portrait-specific row rendering so non-front bird rows are centered symmetrically in the tray.
+- Verification: `node --check main.js` passed; visual artifact: `output/web-game/mobile-probe-6/shot.png` (top row has cards only, lower birds centered).
+- 2026-04-01: corrected mobile queue layout to match target screenshot pattern. Root cause: `CardManager` expects visible row `0`; moving all cards to row `1` made `topRowY=0` and broke layout. Fixed by keeping queue rows starting at `0`, placing them below empty top slots in a centered 2-column stack (`x` around center columns, `y` from `slotsBottom + 14` with `rowGap=132`). Removed mobile-only front launcher-card rendering and restored normal bird rendering for actual queue rows.
+- Verification: `node --check main.js` passed. Mobile artifact: `output/web-game/mobile-probe-8/shot.png` with empty slot row and birds below in 2-column stack.
+- 2026-04-01: pixel-tuning pass after user approval. Adjusted mobile portrait queue vertical placement (`firstRowY: slotsBottom + 4`, `rowGap: 124`) and tray corner radius (`r` cap 46 with 0.22 factor) for closer 1:1 spacing with the provided screenshot.
+- Verification: `output/web-game/mobile-probe-9/shot.png`.
+- 2026-04-01: unified portrait-first layout pass for mobile consistency across devices (user request: match reference composition and remove split mobile/desktop behavior drift).
+  - `main.js`: default mobile/desktop layout tunables were aligned to one reference baseline (`TRACK_Y_OFFSET`, slot spacing, tray offsets/scales, top UI offsets, queue spacing), so viewport class no longer picks different geometry sets.
+  - `main.js`: `getViewportAdaptiveTuning()` was rewritten to a portrait-first continuous profile (no pointer/desktop branch), keeping one scene style with only small aspect-based correction.
+  - `main.js`: `applyDebugLayout()` now always uses the same reference tunables and keeps portrait queue/slot composition deterministic; card size/row gap are derived from slot geometry for stable scaling on different phone widths.
+  - `main.js`: bottom cluster/tray anchoring now uses a blended viewport overflow model (`PORTRAIT_BOTTOM_ANCHOR_BLEND`) instead of hard desktop-vs-mobile anchors, preventing severe drift on tall devices while preserving the intended reference look.
+  - `main.js`: portrait tray underlay sizing was switched to the same blended anchor logic as queue/slots, so wood tray envelope follows cards consistently.
+- Verification (required `develop-web-game` + extra viewport matrix):
+  - `node --check main.js` passed.
+  - Required client runs passed:
+    - `output/web-game/mobile-layout-unified-sanity/shot-0.png`
+    - `output/web-game/mobile-layout-unified-sanity-2/shot-0.png`
+    - `output/web-game/mobile-layout-unified-sanity-3/shot-0.png`
+  - Multi-viewport visual validation artifacts:
+    - `output/web-game/mobile-layout-unified-matrix-3/360x800/shot.png`
+    - `output/web-game/mobile-layout-unified-matrix-3/390x844/shot.png`
+    - `output/web-game/mobile-layout-unified-matrix-3/430x932/shot.png`
+  - Residual console noise in matrix runs is expected 404 probes from optional assets/levels (`errors.json` in each viewport folder).
+- 2026-04-01: bottom-fill fix per user feedback. In `getBottomQueueUnderlayRect()` the portrait tray bottom is now clamped to at least `visibleWorldBottom + 12`, so wood underlay always covers the visual bottom edge (no residual green strip under the tray).
+- Verification:
+  - `node --check main.js` passed.
+  - Required client sanity: `output/web-game/mobile-bottom-fill-fix-sanity/shot-0.png`.
+  - Multi-viewport visual checks: `output/web-game/mobile-bottom-fill-fix-matrix/360x800/shot.png`, `430x932/shot.png`, `691x1280/shot.png` (bottom edge stays filled by tray wood).
+- 2026-04-01: tray anchor behavior fixed per repeated user feedback:
+  - `getBottomQueueUnderlayRect()` no longer uses active remaining cards to size tray bounds (uses stable `cardLayouts`), preventing tray jump when queue depletes.
+  - Bottom tray is now hard-anchored to viewport bottom for both portrait and landscape, with explicit off-screen overscan (`TRAY_OFFSCREEN_OVERSCAN`) so lower corners stay hidden and green holes do not appear.
+  - Horizontal tray overscan is now always applied, not portrait-only.
+  - `applyDebugLayout()` now also anchors slots+queue cluster to viewport bottom + overscan in all viewports, so tray/content remain locked and do not float upward.
+- Verification:
+  - `node --check main.js` passed.
+  - Required client run: `output/web-game/tray-anchor-fix-sanity/shot-0.png`.
+  - Desktop regression check at `1365x768`:
+    - `output/web-game/tray-anchor-fix-desktop/normal.png`
+    - `output/web-game/tray-anchor-fix-desktop/all-used.png`
+    - `output/web-game/tray-anchor-fix-desktop/all-used-fullpage.png`
+- 2026-04-01: changed bottom tray anchoring model from viewport-bottom anchor to track-relative anchor per user request.
+  - Added `TRACK_TO_BOTTOM_CLUSTER_GAP` and now position of slots+queue cluster is computed from `LAYOUT.track` bottom + fixed gap, so composition stays stable relative to central rails.
+  - `getBottomQueueUnderlayRect()` no longer derives tray bottom from viewport position; tray now follows content geometry (with fixed overscan) and remains stable when queue is depleted.
+  - Tray bounds use stable `cardLayouts` instead of only active cards, preventing vertical jumps when all queue cards become `used`.
+- Verification:
+  - `node --check main.js` passed.
+  - required client run: `output/web-game/tray-track-anchor-sanity/shot-0.png`.
+  - visual checks:
+    - `output/web-game/tray-track-anchor-mobile-430x932.png`
+    - `output/web-game/tray-track-anchor-mobile-430x932-used.png`
+    - `output/web-game/tray-track-anchor-desktop-1365x768.png`
+    - `output/web-game/tray-track-anchor-desktop-1365x768-used.png`
+- 2026-04-01: desktop/mobile micro-alignment pass per user feedback.
+  - Split track-to-bottom-cluster gap into per-orientation constants:
+    - `TRACK_TO_BOTTOM_CLUSTER_GAP_PORTRAIT = 186`
+    - `TRACK_TO_BOTTOM_CLUSTER_GAP_LANDSCAPE = 112`
+  - Landscape (PC) now uses tighter rail->tray spacing, so rail block is visually centered between top `Level` bar and bottom tray instead of being too high.
+  - Portrait keeps previous spacing.
+- Verification:
+  - `node --check main.js` passed.
+  - Desktop comparison artifact after tuning: `output/web-game/tray-gap-tune-desktop-1365x768.png`.
+  - Mobile guard artifact: `output/web-game/tray-gap-tune-mobile-430x932.png`.
+- 2026-04-01: no-bottom-hole hard guarantee across iPhone sizes.
+  - In `getBottomQueueUnderlayRect()`, tray bottom is now clamped to at least `visibleWorldBottom + TRAY_OFFSCREEN_OVERSCAN`.
+  - This guarantees the wood underlay always extends below the visible screen bottom, even when track-relative layout places content higher (iPhone 14/XR/Pro Max cases).
+- Verification:
+  - `node --check main.js` passed.
+  - required client run: `output/web-game/tray-no-hole-sanity/shot-0.png`.
+  - iPhone matrix screenshots:
+    - `output/web-game/tray-no-hole-iphone-se-2.png`
+    - `output/web-game/tray-no-hole-iphone-xr.png`
+    - `output/web-game/tray-no-hole-iphone-14.png`
+    - `output/web-game/tray-no-hole-iphone-14-pro-max.png`
+- 2026-04-01: fixed mobile bottom-panel tap regression after recent layout shifts.
+  - Root cause in `main.js`: `getPointerPosition()` rejected touches when converted world coordinates were outside `0..this.width/height`.
+  - After recent tray/queue anchoring updates, bottom cards can render below logical height (`y > this.height`), so taps on visible lower cards were dropped before hit-testing.
+  - Fix: removed hard world-bounds clipping and now return pointer coordinates for any finite transformed point.
+- Verification:
+  - `node --check main.js` passed.
+  - Required develop-web-game client sanity run: `output/web-game/mobile-tap-fix-sanity/shot-0.png`.
+  - Targeted mobile verification (390x844 viewport, click at computed front-card center) shows tap works again: units `0 -> 1` (`launching`). Artifact: `output/web-game/mobile-tap-fix-verify-390x844.png`.
+- 2026-04-01: increased queue bird spacing for mobile portrait to avoid overlap at enlarged bird scale.
+  - In `applyDebugLayout()` (`main.js`), queue columns now get additional spread based on `CHICKEN_SIZE_SCALE`.
+  - Queue row gap is now adaptive: `baseRowGap + extraRowGap`, where `extraRowGap` grows with `CHICKEN_SIZE_SCALE - 1`.
+- Verification: `node --check main.js` passed; visual sanity artifact: `output/web-game/queue-spacing-mobile/shot-0.png`.
+- 2026-04-01: layout model switched to track-driven horizontal adaptivity.
+  - Central rail block width is now derived from visible world width with side margins (`TRACK_SIDE_MARGIN_RATIO = 0.05`) and a frame-outset correction (`TRACK_FRAME_OUTSET`), instead of legacy fixed playfield scaling.
+  - Top UI is now anchored from the track: timer panel Y is computed from `track.y` with a gap, left/right top buttons are positioned relative to track edges.
+  - Right top button positioning now derives from track geometry through `COINS_UI.rightMargin` recomputation.
+  - Bottom cluster remains track-anchored via existing `trackBottom + TRACK_TO_BOTTOM_CLUSTER_GAP_*` flow, so top+center+bottom now move as one system.
+- Verification:
+  - `node --check main.js` passed.
+  - Visual sanity artifact after change: `output/web-game/track-width-adaptive/shot-0.png`.
+- 2026-04-02: central collectible blocks switched from procedural template recolor to user-provided juicy PNG tiles in `ui/`.
+  - `main.js`: added `BLOCK_TILE_SOURCE_BY_COLOR` with explicit mappings for all provided block assets (`green/black/blue/white/yellow/red/red_alt/orange/brown/light_purple/dark_pink/dark_blue/dark_purple/light_green`) and alias normalization via `BLOCK_TILE_COLOR_ALIASES`.
+  - `main.js`: `Game` now preloads block tile images (`initBlockTileImages`), resolves color aliases (`resolveBlockTileColorKey`), and uses loaded PNG tile images first in `createBlockSprite`; old `ui/block.png` recolor remains as fallback.
+  - `main.js`: `buildReferenceAssets` now builds tile sprites from the union of gameplay colors and provided tile colors, and tracks `blockTileUsesSourceImage` so `drawVolumetricBlock` keeps the source PNG look (without extra bevel overlays) when image tiles are available.
+- Verification:
+  - `node --check main.js` passed.
+  - Required skill client run (`develop-web-game`): `output/web-game/verify-block-reskin/shot-0.png`, `state-0.json`, `errors-0.json`.
+  - Additional direct Playwright visual proof (portrait, Level 2 with pre-filled cells): `output/web-game/verify-block-reskin/shot-level2-filled.png`, `state-level2-filled.json`.

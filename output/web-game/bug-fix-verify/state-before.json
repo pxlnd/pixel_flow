@@ -1,0 +1,52 @@
+{
+  "mode": "playing",
+  "scene": "procedural_reskin",
+  "source": "procedural",
+  "levelId": "1",
+  "themeId": "classic",
+  "generatedLevel": null,
+  "unitTheme": "numbered_slimes",
+  "coordinateSystem": {
+    "origin": "top-left",
+    "xDirection": "right",
+    "yDirection": "down",
+    "units": "canvas pixels"
+  },
+  "remainingBlocks": 2,
+  "blocksTotal": 2,
+  "queueCards": 2,
+  "blocksByColor": {
+    "red": 2
+  },
+  "units": [],
+  "slimeCards": [
+    {
+      "index": 0,
+      "lane": 0,
+      "row": 0,
+      "color": "red",
+      "styleKey": "rose",
+      "label": 1,
+      "ammo": 5,
+      "used": false,
+      "x": 322,
+      "y": 1409,
+      "w": 160,
+      "h": 200
+    },
+    {
+      "index": 1,
+      "lane": 1,
+      "row": 0,
+      "color": "red",
+      "styleKey": "coral",
+      "label": 2,
+      "ammo": 5,
+      "used": false,
+      "x": 542,
+      "y": 1409,
+      "w": 160,
+      "h": 200
+    }
+  ]
+}
