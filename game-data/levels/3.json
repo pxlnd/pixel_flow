@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-04-03T12:48:26.438Z",
+  "exportedAt": "2026-04-06T14:33:44.224Z",
   "levelNumber": 3,
   "level": {
     "id": "3",
@@ -40,7 +40,7 @@
       "id": "level-3-art",
       "name": "Frame 30.png",
       "sourceFileName": "Frame 30.png",
-      "artScale": 1,
+      "artScale": 0.95,
       "offsetY": -34,
       "grid": {
         "cols": 30,
@@ -1043,13 +1043,13 @@
     },
     "referenceGrid": {
       "x": 197,
-      "y": 303,
+      "y": 337,
       "step": 21,
       "cellSize": 19
     },
     "layout": {
       "fieldX": 197,
-      "fieldY": 303,
+      "fieldY": 337,
       "fieldStep": 21,
       "cellSize": 19,
       "fieldCols": 30,
