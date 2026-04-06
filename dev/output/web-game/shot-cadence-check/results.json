@@ -1,0 +1,366 @@
+{
+  "level1": {
+    "shots": 31,
+    "first12": [
+      {
+        "t": 1712.699999988079,
+        "color": "black",
+        "region": "bottom-left",
+        "row": 10,
+        "col": 10
+      },
+      {
+        "t": 1713.9000000059605,
+        "color": "black",
+        "region": "bottom",
+        "row": 11,
+        "col": 9
+      },
+      {
+        "t": 1714.699999988079,
+        "color": "black",
+        "region": "bottom",
+        "row": 11,
+        "col": 10
+      },
+      {
+        "t": 1715,
+        "color": "black",
+        "region": "bottom",
+        "row": 11,
+        "col": 11
+      },
+      {
+        "t": 1715.4000000059605,
+        "color": "black",
+        "region": "bottom",
+        "row": 10,
+        "col": 9
+      },
+      {
+        "t": 1715.5999999940395,
+        "color": "black",
+        "region": "bottom",
+        "row": 10,
+        "col": 11
+      },
+      {
+        "t": 1715.9000000059605,
+        "color": "black",
+        "region": "bottom",
+        "row": 9,
+        "col": 11
+      },
+      {
+        "t": 1716.300000011921,
+        "color": "black",
+        "region": "bottom",
+        "row": 9,
+        "col": 10
+      },
+      {
+        "t": 1716.4000000059605,
+        "color": "black",
+        "region": "bottom-right",
+        "row": 9,
+        "col": 9
+      },
+      {
+        "t": 1716.5999999940395,
+        "color": "black",
+        "region": "bottom-right",
+        "row": 12,
+        "col": 12
+      },
+      {
+        "t": 1717.199999988079,
+        "color": "black",
+        "region": "right",
+        "row": 11,
+        "col": 12
+      },
+      {
+        "t": 1717.5,
+        "color": "black",
+        "region": "right",
+        "row": 10,
+        "col": 12
+      }
+    ],
+    "state": {
+      "mode": "playing",
+      "scene": "procedural_reskin",
+      "source": "procedural",
+      "levelId": "1",
+      "themeId": "classic",
+      "generatedLevel": null,
+      "unitTheme": "numbered_slimes",
+      "coordinateSystem": {
+        "origin": "top-left",
+        "xDirection": "right",
+        "yDirection": "down",
+        "units": "canvas pixels"
+      },
+      "remainingBlocks": 410,
+      "blocksTotal": 441,
+      "queueCards": 7,
+      "blocksByColor": {
+        "green": 279,
+        "black": 131
+      },
+      "units": [
+        {
+          "id": 1,
+          "color": "black",
+          "styleKey": "coral",
+          "label": 2,
+          "ammo": 23,
+          "slotIndex": null,
+          "x": 117,
+          "y": 885.1
+        }
+      ],
+      "slimeCards": [
+        {
+          "index": 0,
+          "lane": 0,
+          "row": 0,
+          "color": "green",
+          "styleKey": "mint",
+          "label": 1,
+          "ammo": 70,
+          "used": false,
+          "x": 316,
+          "y": 1484,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 1,
+          "lane": 1,
+          "row": 0,
+          "color": "black",
+          "styleKey": "coral",
+          "label": 2,
+          "ammo": 54,
+          "used": true,
+          "x": 552,
+          "y": 1484,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 2,
+          "lane": 0,
+          "row": 1,
+          "color": "green",
+          "styleKey": "sky",
+          "label": 3,
+          "ammo": 70,
+          "used": false,
+          "x": 316,
+          "y": 1651,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 3,
+          "lane": 1,
+          "row": 0,
+          "color": "black",
+          "styleKey": "gold",
+          "label": 4,
+          "ammo": 54,
+          "used": false,
+          "x": 552,
+          "y": 1484,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 4,
+          "lane": 0,
+          "row": 2,
+          "color": "green",
+          "styleKey": "mint",
+          "label": 5,
+          "ammo": 70,
+          "used": false,
+          "x": 316,
+          "y": 1818,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 5,
+          "lane": 1,
+          "row": 1,
+          "color": "black",
+          "styleKey": "coral",
+          "label": 6,
+          "ammo": 54,
+          "used": false,
+          "x": 552,
+          "y": 1651,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 6,
+          "lane": 0,
+          "row": 3,
+          "color": "green",
+          "styleKey": "sky",
+          "label": 7,
+          "ammo": 69,
+          "used": false,
+          "x": 316,
+          "y": 1985,
+          "w": 158,
+          "h": 199
+        }
+      ]
+    }
+  },
+  "level2": {
+    "shots": 0,
+    "first12": [],
+    "state": {
+      "mode": "playing",
+      "scene": "procedural_reskin",
+      "source": "procedural",
+      "levelId": "2",
+      "themeId": "classic",
+      "generatedLevel": null,
+      "unitTheme": "numbered_slimes",
+      "coordinateSystem": {
+        "origin": "top-left",
+        "xDirection": "right",
+        "yDirection": "down",
+        "units": "canvas pixels"
+      },
+      "remainingBlocks": 625,
+      "blocksTotal": 625,
+      "queueCards": 7,
+      "blocksByColor": {
+        "black": 269,
+        "green": 151,
+        "red": 132,
+        "peach": 29,
+        "white": 44
+      },
+      "units": [
+        {
+          "id": 2,
+          "color": "black",
+          "styleKey": "coral",
+          "label": 1,
+          "ammo": 90,
+          "slotIndex": null,
+          "x": 124.2,
+          "y": 395.9
+        }
+      ],
+      "slimeCards": [
+        {
+          "index": 0,
+          "lane": 0,
+          "row": 0,
+          "color": "black",
+          "styleKey": "coral",
+          "label": 1,
+          "ammo": 90,
+          "used": true,
+          "x": 316,
+          "y": 1484,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 1,
+          "lane": 1,
+          "row": 0,
+          "color": "red",
+          "styleKey": "rose",
+          "label": 2,
+          "ammo": 132,
+          "used": false,
+          "x": 552,
+          "y": 1484,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 2,
+          "lane": 0,
+          "row": 0,
+          "color": "green",
+          "styleKey": "mint",
+          "label": 3,
+          "ammo": 151,
+          "used": false,
+          "x": 316,
+          "y": 1484,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 3,
+          "lane": 1,
+          "row": 1,
+          "color": "black",
+          "styleKey": "coral",
+          "label": 4,
+          "ammo": 89,
+          "used": false,
+          "x": 552,
+          "y": 1651,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 4,
+          "lane": 0,
+          "row": 1,
+          "color": "black",
+          "styleKey": "gold",
+          "label": 5,
+          "ammo": 90,
+          "used": false,
+          "x": 316,
+          "y": 1651,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 5,
+          "lane": 1,
+          "row": 2,
+          "color": "peach",
+          "styleKey": "mint",
+          "label": 6,
+          "ammo": 29,
+          "used": false,
+          "x": 552,
+          "y": 1818,
+          "w": 158,
+          "h": 199
+        },
+        {
+          "index": 6,
+          "lane": 0,
+          "row": 2,
+          "color": "white",
+          "styleKey": "pearl",
+          "label": 7,
+          "ammo": 44,
+          "used": false,
+          "x": 316,
+          "y": 1818,
+          "w": 158,
+          "h": 199
+        }
+      ]
+    }
+  }
+}
