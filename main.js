@@ -354,13 +354,22 @@ const TRACK_FRAME_OUTSET = 40;
 const TRACK_CENTERING_UP_OFFSET = 48;
 const FIELD_CENTERING_UP_RATIO = 0.02;
 let BOARD_FILL_COLOR = "#6aa93a";
+const BACKGROUND_ASSET_ROOT = "ui/background";
+const DEFAULT_BACKGROUND_ID = "default";
+const BACKGROUND_VARIANT_IDS = ["default", "blue", "orange", "purple", "pink", "water"];
+const BACKGROUND_ASSET_NAMES = {
+  background: "background.png",
+  panel: "panel.png",
+  cell: "cell.png",
+  railway: "railway.png",
+};
 const RAILWAY_SOURCE_SIZE = { w: 401, h: 407 };
 const RAILWAY_PATH_NORMALIZED = {
   x: 28.5 / RAILWAY_SOURCE_SIZE.w,
   y: 22 / RAILWAY_SOURCE_SIZE.h,
   w: 341.5 / RAILWAY_SOURCE_SIZE.w,
   h: 320 / RAILWAY_SOURCE_SIZE.h,
-  // Tuned to the visual center of the lane in ui/railway.png.
+  // Tuned to the visual center of the lane in ui/background/default/railway.png.
   r: 50 / RAILWAY_SOURCE_SIZE.w,
 };
 // Chicken sprite is authored facing +X (to the right), where the beak is drawn.
@@ -488,11 +497,28 @@ const DEBUG_DEFAULTS = {
   topLevelNavVisible: false,
   levelId: DEFAULT_LEVEL_ID,
   themeId: DEFAULT_THEME_ID,
+  backgroundId: DEFAULT_BACKGROUND_ID,
 };
 
 const LEVELS_PATH = "game-data/levels";
 const MAX_AUTOLOAD_LEVELS = 50;
 const MAX_AUTOLOAD_MISSES_IN_A_ROW = 5;
+
+function normalizeBackgroundId(backgroundId) {
+  const normalized = String(backgroundId || "")
+    .trim()
+    .toLowerCase();
+  return BACKGROUND_VARIANT_IDS.includes(normalized) ? normalized : DEFAULT_BACKGROUND_ID;
+}
+
+function getBackgroundAssetPath(backgroundId, assetKey) {
+  const resolvedId = normalizeBackgroundId(backgroundId);
+  const fileName = BACKGROUND_ASSET_NAMES[assetKey];
+  if (!fileName) {
+    return "";
+  }
+  return `${BACKGROUND_ASSET_ROOT}/${resolvedId}/${fileName}`;
+}
 
 async function loadLevelJSONByNumber(levelNumber) {
   try {
@@ -2237,16 +2263,16 @@ class Game {
     this.losePopupBirdsImage.src = "ui/loose.png";
     this.losePopupBirdsImage.decoding = "sync";
     this.woodImage = new Image();
-    this.woodImage.src = "ui/wood.png";
+    this.woodImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "panel");
     this.woodImage.decoding = "sync";
     this.slotCellImage = new Image();
-    this.slotCellImage.src = "ui/slot_cell.png";
+    this.slotCellImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "cell");
     this.slotCellImage.decoding = "sync";
     this.railwayImage = new Image();
-    this.railwayImage.src = "ui/railway.png";
+    this.railwayImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "railway");
     this.railwayImage.decoding = "sync";
     this.backdropImage = new Image();
-    this.backdropImage.src = "ui/bg.jpg";
+    this.backdropImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "background");
     this.backdropImage.decoding = "sync";
     this.tutorHandImage = new Image();
     this.tutorHandImage.src = "ui/tutor_hand.png";
@@ -2357,6 +2383,14 @@ class Game {
     this.debugImageLevelSection = document.getElementById("debugImageLevelSection");
     this.debugLevelSelect = document.getElementById("debugLevelSelect");
     this.debugThemeSelect = document.getElementById("debugThemeSelect");
+    this.debugBackgroundButtons = {
+      default: document.getElementById("debugBgDefault"),
+      blue: document.getElementById("debugBgBlue"),
+      orange: document.getElementById("debugBgOrange"),
+      purple: document.getElementById("debugBgPurple"),
+      pink: document.getElementById("debugBgPink"),
+      water: document.getElementById("debugBgWater"),
+    };
     this.debugCurrentLevelNameInput = document.getElementById("debugCurrentLevelName");
     this.debugSaveCurrentLevelNameButton = document.getElementById("debugSaveCurrentLevelName");
     this.debugLevelTopNav = document.querySelector(".debug-level-nav");
@@ -2456,6 +2490,7 @@ class Game {
     this.debugPaintTool = "paint";
     this.debugPaintColor = "blue";
     this.debugPaintHoverCell = null;
+    this.currentBackgroundId = DEFAULT_BACKGROUND_ID;
     this.topLevelNavVisible = true;
 
     this.loadDebugSettings();
@@ -3744,47 +3779,12 @@ class Game {
 
     const imgW = image.naturalWidth;
     const imgH = image.naturalHeight;
-    const rand = this.createSeededRandom((width * 73856093) ^ (height * 19349663) ^ (imgW * 83492791));
-
-    const phaseX = Math.floor(rand() * imgW);
-    const phaseY = Math.floor(rand() * imgH);
-    for (let y = -phaseY; y < height; y += imgH) {
-      for (let x = -phaseX; x < width; x += imgW) {
-        outCtx.drawImage(image, x, y, imgW, imgH);
-      }
-    }
-
-    const patchCount = Math.max(40, Math.round((width * height) / 28000));
-    for (let i = 0; i < patchCount; i += 1) {
-      const patch = Math.max(56, Math.round(56 + rand() * 104));
-      const srcX = Math.floor(rand() * Math.max(1, imgW - patch));
-      const srcY = Math.floor(rand() * Math.max(1, imgH - patch));
-      const dstX = Math.floor(rand() * Math.max(1, width - patch));
-      const dstY = Math.floor(rand() * Math.max(1, height - patch));
-      const rotate = rand() < 0.08;
-      const flipX = rand() < 0.2;
-      const flipY = rand() < 0.12;
-
-      outCtx.save();
-      outCtx.globalAlpha = 0.32 + rand() * 0.22;
-      outCtx.translate(dstX + patch * 0.5, dstY + patch * 0.5);
-      outCtx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-      if (rotate) {
-        outCtx.rotate((Math.PI / 2) * (1 + Math.floor(rand() * 3)));
-      }
-      outCtx.drawImage(
-        image,
-        srcX,
-        srcY,
-        patch,
-        patch,
-        -patch * 0.5,
-        -patch * 0.5,
-        patch,
-        patch
-      );
-      outCtx.restore();
-    }
+    const coverScale = Math.max(width / imgW, height / imgH);
+    const drawW = imgW * coverScale;
+    const drawH = imgH * coverScale;
+    const drawX = (width - drawW) * 0.5;
+    const drawY = (height - drawH) * 0.5;
+    outCtx.drawImage(image, drawX, drawY, drawW, drawH);
 
     this.generatedBackdropCache = { width, height, canvas: out };
     return out;
@@ -4243,6 +4243,52 @@ class Game {
     return true;
   }
 
+  syncDebugBackgroundButtons() {
+    const currentId = normalizeBackgroundId(this.currentBackgroundId);
+    if (!this.debugBackgroundButtons || typeof this.debugBackgroundButtons !== "object") {
+      return;
+    }
+    for (const backgroundId of BACKGROUND_VARIANT_IDS) {
+      const button = this.debugBackgroundButtons[backgroundId];
+      if (!button) {
+        continue;
+      }
+      const isActive = backgroundId === currentId;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    }
+  }
+
+  applyBackgroundConfig(backgroundId, options = {}) {
+    const { save = true } = options;
+    const nextBackgroundId = normalizeBackgroundId(backgroundId);
+    this.currentBackgroundId = nextBackgroundId;
+
+    const bgPath = getBackgroundAssetPath(nextBackgroundId, "background");
+    const panelPath = getBackgroundAssetPath(nextBackgroundId, "panel");
+    const cellPath = getBackgroundAssetPath(nextBackgroundId, "cell");
+    const railwayPath = getBackgroundAssetPath(nextBackgroundId, "railway");
+
+    this.setImageSource(this.backdropImage, bgPath);
+    this.setImageSource(this.woodImage, panelPath);
+    this.setImageSource(this.slotCellImage, cellPath);
+    this.setImageSource(this.railwayImage, railwayPath);
+    this.generatedBackdropCache = null;
+
+    if (typeof document !== "undefined" && document.body) {
+      document.body.style.backgroundImage = `url("${bgPath}")`;
+      document.body.style.backgroundSize = "402px 874px";
+    }
+
+    this.syncDebugBackgroundButtons();
+    this.rebuildStaticSceneLayer();
+    this.invalidate(false);
+
+    if (save) {
+      this.saveDebugSettings();
+    }
+  }
+
   applyLevelConfig(levelId, options = {}) {
     const { restart = true } = options;
     const nextLevelId = this.getValidLevelId(levelId);
@@ -4335,6 +4381,7 @@ class Game {
       debugImageSettingsByLevel: cloneData(this.debugImageSettingsByLevel || {}),
       levelId: this.getValidLevelId(this.currentLevelId),
       themeId: this.getValidThemeId(this.currentThemeId),
+      backgroundId: normalizeBackgroundId(this.currentBackgroundId),
     };
   }
 
@@ -4401,6 +4448,8 @@ class Game {
     }
     this.currentLevelId = this.getValidLevelId(settings.levelId ?? DEBUG_DEFAULTS.levelId);
     this.currentThemeId = this.getValidThemeId(settings.themeId ?? DEBUG_DEFAULTS.themeId);
+    this.currentBackgroundId = normalizeBackgroundId(settings.backgroundId ?? DEBUG_DEFAULTS.backgroundId);
+    this.applyBackgroundConfig(this.currentBackgroundId, { save: false });
   }
 
   loadDebugSettings() {
@@ -9107,6 +9156,7 @@ class Game {
     this.syncDebugContentSelectors();
     this.syncDebugImageGridInputs(CURRENT_LEVEL.layout?.fieldCols || 18, CURRENT_LEVEL.layout?.fieldRows || 18);
     this.syncDebugImageInputsForLevel(this.currentLevelId);
+    this.syncDebugBackgroundButtons();
     this.syncDebugPaintColorOptions();
     this.syncDebugImageFileName();
     this.setDebugImageStatus("Выбери изображение, затем укажи сетку и нажми создать.");
@@ -9678,6 +9728,16 @@ class Game {
       this.debugImageLevelToggleButton.addEventListener("click", (event) => {
         const hidden = !!this.debugImageLevelSection?.classList.contains("is-collapsed");
         this.setDebugImageGeneratorVisible(hidden);
+        event.preventDefault();
+      });
+    }
+    for (const backgroundId of BACKGROUND_VARIANT_IDS) {
+      const button = this.debugBackgroundButtons?.[backgroundId];
+      if (!button) {
+        continue;
+      }
+      button.addEventListener("click", (event) => {
+        this.applyBackgroundConfig(backgroundId);
         event.preventDefault();
       });
     }
