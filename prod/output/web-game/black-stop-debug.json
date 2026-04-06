@@ -1,0 +1,594 @@
+{
+  "shots": [
+    {
+      "unitColor": "black",
+      "ammoBefore": 53,
+      "blockId": 221,
+      "row": 10,
+      "col": 10,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 52,
+      "blockId": 242,
+      "row": 11,
+      "col": 10,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 51,
+      "blockId": 243,
+      "row": 11,
+      "col": 11,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 50,
+      "blockId": 222,
+      "row": 10,
+      "col": 11,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 49,
+      "blockId": 201,
+      "row": 9,
+      "col": 11,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 48,
+      "blockId": 200,
+      "row": 9,
+      "col": 10,
+      "region": "top"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 47,
+      "blockId": 199,
+      "row": 9,
+      "col": 9,
+      "region": "top"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 46,
+      "blockId": 220,
+      "row": 10,
+      "col": 9,
+      "region": "left"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 45,
+      "blockId": 241,
+      "row": 11,
+      "col": 9,
+      "region": "left"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 44,
+      "blockId": 240,
+      "row": 11,
+      "col": 8,
+      "region": "left"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 43,
+      "blockId": 261,
+      "row": 12,
+      "col": 8,
+      "region": "left"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 42,
+      "blockId": 262,
+      "row": 12,
+      "col": 9,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 41,
+      "blockId": 263,
+      "row": 12,
+      "col": 10,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 40,
+      "blockId": 264,
+      "row": 12,
+      "col": 11,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 39,
+      "blockId": 265,
+      "row": 12,
+      "col": 12,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 38,
+      "blockId": 244,
+      "row": 11,
+      "col": 12,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 37,
+      "blockId": 223,
+      "row": 10,
+      "col": 12,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 36,
+      "blockId": 202,
+      "row": 9,
+      "col": 12,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 35,
+      "blockId": 181,
+      "row": 8,
+      "col": 12,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 34,
+      "blockId": 180,
+      "row": 8,
+      "col": 11,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 33,
+      "blockId": 179,
+      "row": 8,
+      "col": 10,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 32,
+      "blockId": 178,
+      "row": 8,
+      "col": 9,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 31,
+      "blockId": 177,
+      "row": 8,
+      "col": 8,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 30,
+      "blockId": 198,
+      "row": 9,
+      "col": 8,
+      "region": "left"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 29,
+      "blockId": 219,
+      "row": 10,
+      "col": 8,
+      "region": "left"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 28,
+      "blockId": 218,
+      "row": 10,
+      "col": 7,
+      "region": "left"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 27,
+      "blockId": 239,
+      "row": 11,
+      "col": 7,
+      "region": "left"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 26,
+      "blockId": 260,
+      "row": 12,
+      "col": 7,
+      "region": "left"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 25,
+      "blockId": 281,
+      "row": 13,
+      "col": 7,
+      "region": "left"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 24,
+      "blockId": 282,
+      "row": 13,
+      "col": 8,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 23,
+      "blockId": 283,
+      "row": 13,
+      "col": 9,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 22,
+      "blockId": 284,
+      "row": 13,
+      "col": 10,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 21,
+      "blockId": 285,
+      "row": 13,
+      "col": 11,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 20,
+      "blockId": 286,
+      "row": 13,
+      "col": 12,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 19,
+      "blockId": 287,
+      "row": 13,
+      "col": 13,
+      "region": "bottom"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 18,
+      "blockId": 266,
+      "row": 12,
+      "col": 13,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 17,
+      "blockId": 245,
+      "row": 11,
+      "col": 13,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 16,
+      "blockId": 224,
+      "row": 10,
+      "col": 13,
+      "region": "right"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 15,
+      "blockId": 160,
+      "row": 7,
+      "col": 12,
+      "region": "top"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 14,
+      "blockId": 159,
+      "row": 7,
+      "col": 11,
+      "region": "top"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 13,
+      "blockId": 158,
+      "row": 7,
+      "col": 10,
+      "region": "top"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 12,
+      "blockId": 157,
+      "row": 7,
+      "col": 9,
+      "region": "top"
+    },
+    {
+      "unitColor": "black",
+      "ammoBefore": 11,
+      "blockId": 156,
+      "row": 7,
+      "col": 8,
+      "region": "top"
+    }
+  ],
+  "hasTargetForBlack": false,
+  "unit": {
+    "id": 1,
+    "state": "moving",
+    "ammo": 11,
+    "slotIndex": null,
+    "position": {
+      "x": 117,
+      "y": 964.3783448184078
+    }
+  },
+  "nextTargets": [
+    {
+      "id": 203,
+      "color": "green",
+      "row": 9,
+      "col": 13,
+      "regionTags": [
+        "bottom",
+        "right",
+        "bottom-right"
+      ],
+      "allowedProbes": [
+        "right",
+        "top",
+        "bottom",
+        "left"
+      ]
+    },
+    {
+      "id": 182,
+      "color": "green",
+      "row": 8,
+      "col": 13,
+      "regionTags": [
+        "right"
+      ],
+      "allowedProbes": [
+        "right",
+        "top",
+        "bottom",
+        "left"
+      ]
+    },
+    {
+      "id": 161,
+      "color": "green",
+      "row": 7,
+      "col": 13,
+      "regionTags": [
+        "top",
+        "right",
+        "top-right"
+      ],
+      "allowedProbes": [
+        "top",
+        "right",
+        "left",
+        "bottom"
+      ]
+    },
+    {
+      "id": 155,
+      "color": "green",
+      "row": 7,
+      "col": 7,
+      "regionTags": [
+        "top",
+        "left",
+        "top-left"
+      ],
+      "allowedProbes": [
+        "top",
+        "left",
+        "bottom",
+        "right"
+      ]
+    },
+    {
+      "id": 176,
+      "color": "green",
+      "row": 8,
+      "col": 7,
+      "regionTags": [
+        "left"
+      ],
+      "allowedProbes": [
+        "left",
+        "top",
+        "bottom",
+        "right"
+      ]
+    },
+    {
+      "id": 197,
+      "color": "green",
+      "row": 9,
+      "col": 7,
+      "regionTags": [
+        "bottom",
+        "left",
+        "bottom-left"
+      ],
+      "allowedProbes": [
+        "left",
+        "top",
+        "bottom",
+        "right"
+      ]
+    }
+  ],
+  "trackSampleHits": [],
+  "textState": {
+    "mode": "playing",
+    "scene": "procedural_reskin",
+    "source": "procedural",
+    "levelId": "1",
+    "themeId": "classic",
+    "generatedLevel": null,
+    "unitTheme": "numbered_slimes",
+    "coordinateSystem": {
+      "origin": "top-left",
+      "xDirection": "right",
+      "yDirection": "down",
+      "units": "canvas pixels"
+    },
+    "remainingBlocks": 398,
+    "blocksTotal": 441,
+    "queueCards": 7,
+    "blocksByColor": {
+      "green": 279,
+      "black": 119
+    },
+    "units": [
+      {
+        "id": 1,
+        "color": "black",
+        "styleKey": "coral",
+        "label": 2,
+        "ammo": 11,
+        "slotIndex": null,
+        "x": 117,
+        "y": 964.4
+      }
+    ],
+    "slimeCards": [
+      {
+        "index": 0,
+        "lane": 0,
+        "row": 0,
+        "color": "green",
+        "styleKey": "mint",
+        "label": 1,
+        "ammo": 70,
+        "used": false,
+        "x": 316,
+        "y": 1484,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 1,
+        "lane": 1,
+        "row": 0,
+        "color": "black",
+        "styleKey": "coral",
+        "label": 2,
+        "ammo": 54,
+        "used": true,
+        "x": 552,
+        "y": 1484,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 2,
+        "lane": 0,
+        "row": 1,
+        "color": "green",
+        "styleKey": "sky",
+        "label": 3,
+        "ammo": 70,
+        "used": false,
+        "x": 316,
+        "y": 1651,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 3,
+        "lane": 1,
+        "row": 0,
+        "color": "black",
+        "styleKey": "gold",
+        "label": 4,
+        "ammo": 54,
+        "used": false,
+        "x": 552,
+        "y": 1484,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 4,
+        "lane": 0,
+        "row": 2,
+        "color": "green",
+        "styleKey": "mint",
+        "label": 5,
+        "ammo": 70,
+        "used": false,
+        "x": 316,
+        "y": 1818,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 5,
+        "lane": 1,
+        "row": 1,
+        "color": "black",
+        "styleKey": "coral",
+        "label": 6,
+        "ammo": 54,
+        "used": false,
+        "x": 552,
+        "y": 1651,
+        "w": 158,
+        "h": 199
+      },
+      {
+        "index": 6,
+        "lane": 0,
+        "row": 3,
+        "color": "green",
+        "styleKey": "sky",
+        "label": 7,
+        "ammo": 69,
+        "used": false,
+        "x": 316,
+        "y": 1985,
+        "w": 158,
+        "h": 199
+      }
+    ]
+  }
+}

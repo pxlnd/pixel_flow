@@ -1,0 +1,35 @@
+{
+  "corner": {
+    "remainingBlocks": 1,
+    "ammo": 5,
+    "allowedSides": [
+      "top"
+    ]
+  },
+  "central": {
+    "allowed": [
+      "top",
+      "bottom"
+    ],
+    "center": {
+      "col": 9,
+      "row": 9
+    }
+  },
+  "loop": {
+    "remainingBefore": 398,
+    "remainingAfter": 388,
+    "ammoBefore": [
+      61,
+      54,
+      53,
+      62
+    ],
+    "ammoAfter": [
+      60,
+      46,
+      53,
+      61
+    ]
+  }
+}

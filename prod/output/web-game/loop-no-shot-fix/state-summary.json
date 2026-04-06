@@ -1,0 +1,52 @@
+{
+  "before": {
+    "remainingBlocks": 400,
+    "ammo": [
+      {
+        "id": 1,
+        "ammo": 63,
+        "slotIndex": null
+      },
+      {
+        "id": 2,
+        "ammo": 54,
+        "slotIndex": null
+      },
+      {
+        "id": 3,
+        "ammo": 53,
+        "slotIndex": null
+      },
+      {
+        "id": 4,
+        "ammo": 62,
+        "slotIndex": null
+      }
+    ]
+  },
+  "after": {
+    "remainingBlocks": 392,
+    "ammo": [
+      {
+        "id": 1,
+        "ammo": 61,
+        "slotIndex": 3
+      },
+      {
+        "id": 2,
+        "ammo": 49,
+        "slotIndex": 2
+      },
+      {
+        "id": 3,
+        "ammo": 53,
+        "slotIndex": 1
+      },
+      {
+        "id": 4,
+        "ammo": 61,
+        "slotIndex": 0
+      }
+    ]
+  }
+}
