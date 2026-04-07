@@ -151,6 +151,20 @@
         </details>
       </div>
 
+      <div class="debug-section">
+        <details class="debug-subsection" open>
+          <summary class="debug-subsection-title">Background</summary>
+          <div class="debug-bg-buttons">
+            <button id="debugBgDefault" class="debug-bg-button" type="button" aria-label="Фон default">default</button>
+            <button id="debugBgBlue" class="debug-bg-button" type="button" aria-label="Фон blue">blue</button>
+            <button id="debugBgOrange" class="debug-bg-button" type="button" aria-label="Фон orange">orange</button>
+            <button id="debugBgPurple" class="debug-bg-button" type="button" aria-label="Фон purple">purple</button>
+            <button id="debugBgPink" class="debug-bg-button" type="button" aria-label="Фон pink">pink</button>
+            <button id="debugBgWater" class="debug-bg-button" type="button" aria-label="Фон water">water</button>
+          </div>
+        </details>
+      </div>
+
       <div id="debugImageLevelSection" class="debug-section debug-image-level is-collapsed">
         <details class="debug-subsection" open>
           <summary class="debug-subsection-title">Генератор уровня</summary>
@@ -242,6 +256,11 @@
             <span>Карточек в очереди</span>
             <input id="queueCards" type="range" min="2" max="24" step="1" value="7">
             <output id="queueCardsValue" for="queueCards">7</output>
+          </label>
+          <label class="debug-control" for="maxActiveUnits">
+            <span>Макс. птичек на поле</span>
+            <input id="maxActiveUnits" type="range" min="1" max="10" step="1" value="5">
+            <output id="maxActiveUnitsValue" for="maxActiveUnits">5</output>
           </label>
           <label class="debug-control" for="chickenSizeScale">
             <span>Размер птичек</span>

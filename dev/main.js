@@ -285,7 +285,9 @@ const getThemeConfig = (themeId) => {
 const LOGICAL_WIDTH = 1024;
 const LOGICAL_HEIGHT = 1600;
 const FIXED_DT = 1 / 60;
-const MAX_ACTIVE_UNITS = 5;
+const MIN_ACTIVE_UNITS_LIMIT = 1;
+const MAX_ACTIVE_UNITS_LIMIT = 10;
+let ACTIVE_UNITS_LIMIT = 5;
 const FIRE_INTERVAL = 0.03;
 const MAX_BURST_SHOTS_PER_TICK = 24;
 const BULLET_RADIUS = 8;
@@ -354,13 +356,22 @@ const TRACK_FRAME_OUTSET = 40;
 const TRACK_CENTERING_UP_OFFSET = 48;
 const FIELD_CENTERING_UP_RATIO = 0.02;
 let BOARD_FILL_COLOR = "#6aa93a";
+const BACKGROUND_ASSET_ROOT = "ui/background";
+const DEFAULT_BACKGROUND_ID = "default";
+const BACKGROUND_VARIANT_IDS = ["default", "blue", "orange", "purple", "pink", "water"];
+const BACKGROUND_ASSET_NAMES = {
+  background: "background.png",
+  panel: "panel.png",
+  cell: "cell.png",
+  railway: "railway.png",
+};
 const RAILWAY_SOURCE_SIZE = { w: 401, h: 407 };
 const RAILWAY_PATH_NORMALIZED = {
   x: 28.5 / RAILWAY_SOURCE_SIZE.w,
   y: 22 / RAILWAY_SOURCE_SIZE.h,
   w: 341.5 / RAILWAY_SOURCE_SIZE.w,
   h: 320 / RAILWAY_SOURCE_SIZE.h,
-  // Tuned to the visual center of the lane in ui/railway.png.
+  // Tuned to the visual center of the lane in ui/background/default/railway.png.
   r: 50 / RAILWAY_SOURCE_SIZE.w,
 };
 // Chicken sprite is authored facing +X (to the right), where the beak is drawn.
@@ -372,6 +383,12 @@ const VICTORY_FLOAT_SPEED = 0.85;
 const VICTORY_FLOAT_AMPLITUDE = 12;
 const VICTORY_ART_OFFSET_Y = 110;
 const VICTORY_CONFETTI_RATE = 42;
+const VICTORY_NEXT_BUTTON_UI = {
+  w: 356,
+  h: 98,
+  radius: 30,
+  bottomMargin: 60,
+};
 const LAUNCH_DURATION = 0.24;
 const LAND_DURATION = 0.2;
 const STREAK_DECAY_TIME = 1.45;
@@ -453,6 +470,7 @@ const DEBUG_DEFAULTS = {
   shotBounceSpeed: 1,
   trackUnitSpeed: 980,
   queueCardCount: 7,
+  activeUnitsLimit: 5,
   chickenSizeScale: 1.22,
   topPanelFontSize: 67,
   topLevelPanelScale: 1.2,
@@ -482,11 +500,28 @@ const DEBUG_DEFAULTS = {
   topLevelNavVisible: false,
   levelId: DEFAULT_LEVEL_ID,
   themeId: DEFAULT_THEME_ID,
+  backgroundId: DEFAULT_BACKGROUND_ID,
 };
 
 const LEVELS_PATH = "game-data/levels";
 const MAX_AUTOLOAD_LEVELS = 50;
 const MAX_AUTOLOAD_MISSES_IN_A_ROW = 5;
+
+function normalizeBackgroundId(backgroundId) {
+  const normalized = String(backgroundId || "")
+    .trim()
+    .toLowerCase();
+  return BACKGROUND_VARIANT_IDS.includes(normalized) ? normalized : DEFAULT_BACKGROUND_ID;
+}
+
+function getBackgroundAssetPath(backgroundId, assetKey) {
+  const resolvedId = normalizeBackgroundId(backgroundId);
+  const fileName = BACKGROUND_ASSET_NAMES[assetKey];
+  if (!fileName) {
+    return "";
+  }
+  return `${BACKGROUND_ASSET_ROOT}/${resolvedId}/${fileName}`;
+}
 
 async function loadLevelJSONByNumber(levelNumber) {
   try {
@@ -2231,16 +2266,16 @@ class Game {
     this.losePopupBirdsImage.src = "ui/loose.png";
     this.losePopupBirdsImage.decoding = "sync";
     this.woodImage = new Image();
-    this.woodImage.src = "ui/wood.png";
+    this.woodImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "panel");
     this.woodImage.decoding = "sync";
     this.slotCellImage = new Image();
-    this.slotCellImage.src = "ui/slot_cell.png";
+    this.slotCellImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "cell");
     this.slotCellImage.decoding = "sync";
     this.railwayImage = new Image();
-    this.railwayImage.src = "ui/railway.png";
+    this.railwayImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "railway");
     this.railwayImage.decoding = "sync";
     this.backdropImage = new Image();
-    this.backdropImage.src = "ui/bg.jpg";
+    this.backdropImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "background");
     this.backdropImage.decoding = "sync";
     this.tutorHandImage = new Image();
     this.tutorHandImage.src = "ui/tutor_hand.png";
@@ -2307,6 +2342,7 @@ class Game {
     this.restartButtonRect = { x: 0, y: 0, w: COINS_UI.panelW, h: COINS_UI.panelH };
     this.loseCloseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.victoryNextButtonRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
     this.cards = [];
     this.wagon = {
@@ -2350,6 +2386,14 @@ class Game {
     this.debugImageLevelSection = document.getElementById("debugImageLevelSection");
     this.debugLevelSelect = document.getElementById("debugLevelSelect");
     this.debugThemeSelect = document.getElementById("debugThemeSelect");
+    this.debugBackgroundButtons = {
+      default: document.getElementById("debugBgDefault"),
+      blue: document.getElementById("debugBgBlue"),
+      orange: document.getElementById("debugBgOrange"),
+      purple: document.getElementById("debugBgPurple"),
+      pink: document.getElementById("debugBgPink"),
+      water: document.getElementById("debugBgWater"),
+    };
     this.debugCurrentLevelNameInput = document.getElementById("debugCurrentLevelName");
     this.debugSaveCurrentLevelNameButton = document.getElementById("debugSaveCurrentLevelName");
     this.debugLevelTopNav = document.querySelector(".debug-level-nav");
@@ -2384,6 +2428,8 @@ class Game {
     this.railSpeedValue = document.getElementById("railSpeedValue");
     this.queueCardsInput = document.getElementById("queueCards");
     this.queueCardsValue = document.getElementById("queueCardsValue");
+    this.maxActiveUnitsInput = document.getElementById("maxActiveUnits");
+    this.maxActiveUnitsValue = document.getElementById("maxActiveUnitsValue");
     this.chickenSizeScaleInput = document.getElementById("chickenSizeScale");
     this.chickenSizeScaleValue = document.getElementById("chickenSizeScaleValue");
     this.topPanelFontSizeInput = document.getElementById("topPanelFontSize");
@@ -2449,6 +2495,7 @@ class Game {
     this.debugPaintTool = "paint";
     this.debugPaintColor = "blue";
     this.debugPaintHoverCell = null;
+    this.currentBackgroundId = DEFAULT_BACKGROUND_ID;
     this.topLevelNavVisible = true;
 
     this.loadDebugSettings();
@@ -3737,47 +3784,12 @@ class Game {
 
     const imgW = image.naturalWidth;
     const imgH = image.naturalHeight;
-    const rand = this.createSeededRandom((width * 73856093) ^ (height * 19349663) ^ (imgW * 83492791));
-
-    const phaseX = Math.floor(rand() * imgW);
-    const phaseY = Math.floor(rand() * imgH);
-    for (let y = -phaseY; y < height; y += imgH) {
-      for (let x = -phaseX; x < width; x += imgW) {
-        outCtx.drawImage(image, x, y, imgW, imgH);
-      }
-    }
-
-    const patchCount = Math.max(40, Math.round((width * height) / 28000));
-    for (let i = 0; i < patchCount; i += 1) {
-      const patch = Math.max(56, Math.round(56 + rand() * 104));
-      const srcX = Math.floor(rand() * Math.max(1, imgW - patch));
-      const srcY = Math.floor(rand() * Math.max(1, imgH - patch));
-      const dstX = Math.floor(rand() * Math.max(1, width - patch));
-      const dstY = Math.floor(rand() * Math.max(1, height - patch));
-      const rotate = rand() < 0.08;
-      const flipX = rand() < 0.2;
-      const flipY = rand() < 0.12;
-
-      outCtx.save();
-      outCtx.globalAlpha = 0.32 + rand() * 0.22;
-      outCtx.translate(dstX + patch * 0.5, dstY + patch * 0.5);
-      outCtx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-      if (rotate) {
-        outCtx.rotate((Math.PI / 2) * (1 + Math.floor(rand() * 3)));
-      }
-      outCtx.drawImage(
-        image,
-        srcX,
-        srcY,
-        patch,
-        patch,
-        -patch * 0.5,
-        -patch * 0.5,
-        patch,
-        patch
-      );
-      outCtx.restore();
-    }
+    const coverScale = Math.max(width / imgW, height / imgH);
+    const drawW = imgW * coverScale;
+    const drawH = imgH * coverScale;
+    const drawX = (width - drawW) * 0.5;
+    const drawY = (height - drawH) * 0.5;
+    outCtx.drawImage(image, drawX, drawY, drawW, drawH);
 
     this.generatedBackdropCache = { width, height, canvas: out };
     return out;
@@ -4236,6 +4248,52 @@ class Game {
     return true;
   }
 
+  syncDebugBackgroundButtons() {
+    const currentId = normalizeBackgroundId(this.currentBackgroundId);
+    if (!this.debugBackgroundButtons || typeof this.debugBackgroundButtons !== "object") {
+      return;
+    }
+    for (const backgroundId of BACKGROUND_VARIANT_IDS) {
+      const button = this.debugBackgroundButtons[backgroundId];
+      if (!button) {
+        continue;
+      }
+      const isActive = backgroundId === currentId;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    }
+  }
+
+  applyBackgroundConfig(backgroundId, options = {}) {
+    const { save = true } = options;
+    const nextBackgroundId = normalizeBackgroundId(backgroundId);
+    this.currentBackgroundId = nextBackgroundId;
+
+    const bgPath = getBackgroundAssetPath(nextBackgroundId, "background");
+    const panelPath = getBackgroundAssetPath(nextBackgroundId, "panel");
+    const cellPath = getBackgroundAssetPath(nextBackgroundId, "cell");
+    const railwayPath = getBackgroundAssetPath(nextBackgroundId, "railway");
+
+    this.setImageSource(this.backdropImage, bgPath);
+    this.setImageSource(this.woodImage, panelPath);
+    this.setImageSource(this.slotCellImage, cellPath);
+    this.setImageSource(this.railwayImage, railwayPath);
+    this.generatedBackdropCache = null;
+
+    if (typeof document !== "undefined" && document.body) {
+      document.body.style.backgroundImage = `url("${bgPath}")`;
+      document.body.style.backgroundSize = "402px 874px";
+    }
+
+    this.syncDebugBackgroundButtons();
+    this.rebuildStaticSceneLayer();
+    this.invalidate(false);
+
+    if (save) {
+      this.saveDebugSettings();
+    }
+  }
+
   applyLevelConfig(levelId, options = {}) {
     const { restart = true } = options;
     const nextLevelId = this.getValidLevelId(levelId);
@@ -4298,6 +4356,7 @@ class Game {
       shotBounceSpeed: SHOT_BOUNCE_SPEED,
       trackUnitSpeed: TRACK_UNIT_SPEED,
       queueCardCount: BOTTOM_QUEUE_CARD_COUNT,
+      activeUnitsLimit: ACTIVE_UNITS_LIMIT,
       chickenSizeScale: CHICKEN_SIZE_SCALE,
       topPanelFontSize: TOP_PANEL_FONT_SIZE,
       topLevelPanelScale: TOP_LEVEL_PANEL_SCALE,
@@ -4328,6 +4387,7 @@ class Game {
       debugImageSettingsByLevel: cloneData(this.debugImageSettingsByLevel || {}),
       levelId: this.getValidLevelId(this.currentLevelId),
       themeId: this.getValidThemeId(this.currentThemeId),
+      backgroundId: normalizeBackgroundId(this.currentBackgroundId),
     };
   }
 
@@ -4339,6 +4399,11 @@ class Game {
       Math.round(Number(settings.queueCardCount ?? DEBUG_DEFAULTS.queueCardCount)),
       MIN_QUEUE_CARDS,
       MAX_QUEUE_CARDS
+    );
+    ACTIVE_UNITS_LIMIT = clamp(
+      Math.round(Number(settings.activeUnitsLimit ?? DEBUG_DEFAULTS.activeUnitsLimit)),
+      MIN_ACTIVE_UNITS_LIMIT,
+      MAX_ACTIVE_UNITS_LIMIT
     );
     CHICKEN_SIZE_SCALE = clamp(Number(settings.chickenSizeScale ?? DEBUG_DEFAULTS.chickenSizeScale), 0.6, 1.8);
     TOP_PANEL_FONT_SIZE = clamp(Number(settings.topPanelFontSize ?? DEBUG_DEFAULTS.topPanelFontSize), 24, 80);
@@ -4394,6 +4459,8 @@ class Game {
     }
     this.currentLevelId = this.getValidLevelId(settings.levelId ?? DEBUG_DEFAULTS.levelId);
     this.currentThemeId = this.getValidThemeId(settings.themeId ?? DEBUG_DEFAULTS.themeId);
+    this.currentBackgroundId = normalizeBackgroundId(settings.backgroundId ?? DEBUG_DEFAULTS.backgroundId);
+    this.applyBackgroundConfig(this.currentBackgroundId, { save: false });
   }
 
   loadDebugSettings() {
@@ -4784,6 +4851,7 @@ class Game {
       [this.shotBounceSpeedInput, SHOT_BOUNCE_SPEED],
       [this.railSpeedInput, TRACK_UNIT_SPEED],
       [this.queueCardsInput, BOTTOM_QUEUE_CARD_COUNT],
+      [this.maxActiveUnitsInput, ACTIVE_UNITS_LIMIT],
       [this.chickenSizeScaleInput, CHICKEN_SIZE_SCALE],
       [this.topPanelFontSizeInput, TOP_PANEL_FONT_SIZE],
       [this.levelPanelScaleInput, TOP_LEVEL_PANEL_SCALE],
@@ -5139,7 +5207,7 @@ class Game {
     }
 
     const activeUnitCount = this.units.reduce((count, unit) => count + (unit.alive ? 1 : 0), 0);
-    if (activeUnitCount >= MAX_ACTIVE_UNITS) {
+    if (activeUnitCount >= ACTIVE_UNITS_LIMIT) {
       return false;
     }
     const card = this.cards[cardIndex];
@@ -6790,6 +6858,112 @@ class Game {
     }
   }
 
+  getVictoryNextButtonRect() {
+    const width = Math.round(clamp(VICTORY_NEXT_BUTTON_UI.w, 240, this.width * 0.72));
+    const height = VICTORY_NEXT_BUTTON_UI.h;
+    const y = Math.max(0, Math.round(this.height - height - VICTORY_NEXT_BUTTON_UI.bottomMargin));
+    return {
+      x: Math.round((this.width - width) * 0.5),
+      y,
+      w: width,
+      h: height,
+    };
+  }
+
+  getNextPlayableLevelId() {
+    const levels = this.getTopLevelDebugList();
+    if (levels.length === 0) {
+      return null;
+    }
+    const currentId = this.getValidLevelId(this.currentLevelId);
+    const currentIndex = levels.findIndex((level) => String(level.id) === currentId);
+    if (currentIndex < 0) {
+      return String(levels[0].id);
+    }
+    if (currentIndex + 1 >= levels.length) {
+      return null;
+    }
+    return String(levels[currentIndex + 1].id);
+  }
+
+  goToNextLevelFromVictory() {
+    const nextLevelId = this.getNextPlayableLevelId();
+    if (!nextLevelId) {
+      return false;
+    }
+    this.applyLevelConfig(nextLevelId, { restart: true });
+    this.debugSaveTargetDirty = false;
+    this.syncDebugContentSelectors();
+    this.saveDebugSettings();
+    return true;
+  }
+
+  drawVictoryNextButton(ctx, enabled) {
+    const rect = this.getVictoryNextButtonRect();
+    this.victoryNextButtonRect = rect;
+    const radius = VICTORY_NEXT_BUTTON_UI.radius;
+    const isEnabled = !!enabled;
+
+    ctx.save();
+    ctx.shadowColor = isEnabled ? "rgba(24, 74, 20, 0.44)" : "rgba(40, 48, 60, 0.28)";
+    ctx.shadowBlur = isEnabled ? 22 : 14;
+    ctx.shadowOffsetY = isEnabled ? 8 : 5;
+    const fillGrad = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+    if (isEnabled) {
+      fillGrad.addColorStop(0, "#a9ef57");
+      fillGrad.addColorStop(1, "#56c719");
+    } else {
+      fillGrad.addColorStop(0, "#b8c0cd");
+      fillGrad.addColorStop(1, "#8e99aa");
+    }
+    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, radius);
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = isEnabled ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.3)";
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = isEnabled ? 0.28 : 0.16;
+    roundedRect(ctx, rect.x + 10, rect.y + 8, rect.w - 20, Math.round(rect.h * 0.4), Math.max(14, radius - 10));
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.restore();
+
+    const text = "Next level";
+    ctx.save();
+    ctx.font = "900 42px \"Baloo 2\", \"Arial Rounded MT Bold\", \"Trebuchet MS\", Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = isEnabled ? "rgba(22, 76, 16, 0.62)" : "rgba(63, 73, 90, 0.52)";
+    ctx.fillStyle = "#ffffff";
+    const textX = rect.x + rect.w * 0.5;
+    const textY = rect.y + rect.h * 0.5 + 1;
+    ctx.strokeText(text, textX, textY);
+    ctx.fillText(text, textX, textY);
+    ctx.restore();
+
+    if (!isEnabled) {
+      return;
+    }
+    ctx.save();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.86)";
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    const arrowX = rect.x + rect.w - 46;
+    const arrowY = rect.y + rect.h * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(arrowX - 24, arrowY - 14);
+    ctx.lineTo(arrowX - 4, arrowY);
+    ctx.lineTo(arrowX - 24, arrowY + 14);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   drawVolumetricBlock(ctx, block, x, y, options = {}) {
     const size = block.size;
     const spriteKey = `${block.color}Tile`;
@@ -8035,6 +8209,7 @@ class Game {
       this.drawTopTimerPanel(ctx);
       this.drawTopCoinsPanel(ctx);
       this.drawBackButton(ctx);
+      this.drawVictoryNextButton(ctx, !!this.getNextPlayableLevelId());
       this.drawLevelStartFade(ctx);
       ctx.restore();
       this.needsRender = false;
@@ -8195,6 +8370,13 @@ class Game {
       this.canvas.style.cursor = overClose || overContinue ? "pointer" : "default";
       return;
     }
+    if (this.gameState === "victory") {
+      const overNextLevel = !!this.getNextPlayableLevelId() && isInsideRect(x, y, this.getVictoryNextButtonRect());
+      const overBack = isInsideRect(x, y, this.backButtonRect);
+      const overRestart = isInsideRect(x, y, this.restartButtonRect);
+      this.canvas.style.cursor = overNextLevel || overBack || overRestart ? "pointer" : "default";
+      return;
+    }
     const overBack = isInsideRect(x, y, this.backButtonRect);
     const overRestart = isInsideRect(x, y, this.restartButtonRect);
     this.canvas.style.cursor = overBack || overRestart ? "pointer" : "default";
@@ -8228,6 +8410,11 @@ class Game {
         this.continueFromLoseWithOneSlot();
       }
       return;
+    }
+    if (this.gameState === "victory" && isInsideRect(x, y, this.getVictoryNextButtonRect())) {
+      if (this.goToNextLevelFromVictory()) {
+        return;
+      }
     }
     if (isInsideRect(x, y, this.backButtonRect)) {
       return;
@@ -8981,6 +9168,7 @@ class Game {
     this.syncDebugContentSelectors();
     this.syncDebugImageGridInputs(CURRENT_LEVEL.layout?.fieldCols || 18, CURRENT_LEVEL.layout?.fieldRows || 18);
     this.syncDebugImageInputsForLevel(this.currentLevelId);
+    this.syncDebugBackgroundButtons();
     this.syncDebugPaintColorOptions();
     this.syncDebugImageFileName();
     this.setDebugImageStatus("Выбери изображение, затем укажи сетку и нажми создать.");
@@ -9060,6 +9248,17 @@ class Game {
       });
       this.queueCardsInput.dispatchEvent(new Event("input"));
     }
+    bindRange(
+      this.maxActiveUnitsInput,
+      this.maxActiveUnitsValue,
+      ACTIVE_UNITS_LIMIT,
+      (value) => Number(value),
+      (value) => String(Math.round(value)),
+      (value) => {
+        ACTIVE_UNITS_LIMIT = clamp(Math.round(value), MIN_ACTIVE_UNITS_LIMIT, MAX_ACTIVE_UNITS_LIMIT);
+        return ACTIVE_UNITS_LIMIT;
+      }
+    );
     bindRange(
       this.chickenSizeScaleInput,
       this.chickenSizeScaleValue,
@@ -9552,6 +9751,16 @@ class Game {
       this.debugImageLevelToggleButton.addEventListener("click", (event) => {
         const hidden = !!this.debugImageLevelSection?.classList.contains("is-collapsed");
         this.setDebugImageGeneratorVisible(hidden);
+        event.preventDefault();
+      });
+    }
+    for (const backgroundId of BACKGROUND_VARIANT_IDS) {
+      const button = this.debugBackgroundButtons?.[backgroundId];
+      if (!button) {
+        continue;
+      }
+      button.addEventListener("click", (event) => {
+        this.applyBackgroundConfig(backgroundId);
         event.preventDefault();
       });
     }
