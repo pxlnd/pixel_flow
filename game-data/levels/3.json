@@ -40,7 +40,7 @@
       "id": "level-3-art",
       "name": "Frame 30.png",
       "sourceFileName": "Frame 30.png",
-      "artScale": 0.95,
+      "artScale": 0.9,
       "offsetY": -34,
       "grid": {
         "cols": 30,
