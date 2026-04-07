@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-04-03T15:02:52.432Z",
+  "exportedAt": "2026-04-06T14:32:25.745Z",
   "levelNumber": 1,
   "level": {
     "id": "1",
@@ -28,16 +28,16 @@
       "GGGGGGGGGGGGGGGGGGGGG"
     ],
     "referenceGrid": {
-      "x": 229,
-      "y": 372,
-      "step": 27,
-      "cellSize": 25
+      "x": 218,
+      "y": 361,
+      "step": 28,
+      "cellSize": 26
     },
     "layout": {
-      "fieldX": 229,
-      "fieldY": 372,
-      "fieldStep": 27,
-      "cellSize": 25,
+      "fieldX": 218,
+      "fieldY": 361,
+      "fieldStep": 28,
+      "cellSize": 26,
       "fieldCols": 21,
       "fieldRows": 21,
       "track": {
@@ -156,7 +156,7 @@
       "id": "level-1-art",
       "name": "png-klev-club-8rnq-p-litso-kripera-png-11.png",
       "sourceFileName": "png-klev-club-8rnq-p-litso-kripera-png-11.png",
-      "artScale": 0.9,
+      "artScale": 1,
       "offsetY": -31,
       "grid": {
         "cols": 21,
