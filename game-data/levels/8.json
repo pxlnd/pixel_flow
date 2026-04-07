@@ -154,7 +154,7 @@
       "id": "level-8-art",
       "name": "image (3).png",
       "sourceFileName": "image (3).png",
-      "artScale": 1,
+      "artScale": 0.9,
       "offsetY": -18,
       "grid": {
         "cols": 20,

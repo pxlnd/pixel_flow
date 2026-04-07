@@ -49,7 +49,7 @@
       "id": "level-4-art",
       "name": "image.png",
       "sourceFileName": "image.png",
-      "artScale": 0.95,
+      "artScale": 0.9,
       "offsetY": -34,
       "grid": {
         "cols": 39,
