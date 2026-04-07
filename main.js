@@ -105,6 +105,91 @@ const BUILTIN_FALLBACK_THEME = {
   confettiColors: ["#ff5f5f", "#ffd166", "#6ee7b7", "#60a5fa", "#f9a8d4", "#c4b5fd"],
 };
 
+const SOUND_DEFINITIONS = {
+  back_to_cell: { src: "sounds/back_to_cell.wav", channels: 3, volume: 0.8 },
+  cant_select: { src: "sounds/cant_select.wav", channels: 2, volume: 0.9 },
+  fail: { src: "sounds/Fail.mp3", channels: 1, volume: 0.9 },
+  lvl_complete_button: { src: "sounds/lvl_complete_button.mp3", channels: 2, volume: 0.9 },
+  no_moves: { src: "sounds/no_moves.wav", channels: 1, volume: 0.9 },
+  win: { src: "sounds/Win.mp3", channels: 1, volume: 0.9 },
+  buble: { src: "sounds/Bubble.mp3", channels: 5, volume: 0.75 },
+  tap: { src: "sounds/tap.wav", channels: 3, volume: 0.85 },
+};
+
+class SoundManager {
+  constructor(definitions = {}) {
+    this.poolByName = new Map();
+    if (typeof Audio !== "function") {
+      return;
+    }
+    for (const [name, config] of Object.entries(definitions)) {
+      const src = typeof config?.src === "string" ? config.src : "";
+      if (!src) {
+        continue;
+      }
+      const channelsCount = Math.max(1, Math.min(8, Math.round(Number(config.channels) || 1)));
+      const volume = Number.isFinite(config.volume) ? Math.max(0, Math.min(1, config.volume)) : 1;
+      const channels = [];
+      for (let i = 0; i < channelsCount; i += 1) {
+        let audio = null;
+        try {
+          audio = new Audio(src);
+        } catch {
+          audio = null;
+        }
+        if (!audio) {
+          continue;
+        }
+        audio.preload = "auto";
+        audio.volume = volume;
+        channels.push(audio);
+      }
+      if (channels.length === 0) {
+        continue;
+      }
+      this.poolByName.set(name, {
+        channels,
+        cursor: 0,
+      });
+    }
+  }
+
+  play(name) {
+    const pool = this.poolByName.get(name);
+    if (!pool || pool.channels.length === 0) {
+      return;
+    }
+
+    const channels = pool.channels;
+    const channelCount = channels.length;
+    let picked = null;
+    for (let i = 0; i < channelCount; i += 1) {
+      const index = (pool.cursor + i) % channelCount;
+      const candidate = channels[index];
+      if (candidate.paused || candidate.ended) {
+        picked = candidate;
+        pool.cursor = (index + 1) % channelCount;
+        break;
+      }
+    }
+
+    if (!picked) {
+      picked = channels[pool.cursor];
+      pool.cursor = (pool.cursor + 1) % channelCount;
+    }
+
+    try {
+      picked.currentTime = 0;
+      const playResult = picked.play();
+      if (playResult && typeof playResult.catch === "function") {
+        playResult.catch(() => {});
+      }
+    } catch {
+      // Ignore audio playback failures (e.g. autoplay restrictions).
+    }
+  }
+}
+
 let LEVEL_DEFINITIONS = [];
 const THEME_DEFINITIONS = Array.isArray(THEME_REGISTRY.THEME_DEFINITIONS) ? THEME_REGISTRY.THEME_DEFINITIONS : [];
 let DEFAULT_LEVEL_ID = BUILTIN_FALLBACK_LEVEL.id;
@@ -1643,11 +1728,13 @@ class Unit {
           }
           const freeSlotIndex = game.claimFreeSlot(this.id);
           if (freeSlotIndex === null) {
+            game.playSound("no_moves");
             this.alive = false;
             game.startLoseSequence();
             return;
           }
           this.slotIndex = freeSlotIndex;
+          game.playSound("back_to_cell");
           this.landTo = game.getSlotCenter(freeSlotIndex);
           this.landFrom = { ...this.position };
           const dx = this.landTo.x - this.landFrom.x;
@@ -2230,6 +2317,24 @@ class CardManager {
     }
     return best;
   }
+
+  findAnyTapTarget(x, y, options = {}) {
+    const visualLiftY = Number.isFinite(options.visualLiftY) ? options.visualLiftY : 0;
+    let best = null;
+    let bestDistance = Infinity;
+    for (const card of this.cards) {
+      if (!card || !this.isPointOnCard(card, x, y, { visualLiftY })) {
+        continue;
+      }
+      const center = this.getCardPigCenter(card);
+      const score = Math.hypot(x - center.x, y - (center.y - visualLiftY));
+      if (score < bestDistance) {
+        bestDistance = score;
+        best = card;
+      }
+    }
+    return best;
+  }
 }
 
 class Game {
@@ -2249,6 +2354,7 @@ class Game {
     this.availableLevels = [];
     this.availableThemes = THEME_DEFINITIONS.map((theme) => ({ id: theme.id, name: theme.name }));
     this.refreshAvailableLevels();
+    this.soundManager = new SoundManager(SOUND_DEFINITIONS);
 
     this.backButtonImage = new Image();
     this.backButtonImage.src = getThemeAsset("backButton", "ui/back_button.png");
@@ -2548,6 +2654,10 @@ class Game {
 
     this.buildReferenceAssets();
     this.restart();
+  }
+
+  playSound(name) {
+    this.soundManager.play(name);
   }
 
   buildReferenceAssets() {
@@ -6284,6 +6394,7 @@ class Game {
   }
 
   fireProjectile(unit, block) {
+    this.playSound("buble");
     const target = this.blockCenter(block);
     this.damageBlock(block, unit.color);
 
@@ -6406,6 +6517,7 @@ class Game {
       return;
     }
     this.gameState = "victory";
+    this.playSound("win");
     this.cameraZoomTarget = VICTORY_ZOOM_TARGET;
     this.victoryConfettiTime = VICTORY_CONFETTI_DURATION;
     this.victoryFloatTime = 0;
@@ -6429,6 +6541,7 @@ class Game {
       return;
     }
     this.gameState = "lose";
+    this.playSound("fail");
     const parkedUnits = this.units.filter(
       (unit) => unit.alive && unit.state === "parked" && unit.slotIndex !== null && unit.ammo > 0
     );
@@ -8392,10 +8505,17 @@ class Game {
     if (this.gameState === "playing" && this.tutorial?.active) {
       const target = this.getTutorialTapTarget();
       if (!target || !this.isPointOnTutorialTarget(target, x, y)) {
+        const anyCard = this.cardManager.findAnyTapTarget(x, y, {
+          visualLiftY: this.getQueueVisualLiftY(),
+        });
+        if (anyCard) {
+          this.playSound("cant_select");
+        }
         return;
       }
       if (target.type === "card") {
-        this.spawnUnit(target.card.index);
+        const didSpawn = this.spawnUnit(target.card.index);
+        this.playSound(didSpawn ? "tap" : "cant_select");
         return;
       }
       if (target.type === "parkedUnit") {
@@ -8413,6 +8533,7 @@ class Game {
     }
     if (this.gameState === "victory" && isInsideRect(x, y, this.getVictoryNextButtonRect())) {
       if (this.goToNextLevelFromVictory()) {
+        this.playSound("lvl_complete_button");
         return;
       }
     }
@@ -8433,7 +8554,15 @@ class Game {
       visualLiftY: this.getQueueVisualLiftY(),
     });
     if (tapCard) {
-      this.spawnUnit(tapCard.index);
+      const didSpawn = this.spawnUnit(tapCard.index);
+      this.playSound(didSpawn ? "tap" : "cant_select");
+      return;
+    }
+    const anyCard = this.cardManager.findAnyTapTarget(x, y, {
+      visualLiftY: this.getQueueVisualLiftY(),
+    });
+    if (anyCard) {
+      this.playSound("cant_select");
     }
   }
 
