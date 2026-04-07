@@ -285,7 +285,9 @@ const getThemeConfig = (themeId) => {
 const LOGICAL_WIDTH = 1024;
 const LOGICAL_HEIGHT = 1600;
 const FIXED_DT = 1 / 60;
-const MAX_ACTIVE_UNITS = 5;
+const MIN_ACTIVE_UNITS_LIMIT = 1;
+const MAX_ACTIVE_UNITS_LIMIT = 10;
+let ACTIVE_UNITS_LIMIT = 5;
 const FIRE_INTERVAL = 0.03;
 const MAX_BURST_SHOTS_PER_TICK = 24;
 const BULLET_RADIUS = 8;
@@ -468,6 +470,7 @@ const DEBUG_DEFAULTS = {
   shotBounceSpeed: 1,
   trackUnitSpeed: 980,
   queueCardCount: 7,
+  activeUnitsLimit: 5,
   chickenSizeScale: 1.22,
   topPanelFontSize: 67,
   topLevelPanelScale: 1.2,
@@ -2425,6 +2428,8 @@ class Game {
     this.railSpeedValue = document.getElementById("railSpeedValue");
     this.queueCardsInput = document.getElementById("queueCards");
     this.queueCardsValue = document.getElementById("queueCardsValue");
+    this.maxActiveUnitsInput = document.getElementById("maxActiveUnits");
+    this.maxActiveUnitsValue = document.getElementById("maxActiveUnitsValue");
     this.chickenSizeScaleInput = document.getElementById("chickenSizeScale");
     this.chickenSizeScaleValue = document.getElementById("chickenSizeScaleValue");
     this.topPanelFontSizeInput = document.getElementById("topPanelFontSize");
@@ -4351,6 +4356,7 @@ class Game {
       shotBounceSpeed: SHOT_BOUNCE_SPEED,
       trackUnitSpeed: TRACK_UNIT_SPEED,
       queueCardCount: BOTTOM_QUEUE_CARD_COUNT,
+      activeUnitsLimit: ACTIVE_UNITS_LIMIT,
       chickenSizeScale: CHICKEN_SIZE_SCALE,
       topPanelFontSize: TOP_PANEL_FONT_SIZE,
       topLevelPanelScale: TOP_LEVEL_PANEL_SCALE,
@@ -4393,6 +4399,11 @@ class Game {
       Math.round(Number(settings.queueCardCount ?? DEBUG_DEFAULTS.queueCardCount)),
       MIN_QUEUE_CARDS,
       MAX_QUEUE_CARDS
+    );
+    ACTIVE_UNITS_LIMIT = clamp(
+      Math.round(Number(settings.activeUnitsLimit ?? DEBUG_DEFAULTS.activeUnitsLimit)),
+      MIN_ACTIVE_UNITS_LIMIT,
+      MAX_ACTIVE_UNITS_LIMIT
     );
     CHICKEN_SIZE_SCALE = clamp(Number(settings.chickenSizeScale ?? DEBUG_DEFAULTS.chickenSizeScale), 0.6, 1.8);
     TOP_PANEL_FONT_SIZE = clamp(Number(settings.topPanelFontSize ?? DEBUG_DEFAULTS.topPanelFontSize), 24, 80);
@@ -4840,6 +4851,7 @@ class Game {
       [this.shotBounceSpeedInput, SHOT_BOUNCE_SPEED],
       [this.railSpeedInput, TRACK_UNIT_SPEED],
       [this.queueCardsInput, BOTTOM_QUEUE_CARD_COUNT],
+      [this.maxActiveUnitsInput, ACTIVE_UNITS_LIMIT],
       [this.chickenSizeScaleInput, CHICKEN_SIZE_SCALE],
       [this.topPanelFontSizeInput, TOP_PANEL_FONT_SIZE],
       [this.levelPanelScaleInput, TOP_LEVEL_PANEL_SCALE],
@@ -5195,7 +5207,7 @@ class Game {
     }
 
     const activeUnitCount = this.units.reduce((count, unit) => count + (unit.alive ? 1 : 0), 0);
-    if (activeUnitCount >= MAX_ACTIVE_UNITS) {
+    if (activeUnitCount >= ACTIVE_UNITS_LIMIT) {
       return false;
     }
     const card = this.cards[cardIndex];
@@ -9236,6 +9248,17 @@ class Game {
       });
       this.queueCardsInput.dispatchEvent(new Event("input"));
     }
+    bindRange(
+      this.maxActiveUnitsInput,
+      this.maxActiveUnitsValue,
+      ACTIVE_UNITS_LIMIT,
+      (value) => Number(value),
+      (value) => String(Math.round(value)),
+      (value) => {
+        ACTIVE_UNITS_LIMIT = clamp(Math.round(value), MIN_ACTIVE_UNITS_LIMIT, MAX_ACTIVE_UNITS_LIMIT);
+        return ACTIVE_UNITS_LIMIT;
+      }
+    );
     bindRange(
       this.chickenSizeScaleInput,
       this.chickenSizeScaleValue,
