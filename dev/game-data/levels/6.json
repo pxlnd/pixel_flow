@@ -40,7 +40,7 @@
       "id": "level-6-art",
       "name": "banana.png",
       "sourceFileName": "banana.png",
-      "artScale": 0.9,
+      "artScale": 0.85,
       "offsetY": -34,
       "grid": {
         "cols": 30,

@@ -173,7 +173,7 @@
       "id": "level-7-art",
       "name": "Mask group.png",
       "sourceFileName": "Mask group.png",
-      "artScale": 1,
+      "artScale": 0.95,
       "offsetY": -33,
       "grid": {
         "cols": 38,
