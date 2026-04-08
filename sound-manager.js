@@ -1,10 +1,27 @@
 class SoundManager {
   constructor(definitions = {}) {
+    this.definitionByName = new Map();
+    this.bufferByName = new Map();
+    this.loadingByName = new Map();
     this.poolByName = new Map();
+    this.audioContext = null;
+    this.webAudioEnabled = false;
     this.unlocked = false;
-    if (typeof Audio !== "function") {
-      return;
+
+    const AudioContextClass =
+      typeof window !== "undefined"
+        ? (window.AudioContext || window.webkitAudioContext || null)
+        : null;
+    if (AudioContextClass && typeof fetch === "function") {
+      try {
+        this.audioContext = new AudioContextClass({ latencyHint: "interactive" });
+        this.webAudioEnabled = true;
+      } catch {
+        this.audioContext = null;
+        this.webAudioEnabled = false;
+      }
     }
+
     for (const [name, config] of Object.entries(definitions)) {
       const src = typeof config?.src === "string" ? config.src : "";
       if (!src) {
@@ -12,6 +29,15 @@ class SoundManager {
       }
       const channelsCount = Math.max(1, Math.min(8, Math.round(Number(config.channels) || 1)));
       const volume = Number.isFinite(config.volume) ? Math.max(0, Math.min(1, config.volume)) : 1;
+      this.definitionByName.set(name, {
+        src,
+        channelsCount,
+        volume,
+      });
+
+      if (typeof Audio !== "function") {
+        continue;
+      }
       const channels = [];
       for (let i = 0; i < channelsCount; i += 1) {
         let audio = null;
@@ -35,10 +61,97 @@ class SoundManager {
         cursor: 0,
       });
     }
+
+    if (this.webAudioEnabled) {
+      this.warmupBuffers();
+    }
   }
 
-  unlock() {
-    if (this.unlocked) {
+  warmupBuffers() {
+    if (!this.webAudioEnabled) {
+      return;
+    }
+    const names = [...this.definitionByName.keys()];
+    names.sort((a, b) => {
+      if (a === "buble") {
+        return -1;
+      }
+      if (b === "buble") {
+        return 1;
+      }
+      return 0;
+    });
+    for (const name of names) {
+      void this.ensureBufferLoaded(name);
+    }
+  }
+
+  decodeAudioData(ctx, arrayBuffer) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finishResolve = (buffer) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(buffer);
+      };
+      const finishReject = (error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(error);
+      };
+
+      try {
+        const maybePromise = ctx.decodeAudioData(arrayBuffer, finishResolve, finishReject);
+        if (maybePromise && typeof maybePromise.then === "function") {
+          maybePromise.then(finishResolve).catch(finishReject);
+        }
+      } catch (error) {
+        finishReject(error);
+      }
+    });
+  }
+
+  ensureBufferLoaded(name) {
+    if (!this.webAudioEnabled || !this.audioContext) {
+      return Promise.resolve(null);
+    }
+    if (this.bufferByName.has(name)) {
+      return Promise.resolve(this.bufferByName.get(name));
+    }
+    if (this.loadingByName.has(name)) {
+      return this.loadingByName.get(name);
+    }
+    const definition = this.definitionByName.get(name);
+    if (!definition?.src) {
+      return Promise.resolve(null);
+    }
+
+    const loadingPromise = (async () => {
+      try {
+        const response = await fetch(definition.src, { cache: "force-cache" });
+        if (!response.ok) {
+          return null;
+        }
+        const raw = await response.arrayBuffer();
+        const decoded = await this.decodeAudioData(this.audioContext, raw.slice(0));
+        this.bufferByName.set(name, decoded);
+        return decoded;
+      } catch {
+        return null;
+      } finally {
+        this.loadingByName.delete(name);
+      }
+    })();
+    this.loadingByName.set(name, loadingPromise);
+    return loadingPromise;
+  }
+
+  unlockFallbackPools() {
+    if (this.poolByName.size === 0) {
       return;
     }
     for (const pool of this.poolByName.values()) {
@@ -62,7 +175,6 @@ class SoundManager {
           audio.muted = true;
           audio.currentTime = 0;
           const playResult = audio.play();
-          // iOS can keep the promise pending for a while; don't leave channel muted forever.
           const timeoutId = setTimeout(settle, 450);
           if (playResult && typeof playResult.then === "function") {
             playResult
@@ -83,10 +195,36 @@ class SoundManager {
         }
       }
     }
-    this.unlocked = true;
   }
 
-  play(name) {
+  playFromWebAudio(name) {
+    if (!this.webAudioEnabled || !this.audioContext || !this.unlocked) {
+      return false;
+    }
+    const definition = this.definitionByName.get(name);
+    const buffer = this.bufferByName.get(name);
+    if (!definition || !buffer) {
+      return false;
+    }
+    try {
+      if (this.audioContext.state !== "running") {
+        void this.audioContext.resume();
+        return false;
+      }
+      const source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+      const gain = this.audioContext.createGain();
+      gain.gain.value = definition.volume;
+      source.connect(gain);
+      gain.connect(this.audioContext.destination);
+      source.start(0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  playFromFallbackPool(name) {
     const pool = this.poolByName.get(name);
     if (!pool || pool.channels.length === 0) {
       return;
@@ -119,5 +257,30 @@ class SoundManager {
     } catch {
       // Ignore audio playback failures (e.g. autoplay restrictions).
     }
+  }
+
+  unlock() {
+    if (this.unlocked) {
+      return;
+    }
+    this.unlocked = true;
+    if (this.webAudioEnabled && this.audioContext) {
+      void this.audioContext.resume();
+      this.warmupBuffers();
+    }
+    this.unlockFallbackPools();
+  }
+
+  play(name) {
+    if (this.webAudioEnabled) {
+      if (this.playFromWebAudio(name)) {
+        return;
+      }
+      void this.ensureBufferLoaded(name);
+      if (name === "buble") {
+        return;
+      }
+    }
+    this.playFromFallbackPool(name);
   }
 }
