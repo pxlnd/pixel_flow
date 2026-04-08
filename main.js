@@ -517,6 +517,7 @@ const DEBUG_DEFAULTS = {
 const LEVELS_PATH = "game-data/levels";
 const MAX_AUTOLOAD_LEVELS = 50;
 const MAX_AUTOLOAD_MISSES_IN_A_ROW = 5;
+const LEVEL_LOAD_BATCH_SIZE = 6;
 
 function normalizeBackgroundId(backgroundId) {
   const normalized = String(backgroundId || "")
@@ -536,7 +537,7 @@ function getBackgroundAssetPath(backgroundId, assetKey) {
 
 async function loadLevelJSONByNumber(levelNumber) {
   try {
-    const response = await fetch(`${LEVELS_PATH}/${levelNumber}.json`, { cache: "no-store" });
+    const response = await fetch(`${LEVELS_PATH}/${levelNumber}.json`, { cache: "default" });
     if (!response.ok) {
       return null;
     }
@@ -568,17 +569,29 @@ async function loadLevelJSONByNumber(levelNumber) {
 async function loadLevelDefinitions() {
   const levels = [];
   let missesInARow = 0;
-  for (let levelNumber = 1; levelNumber <= MAX_AUTOLOAD_LEVELS; levelNumber += 1) {
-    const level = await loadLevelJSONByNumber(levelNumber);
-    if (!level) {
-      missesInARow += 1;
-      if (missesInARow >= MAX_AUTOLOAD_MISSES_IN_A_ROW) {
-        break;
-      }
-      continue;
+  let levelNumber = 1;
+  while (levelNumber <= MAX_AUTOLOAD_LEVELS && missesInARow < MAX_AUTOLOAD_MISSES_IN_A_ROW) {
+    const batchNumbers = [];
+    for (
+      let i = 0;
+      i < LEVEL_LOAD_BATCH_SIZE && levelNumber <= MAX_AUTOLOAD_LEVELS;
+      i += 1, levelNumber += 1
+    ) {
+      batchNumbers.push(levelNumber);
     }
-    missesInARow = 0;
-    levels.push(level);
+
+    const batch = await Promise.all(batchNumbers.map((number) => loadLevelJSONByNumber(number)));
+    for (const level of batch) {
+      if (!level) {
+        missesInARow += 1;
+        if (missesInARow >= MAX_AUTOLOAD_MISSES_IN_A_ROW) {
+          break;
+        }
+        continue;
+      }
+      missesInARow = 0;
+      levels.push(level);
+    }
   }
   return levels;
 }
@@ -780,6 +793,13 @@ const DEBUG_IMAGE_SCALE_MIN = 0.5;
 const DEBUG_IMAGE_SCALE_MAX = 3;
 const DEBUG_IMAGE_OFFSET_Y_DEFAULT = -37;
 const MAX_SIMULATION_DT = 0.2;
+const MAX_SIM_STEPS_PER_FRAME = 8;
+const MAX_ACTIVE_FLOAT_TEXTS = 3;
+const MAX_ACTIVE_PARTICLES = 520;
+const MAX_ACTIVE_IMPACT_RINGS = 36;
+const MAX_ACTIVE_BLOCK_WAVES = 8;
+const MAX_ACTIVE_SLOT_BURSTS = 24;
+const WAVE_OFFSET_VISUAL_EPSILON = 0.18;
 
 const BLOCK_COLOR_CONFIG = {
   green: {
@@ -2287,37 +2307,37 @@ class Game {
 
     this.backButtonImage = new Image();
     this.backButtonImage.src = getThemeAsset("backButton", "ui/back_button.png");
-    this.backButtonImage.decoding = "sync";
+    this.backButtonImage.decoding = "async";
     this.timerPanelImage = new Image();
     this.timerPanelImage.src = getThemeAsset("timerPanel", "ui/timer_panel.png");
-    this.timerPanelImage.decoding = "sync";
+    this.timerPanelImage.decoding = "async";
     this.restartButtonImage = new Image();
     this.restartButtonImage.src = getThemeAsset("restartButton", "ui/restart_button.png");
-    this.restartButtonImage.decoding = "sync";
+    this.restartButtonImage.decoding = "async";
     this.losePopupImage = new Image();
     this.losePopupImage.src = "ui/lose_popup_space_ref.png";
-    this.losePopupImage.decoding = "sync";
+    this.losePopupImage.decoding = "async";
     this.losePopupBirdsImage = new Image();
     this.losePopupBirdsImage.src = "ui/loose.png";
-    this.losePopupBirdsImage.decoding = "sync";
+    this.losePopupBirdsImage.decoding = "async";
     this.woodImage = new Image();
     this.woodImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "panel");
-    this.woodImage.decoding = "sync";
+    this.woodImage.decoding = "async";
     this.slotCellImage = new Image();
     this.slotCellImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "cell");
-    this.slotCellImage.decoding = "sync";
+    this.slotCellImage.decoding = "async";
     this.railwayImage = new Image();
     this.railwayImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "railway");
-    this.railwayImage.decoding = "sync";
+    this.railwayImage.decoding = "async";
     this.backdropImage = new Image();
     this.backdropImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "background");
-    this.backdropImage.decoding = "sync";
+    this.backdropImage.decoding = "async";
     this.tutorHandImage = new Image();
     this.tutorHandImage.src = "ui/tutor_hand.png";
-    this.tutorHandImage.decoding = "sync";
+    this.tutorHandImage.decoding = "async";
     this.blockTemplateImage = new Image();
     this.blockTemplateImage.src = "ui/block.png";
-    this.blockTemplateImage.decoding = "sync";
+    this.blockTemplateImage.decoding = "async";
     this.blockTileImageByColor = {};
     this.blockTileColorSampleByColor = {};
     this.blockTileUsesSourceImage = {};
@@ -2325,6 +2345,7 @@ class Game {
     this.debugBlockColorPalette = [];
     this.debugImageBucketColorCache = new Map();
     this.generatedBackdropCache = null;
+    this.referenceAssetsRebuildScheduled = false;
 
     this.sprites = {
       holeTile: null,
@@ -2351,6 +2372,7 @@ class Game {
     const blockFieldLayer = createBufferCanvas(this.width, this.height, true);
     this.blockFieldLayer = blockFieldLayer.canvas;
     this.blockFieldCtx = blockFieldLayer.ctx;
+    this.blockFieldLayerDirty = true;
 
     this.conveyor = new Conveyor();
     this.spiralOrderByCell = this.buildSpiralOrderMap(LAYOUT.fieldCols, LAYOUT.fieldRows);
@@ -2363,6 +2385,10 @@ class Game {
     this.trackProbeWindowCache = new Map();
     this.trackSideSamples = null;
     this.trackSideSamplesKey = "";
+    this.nextSpiralTargetsCache = [];
+    this.nextSpiralTargetsCacheVersion = -1;
+    this.contourGhostTargetsCache = [];
+    this.contourGhostTargetsCacheVersion = -1;
     this.units = [];
     this.projectiles = [];
     this.particles = [];
@@ -2637,6 +2663,18 @@ class Game {
     this.rebuildBlockFieldLayer();
   }
 
+  scheduleReferenceAssetsRebuild() {
+    if (this.referenceAssetsRebuildScheduled) {
+      return;
+    }
+    this.referenceAssetsRebuildScheduled = true;
+    requestAnimationFrame(() => {
+      this.referenceAssetsRebuildScheduled = false;
+      this.buildReferenceAssets();
+      this.invalidate(false);
+    });
+  }
+
   initChickenSpriteImages() {
     for (const [color, src] of Object.entries(CHICKEN_SPRITE_SOURCE_BY_COLOR)) {
       this.registerChickenSpriteImageSource(color, src);
@@ -2662,7 +2700,7 @@ class Game {
     }
     CHICKEN_SPRITE_SOURCE_BY_COLOR[normalizedColor] = normalizedSrc;
     const image = new Image();
-    image.decoding = "sync";
+    image.decoding = "async";
     image.src = normalizedSrc;
     image.onload = () => {
       try {
@@ -2673,8 +2711,7 @@ class Game {
       } catch {
         // On file://, reading pixels can throw SecurityError (tainted canvas).
       }
-      this.buildReferenceAssets();
-      this.invalidate(false);
+      this.scheduleReferenceAssetsRebuild();
     };
     image.onerror = () => {
       delete this.chickenSpriteColorSampleByColor[normalizedColor];
@@ -2772,7 +2809,7 @@ class Game {
     }
     BLOCK_TILE_SOURCE_BY_COLOR[normalizedColor] = normalizedSrc;
     const image = new Image();
-    image.decoding = "sync";
+    image.decoding = "async";
     image.src = normalizedSrc;
     image.onload = () => {
       try {
@@ -2785,8 +2822,7 @@ class Game {
         // On file://, reading pixels can throw SecurityError (tainted canvas).
       }
       this.rebuildBlockColorSamplerPalette();
-      this.buildReferenceAssets();
-      this.invalidate(false);
+      this.scheduleReferenceAssetsRebuild();
     };
     image.onerror = () => {
       delete this.blockTileColorSampleByColor[normalizedColor];
@@ -3601,6 +3637,18 @@ class Game {
         offsetY: 0,
       });
     }
+    this.blockFieldLayerDirty = false;
+  }
+
+  markBlockFieldLayerDirty() {
+    this.blockFieldLayerDirty = true;
+  }
+
+  ensureBlockFieldLayerFresh() {
+    if (!this.blockFieldLayerDirty) {
+      return;
+    }
+    this.rebuildBlockFieldLayer();
   }
 
   drawTiledBackdrop(ctx, rect, fillColor, palette, shadeDark) {
@@ -5423,6 +5471,9 @@ class Game {
   }
 
   spawnImpactRing(x, y, color, size = 1) {
+    while (this.impactRings.length >= MAX_ACTIVE_IMPACT_RINGS) {
+      this.impactRings.shift();
+    }
     const colorConfig = getBlockColorConfig(color);
     this.impactRings.push({
       x,
@@ -5437,6 +5488,9 @@ class Game {
   }
 
   spawnSlotBurst(x, y, color) {
+    while (this.slotBursts.length >= MAX_ACTIVE_SLOT_BURSTS) {
+      this.slotBursts.shift();
+    }
     const colorConfig = getBlockColorConfig(color);
     this.slotBursts.push({
       x,
@@ -5450,6 +5504,9 @@ class Game {
   }
 
   spawnFloatText(x, y, text, color = "#ffffff", scale = 1) {
+    while (this.floatTexts.length >= MAX_ACTIVE_FLOAT_TEXTS) {
+      this.floatTexts.shift();
+    }
     this.floatTexts.push({
       x,
       y,
@@ -5667,6 +5724,9 @@ class Game {
   }
 
   getNextSpiralTargets() {
+    if (this.nextSpiralTargetsCacheVersion === this.targetingCacheVersion) {
+      return this.nextSpiralTargetsCache;
+    }
     let minPendingSpiralIndex = Number.POSITIVE_INFINITY;
 
     for (const block of this.blocksBySpiral) {
@@ -5676,7 +5736,9 @@ class Game {
       minPendingSpiralIndex = Math.min(minPendingSpiralIndex, block.spiralIndex);
     }
     if (!Number.isFinite(minPendingSpiralIndex)) {
-      return [];
+      this.nextSpiralTargetsCache = [];
+      this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
+      return this.nextSpiralTargetsCache;
     }
 
     const targets = [];
@@ -5710,7 +5772,9 @@ class Game {
 
     if (targets.length > 0) {
       targets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-      return targets;
+      this.nextSpiralTargetsCache = targets;
+      this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
+      return this.nextSpiralTargetsCache;
     }
 
     // Safety fallback: if strict filter removed everything, keep inner ring available.
@@ -5721,16 +5785,26 @@ class Game {
       }
     }
     fallbackTargets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-    return fallbackTargets;
+    this.nextSpiralTargetsCache = fallbackTargets;
+    this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
+    return this.nextSpiralTargetsCache;
   }
 
   getContourGhostTargets() {
+    if (this.contourGhostTargetsCacheVersion === this.targetingCacheVersion) {
+      return this.contourGhostTargetsCache;
+    }
     if (this.remainingBlocks <= 0) {
-      return [];
+      this.contourGhostTargetsCache = [];
+      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
+      return this.contourGhostTargetsCache;
     }
     const hasFilledBlocks = this.remainingBlocks < this.blocks.length;
     if (!hasFilledBlocks) {
-      return this.getNextSpiralTargets();
+      const targets = this.getNextSpiralTargets();
+      this.contourGhostTargetsCache = targets;
+      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
+      return this.contourGhostTargetsCache;
     }
 
     const contourTargets = [];
@@ -5756,10 +5830,15 @@ class Game {
     }
 
     if (contourTargets.length === 0) {
-      return this.getNextSpiralTargets();
+      const targets = this.getNextSpiralTargets();
+      this.contourGhostTargetsCache = targets;
+      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
+      return this.contourGhostTargetsCache;
     }
     contourTargets.sort((a, b) => (a.spiralIndex - b.spiralIndex) || (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-    return contourTargets;
+    this.contourGhostTargetsCache = contourTargets;
+    this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
+    return this.contourGhostTargetsCache;
   }
 
   getSpiralBuildPriority(target, forwardDistance) {
@@ -5842,6 +5921,10 @@ class Game {
     this.targetingCacheVersion += 1;
     this.allowedReachableProbeCache.clear();
     this.trackProbeWindowCache.clear();
+    this.nextSpiralTargetsCache = [];
+    this.nextSpiralTargetsCacheVersion = -1;
+    this.contourGhostTargetsCache = [];
+    this.contourGhostTargetsCacheVersion = -1;
     if (clearTrackSamples) {
       this.trackSideSamples = null;
       this.trackSideSamplesKey = "";
@@ -6283,7 +6366,7 @@ class Game {
       if (!this.doesTargetMatchTrackRegionFrontierLock(target, frontierLock)) {
         continue;
       }
-      if (!this.isTargetOnTrackRegionFrontier(target, sourceRegion, activeTargets)) {
+      if (!frontierLock && !this.isTargetOnTrackRegionFrontier(target, sourceRegion, activeTargets)) {
         continue;
       }
       const allowedProbes = this.getAllowedReachableProbesForTarget(target);
@@ -6352,7 +6435,7 @@ class Game {
     block.hitFlash = 1;
     this.remainingBlocks -= 1;
     this.invalidateTargetingCaches();
-    this.rebuildBlockFieldLayer();
+    this.markBlockFieldLayerDirty();
 
     const center = this.blockCenter(block);
     this.spawnParticles(center.x, center.y, color, 28);
@@ -6374,6 +6457,9 @@ class Game {
   }
 
   spawnBlockWave(x, y) {
+    while (this.blockWaves.length >= MAX_ACTIVE_BLOCK_WAVES) {
+      this.blockWaves.shift();
+    }
     this.blockWaves.push({
       x,
       y,
@@ -6394,6 +6480,9 @@ class Game {
       bandWidth: 46,
       jumpHeight: 7,
     });
+    while (this.blockWaves.length > MAX_ACTIVE_BLOCK_WAVES) {
+      this.blockWaves.shift();
+    }
   }
 
   blockCenter(block) {
@@ -6404,9 +6493,14 @@ class Game {
   }
 
   spawnParticles(x, y, color, amount) {
+    if (this.particles.length >= MAX_ACTIVE_PARTICLES) {
+      return;
+    }
     const particleColor = getBlockColorConfig(color).particle;
-    for (let i = 0; i < amount; i++) {
-      const angle = (Math.PI * 2 * i) / amount + Math.random() * 0.3;
+    const available = Math.max(0, MAX_ACTIVE_PARTICLES - this.particles.length);
+    const spawnAmount = Math.min(amount, available);
+    for (let i = 0; i < spawnAmount; i++) {
+      const angle = (Math.PI * 2 * i) / Math.max(1, spawnAmount) + Math.random() * 0.3;
       const speed = 36 + Math.random() * 80;
       this.particles.push({
         x,
@@ -7095,20 +7189,60 @@ class Game {
   }
 
   drawDestroyedBlocks(ctx) {
-    if (this.blockWaves.length === 0 && this.blockFieldLayer) {
+    this.ensureBlockFieldLayerFresh();
+    if (this.blockFieldLayer) {
       ctx.drawImage(this.blockFieldLayer, 0, 0);
     } else {
       for (const block of this.blocks) {
         if (!block.alive) {
           continue;
         }
-        const waveOffsetY = this.getBlockWaveOffsetY(block);
         this.drawVolumetricBlock(ctx, block, block.x, block.y, {
           alpha: 0.96,
           shadowOpacity: 0.22,
           bevelStrength: 0.26,
-          offsetY: waveOffsetY,
+          offsetY: 0,
         });
+      }
+    }
+
+    if (this.blockWaves.length > 0) {
+      const movedBlocks = [];
+      for (const block of this.blocks) {
+        if (!block.alive) {
+          continue;
+        }
+        const waveOffsetY = this.getBlockWaveOffsetY(block);
+        if (Math.abs(waveOffsetY) < WAVE_OFFSET_VISUAL_EPSILON) {
+          continue;
+        }
+        movedBlocks.push({ block, waveOffsetY });
+      }
+
+      if (movedBlocks.length > 0) {
+        for (const item of movedBlocks) {
+          const block = item.block;
+          const patchPad = Math.max(2, Math.ceil(block.size * 0.2));
+          const srcX = Math.max(0, Math.floor(block.x - patchPad));
+          const srcY = Math.max(0, Math.floor(block.y - patchPad));
+          const srcW = Math.min(this.width - srcX, Math.ceil(block.size + patchPad * 2));
+          const srcH = Math.min(this.height - srcY, Math.ceil(block.size + patchPad * 2));
+          if (srcW <= 0 || srcH <= 0) {
+            continue;
+          }
+          if (this.staticSceneLayer) {
+            ctx.drawImage(this.staticSceneLayer, srcX, srcY, srcW, srcH, srcX, srcY, srcW, srcH);
+          }
+        }
+
+        for (const item of movedBlocks) {
+          this.drawVolumetricBlock(ctx, item.block, item.block.x, item.block.y, {
+            alpha: 0.96,
+            shadowOpacity: 0.22,
+            bevelStrength: 0.26,
+            offsetY: item.waveOffsetY,
+          });
+        }
       }
     }
 
@@ -7661,33 +7795,42 @@ class Game {
   }
 
   drawParticles(ctx) {
+    if (this.particles.length === 0) {
+      return;
+    }
+    ctx.save();
     for (const particle of this.particles) {
-      ctx.save();
       ctx.globalAlpha = particle.life / particle.maxLife;
       ctx.fillStyle = particle.color;
       ctx.fillRect(particle.x - particle.size / 2, particle.y - particle.size / 2, particle.size, particle.size);
-      ctx.restore();
     }
+    ctx.restore();
   }
 
   drawImpactFx(ctx) {
+    if (this.impactRings.length > 0) {
+      ctx.save();
+    }
     for (const ring of this.impactRings) {
       const t = 1 - ring.life / ring.maxLife;
       const radius = lerp(ring.startR, ring.endR, easeOutCubic(t));
-      ctx.save();
       ctx.globalAlpha = (1 - t) * 0.95;
       ctx.lineWidth = ring.lineWidth;
       ctx.strokeStyle = ring.color;
       ctx.beginPath();
       ctx.arc(ring.x, ring.y, radius, 0, Math.PI * 2);
       ctx.stroke();
+    }
+    if (this.impactRings.length > 0) {
       ctx.restore();
     }
 
+    if (this.slotBursts.length > 0) {
+      ctx.save();
+    }
     for (const burst of this.slotBursts) {
       const t = 1 - burst.life / burst.maxLife;
       const radius = lerp(burst.r, burst.maxR, easeOutCubic(t));
-      ctx.save();
       ctx.globalAlpha = (1 - t) * 0.58;
       const gradient = ctx.createRadialGradient(burst.x, burst.y, 0, burst.x, burst.y, radius);
       gradient.addColorStop(0, burst.color);
@@ -7696,25 +7839,30 @@ class Game {
       ctx.beginPath();
       ctx.arc(burst.x, burst.y, radius, 0, Math.PI * 2);
       ctx.fill();
+    }
+    if (this.slotBursts.length > 0) {
       ctx.restore();
     }
   }
 
   drawFloatingTexts(ctx) {
+    if (this.floatTexts.length === 0) {
+      return;
+    }
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = COLORS.textGlow;
+    ctx.lineWidth = 6;
     for (const item of this.floatTexts) {
       const t = item.maxLife > 0 ? item.life / item.maxLife : 0;
-      ctx.save();
       ctx.globalAlpha = t;
       ctx.font = `900 ${Math.round(46 * item.scale)}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.strokeStyle = COLORS.textGlow;
-      ctx.lineWidth = 6;
       ctx.strokeText(item.text, item.x, item.y);
       ctx.fillStyle = item.color;
       ctx.fillText(item.text, item.x, item.y);
-      ctx.restore();
     }
+    ctx.restore();
   }
 
   drawConfetti(ctx) {
@@ -8307,7 +8455,7 @@ class Game {
     if (animating) {
       this.simAccumulator = Math.min(MAX_SIMULATION_DT, this.simAccumulator + dt);
       let steps = 0;
-      const maxSteps = 12;
+      const maxSteps = MAX_SIM_STEPS_PER_FRAME;
       while (this.simAccumulator >= FIXED_DT && steps < maxSteps) {
         this.update(FIXED_DT);
         this.simAccumulator -= FIXED_DT;
@@ -8368,7 +8516,8 @@ class Game {
     if (animate || this.hasActiveAnimations()) {
       if (!this.isLoopRunning) {
         this.isLoopRunning = true;
-        this.lastTimestamp = performance.now();
+        const now = performance.now();
+        this.lastTimestamp = now;
         this.simAccumulator = 0;
         requestAnimationFrame((t) => this.frame(t));
       }
