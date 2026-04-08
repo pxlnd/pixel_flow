@@ -1,6 +1,7 @@
 class SoundManager {
   constructor(definitions = {}) {
     this.poolByName = new Map();
+    this.unlocked = false;
     if (typeof Audio !== "function") {
       return;
     }
@@ -34,6 +35,55 @@ class SoundManager {
         cursor: 0,
       });
     }
+  }
+
+  unlock() {
+    if (this.unlocked) {
+      return;
+    }
+    for (const pool of this.poolByName.values()) {
+      for (const audio of pool.channels) {
+        const prevMuted = !!audio.muted;
+        let settled = false;
+        const settle = () => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          try {
+            audio.pause();
+            audio.currentTime = 0;
+          } catch {
+            // Ignore reset failures.
+          }
+          audio.muted = prevMuted;
+        };
+        try {
+          audio.muted = true;
+          audio.currentTime = 0;
+          const playResult = audio.play();
+          // iOS can keep the promise pending for a while; don't leave channel muted forever.
+          const timeoutId = setTimeout(settle, 450);
+          if (playResult && typeof playResult.then === "function") {
+            playResult
+              .then(() => {
+                clearTimeout(timeoutId);
+                settle();
+              })
+              .catch(() => {
+                clearTimeout(timeoutId);
+                settle();
+              });
+          } else {
+            clearTimeout(timeoutId);
+            settle();
+          }
+        } catch {
+          settle();
+        }
+      }
+    }
+    this.unlocked = true;
   }
 
   play(name) {
@@ -71,4 +121,3 @@ class SoundManager {
     }
   }
 }
-
