@@ -8461,8 +8461,9 @@ class Game {
       return;
     }
     if (this.gameState === "victory" && isInsideRect(x, y, this.getVictoryNextButtonRect())) {
-      if (this.goToNextLevelFromVictory()) {
+      if (this.getNextPlayableLevelId()) {
         this.playSound("lvl_complete_button");
+        this.goToNextLevelFromVictory();
         return;
       }
     }
@@ -9725,6 +9726,15 @@ class Game {
 
   bindEvents() {
     window.addEventListener("resize", () => this.resize());
+    const unlockAudio = () => {
+      if (this.soundManager && typeof this.soundManager.unlock === "function") {
+        this.soundManager.unlock();
+      }
+    };
+    window.addEventListener("pointerdown", unlockAudio, { passive: true, once: true });
+    window.addEventListener("touchstart", unlockAudio, { passive: true, once: true });
+    window.addEventListener("mousedown", unlockAudio, { passive: true, once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
     window.addEventListener("keydown", (event) => {
       if (event.code !== "Space" || event.repeat) {
         return;
@@ -9745,6 +9755,7 @@ class Game {
       this.handlePointerMove(point.x, point.y);
     });
     this.canvas.addEventListener("pointerdown", (event) => {
+      unlockAudio();
       const point = this.getPointerPosition(event);
       if (!point) {
         return;
