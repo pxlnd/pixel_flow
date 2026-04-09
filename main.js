@@ -8252,6 +8252,10 @@ class Game {
     return { offer: offerRect, button: buttonRect };
   }
 
+  shouldShowLoseOffer() {
+    return !resolveExternalSubscriptionStatus(this);
+  }
+
   drawLoseBirdRow(ctx, popupX, popupY, popupW, popupH, alpha = 1) {
     const sx = popupW / 646;
     const sy = popupH / 663;
@@ -8491,8 +8495,12 @@ class Game {
     const loseButtons = this.getLoseButtonRects(drawRect);
     this.loseContinueRect = loseButtons.left;
     this.loseFreeRect = loseButtons.right;
-    const loseOfferRects = this.getLoseOfferRects(drawRect);
-    this.loseOfferPurchaseRect = loseOfferRects.button;
+    if (this.shouldShowLoseOffer()) {
+      const loseOfferRects = this.getLoseOfferRects(drawRect);
+      this.loseOfferPurchaseRect = loseOfferRects.button;
+    } else {
+      this.loseOfferPurchaseRect = { x: 0, y: 0, w: 0, h: 0 };
+    }
 
     ctx.save();
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -8521,7 +8529,9 @@ class Game {
       ctx.drawImage(this.losePopupImage, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
       this.drawLoseBirdRow(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h, fade);
       this.drawLoseButtons(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
-      this.drawLoseOffer(ctx, drawRect, fade);
+      if (this.shouldShowLoseOffer()) {
+        this.drawLoseOffer(ctx, drawRect, fade);
+      }
       ctx.restore();
       return;
     }
@@ -8593,7 +8603,9 @@ class Game {
 
     this.drawLoseSpaceBadge(ctx, drawRect.x + drawRect.w * 0.5, drawRect.y + 314, 430, 250);
     this.drawLoseButtons(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
-    this.drawLoseOffer(ctx, drawRect, fade);
+    if (this.shouldShowLoseOffer()) {
+      this.drawLoseOffer(ctx, drawRect, fade);
+    }
   }
 
   render() {
@@ -8792,7 +8804,7 @@ class Game {
       const overClose = isInsideRect(x, y, this.loseCloseRect);
       const overContinue = this.canContinueFromLoseForCoins() && isInsideRect(x, y, this.loseContinueRect);
       const overFree = isInsideRect(x, y, this.loseFreeRect);
-      const overOfferPurchase = isInsideRect(x, y, this.loseOfferPurchaseRect);
+      const overOfferPurchase = this.shouldShowLoseOffer() && isInsideRect(x, y, this.loseOfferPurchaseRect);
       this.canvas.style.cursor = overClose || overContinue || overFree || overOfferPurchase ? "pointer" : "default";
       return;
     }
@@ -8853,7 +8865,7 @@ class Game {
         if (!this.continueFromLoseWithAd()) {
           this.playSound("cant_select");
         }
-      } else if (isInsideRect(x, y, this.loseOfferPurchaseRect)) {
+      } else if (this.shouldShowLoseOffer() && isInsideRect(x, y, this.loseOfferPurchaseRect)) {
         dispatchUnitySubscriptionRequestEvent();
       }
       return;
@@ -10324,10 +10336,12 @@ let pendingExternalLevelSelection = null;
 let pendingExternalCoinsCount = null;
 let pendingExternalHeartsCount = null;
 let pendingExternalMaxLivesCount = null;
+let pendingExternalSubscriptionStatus = null;
 let pendingExternalTimeOutCoinsCost = null;
 const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
 const EXTERNAL_HEARTS_STORAGE_KEY = "pixelflow.external.hearts.v1";
 const EXTERNAL_MAX_LIVES_STORAGE_KEY = "pixelflow.external.max_lives.v1";
+const EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY = "pixelflow.external.subscription_status.v1";
 const EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY = "pixelflow.external.timeout_coins_cost.v1";
 const DEFAULT_TIMEOUT_COINS_COST = 50;
 
@@ -10384,7 +10398,18 @@ function normalizeExternalMaxLivesCount(value) {
   if (raw.length === 0) {
     return null;
   }
-  const numeric = Number(raw);
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  if (normalizedRaw.length === 0) {
+    return null;
+  }
+  const numeric = Number(normalizedRaw);
   if (!Number.isFinite(numeric)) {
     return null;
   }
@@ -10397,6 +10422,41 @@ function persistExternalMaxLivesCount(value) {
   }
   try {
     window.localStorage.setItem(EXTERNAL_MAX_LIVES_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeExternalSubscriptionStatus(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  const lowered = normalizedRaw.toLowerCase();
+  if (lowered === "true" || lowered === "1" || lowered === "yes") {
+    return true;
+  }
+  if (lowered === "false" || lowered === "0" || lowered === "no") {
+    return false;
+  }
+  return null;
+}
+
+function persistExternalSubscriptionStatus(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY, value ? "1" : "0");
     return true;
   } catch {
     return false;
@@ -10481,6 +10541,41 @@ function resolveExternalHeartsCount(gameInstance) {
   }
   const fromStorage = loadExternalCountFromStorage(EXTERNAL_HEARTS_STORAGE_KEY);
   return fromStorage ?? 0;
+}
+
+function resolveExternalMaxLivesCount(gameInstance) {
+  const fromGame = normalizeExternalMaxLivesCount(gameInstance?.externalMaxLivesCount);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalMaxLivesCount(pendingExternalMaxLivesCount);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_MAX_LIVES_STORAGE_KEY);
+  return fromStorage ?? 0;
+}
+
+function resolveExternalSubscriptionStatus(gameInstance) {
+  const fromGame = normalizeExternalSubscriptionStatus(gameInstance?.externalSubscriptionStatus);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalSubscriptionStatus(pendingExternalSubscriptionStatus);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    const fromStorage = normalizeExternalSubscriptionStatus(
+      window.localStorage.getItem(EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY)
+    );
+    return fromStorage ?? false;
+  } catch {
+    return false;
+  }
 }
 
 function resolveExternalTimeOutCoinsCost(gameInstance) {
@@ -10575,6 +10670,14 @@ if (typeof window !== "undefined") {
     }
     return persistExternalMaxLivesCount(normalized);
   };
+  window.setSubscriptionStatus = (subscriptionStatus) => {
+    pendingExternalSubscriptionStatus = subscriptionStatus;
+    const normalized = normalizeExternalSubscriptionStatus(subscriptionStatus);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalSubscriptionStatus(normalized);
+  };
   window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
   window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
   window.rewardResult = () => false;
@@ -10592,6 +10695,8 @@ async function bootstrapGame() {
 
   const canvas = document.getElementById("gameCanvas");
   const game = new Game(canvas);
+  game.externalMaxLivesCount = resolveExternalMaxLivesCount(game);
+  game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
 
   const resolveExternalLevelId = (value) => {
     const levels = Array.isArray(game.availableLevels) ? game.availableLevels : [];
@@ -10671,6 +10776,16 @@ async function bootstrapGame() {
     game.externalMaxLivesCount = normalized;
     return persistExternalMaxLivesCount(normalized);
   };
+  window.setSubscriptionStatus = (subscriptionStatus) => {
+    pendingExternalSubscriptionStatus = subscriptionStatus;
+    const normalized = normalizeExternalSubscriptionStatus(subscriptionStatus);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalSubscriptionStatus = normalized;
+    game.invalidate(false);
+    return persistExternalSubscriptionStatus(normalized);
+  };
   const applyExternalTimeOutCoinsCost = (timeOutCoinsCost) => {
     pendingExternalTimeOutCoinsCost = timeOutCoinsCost;
     const normalized = normalizeExternalTimeOutCoinsCost(timeOutCoinsCost);
@@ -10705,6 +10820,9 @@ async function bootstrapGame() {
   }
   if (pendingExternalMaxLivesCount !== null && pendingExternalMaxLivesCount !== undefined) {
     window.setMaxLives(pendingExternalMaxLivesCount);
+  }
+  if (pendingExternalSubscriptionStatus !== null && pendingExternalSubscriptionStatus !== undefined) {
+    window.setSubscriptionStatus(pendingExternalSubscriptionStatus);
   }
   if (pendingExternalTimeOutCoinsCost !== null && pendingExternalTimeOutCoinsCost !== undefined) {
     window.setTimeOutCoinsCost(pendingExternalTimeOutCoinsCost);
