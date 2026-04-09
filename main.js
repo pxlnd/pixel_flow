@@ -109,7 +109,6 @@ const SOUND_DEFINITIONS = {
   back_to_cell: { src: "sounds/back_to_cell.wav", channels: 3, volume: 0.8 },
   cant_select: { src: "sounds/cant_select.wav", channels: 2, volume: 0.9 },
   fail: { src: "sounds/Fail.mp3", channels: 1, volume: 0.9 },
-  lvl_complete_button: { src: "sounds/lvl_complete_button.mp3", channels: 2, volume: 0.9 },
   no_moves: { src: "sounds/no_moves.wav", channels: 1, volume: 0.9 },
   win: { src: "sounds/Win.mp3", channels: 1, volume: 0.9 },
   buble: { src: "sounds/Bubble.mp3", channels: 5, volume: 0.75 },
@@ -394,12 +393,6 @@ const VICTORY_FLOAT_SPEED = 0.85;
 const VICTORY_FLOAT_AMPLITUDE = 12;
 const VICTORY_ART_OFFSET_Y = 110;
 const VICTORY_CONFETTI_RATE = 42;
-const VICTORY_NEXT_BUTTON_UI = {
-  w: 356,
-  h: 98,
-  radius: 30,
-  bottomMargin: 60,
-};
 const LAUNCH_DURATION = 0.24;
 const LAND_DURATION = 0.2;
 const STREAK_DECAY_TIME = 1.45;
@@ -2453,7 +2446,6 @@ class Game {
     this.restartButtonRect = { x: 0, y: 0, w: COINS_UI.panelW, h: COINS_UI.panelH };
     this.loseCloseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
-    this.victoryNextButtonRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseOfferPurchaseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.cards = [];
@@ -2486,6 +2478,7 @@ class Game {
     this.victoryConfettiTime = 0;
     this.victoryFloatTime = 0;
     this.victoryConfettiSpawnCarry = 0;
+    this.victoryCompleteEventPending = false;
     this.levelStartFade = 0;
     this.losePopupAppear = 1;
     this.debugPanel = document.getElementById("debugPanel");
@@ -4006,6 +3999,7 @@ class Game {
     this.victoryConfettiTime = 0;
     this.victoryFloatTime = 0;
     this.victoryConfettiSpawnCarry = 0;
+    this.victoryCompleteEventPending = false;
     this.levelStartFade = 1;
     this.losePopupAppear = 1;
 
@@ -6626,6 +6620,7 @@ class Game {
     this.cameraShakeX = 0;
     this.cameraShakeY = 0;
     this.spawnConfettiBurst(64);
+    this.victoryCompleteEventPending = true;
   }
 
   startLoseSequence() {
@@ -6855,6 +6850,14 @@ class Game {
       this.victoryFloatTime += dt;
       this.updateConfetti(dt);
       this.cameraZoom += (this.cameraZoomTarget - this.cameraZoom) * Math.min(1, dt * VICTORY_ZOOM_SPEED);
+      if (
+        this.victoryCompleteEventPending &&
+        this.victoryConfettiTime <= 0 &&
+        Math.abs(this.cameraZoomTarget - this.cameraZoom) <= 0.01
+      ) {
+        this.victoryCompleteEventPending = false;
+        dispatchUnityCompleteEvent(this);
+      }
       this.cameraShakeTime = 0;
       this.cameraShakeX = 0;
       this.cameraShakeY = 0;
@@ -7092,112 +7095,6 @@ class Game {
         bevelStrength: 0.34,
       });
     }
-  }
-
-  getVictoryNextButtonRect() {
-    const width = Math.round(clamp(VICTORY_NEXT_BUTTON_UI.w, 240, this.width * 0.72));
-    const height = VICTORY_NEXT_BUTTON_UI.h;
-    const y = Math.max(0, Math.round(this.height - height - VICTORY_NEXT_BUTTON_UI.bottomMargin));
-    return {
-      x: Math.round((this.width - width) * 0.5),
-      y,
-      w: width,
-      h: height,
-    };
-  }
-
-  getNextPlayableLevelId() {
-    const levels = this.getTopLevelDebugList();
-    if (levels.length === 0) {
-      return null;
-    }
-    const currentId = this.getValidLevelId(this.currentLevelId);
-    const currentIndex = levels.findIndex((level) => String(level.id) === currentId);
-    if (currentIndex < 0) {
-      return String(levels[0].id);
-    }
-    if (currentIndex + 1 >= levels.length) {
-      return null;
-    }
-    return String(levels[currentIndex + 1].id);
-  }
-
-  goToNextLevelFromVictory() {
-    const nextLevelId = this.getNextPlayableLevelId();
-    if (!nextLevelId) {
-      return false;
-    }
-    this.applyLevelConfig(nextLevelId, { restart: true });
-    this.debugSaveTargetDirty = false;
-    this.syncDebugContentSelectors();
-    this.saveDebugSettings();
-    return true;
-  }
-
-  drawVictoryNextButton(ctx, enabled) {
-    const rect = this.getVictoryNextButtonRect();
-    this.victoryNextButtonRect = rect;
-    const radius = VICTORY_NEXT_BUTTON_UI.radius;
-    const isEnabled = !!enabled;
-
-    ctx.save();
-    ctx.shadowColor = isEnabled ? "rgba(24, 74, 20, 0.44)" : "rgba(40, 48, 60, 0.28)";
-    ctx.shadowBlur = isEnabled ? 22 : 14;
-    ctx.shadowOffsetY = isEnabled ? 8 : 5;
-    const fillGrad = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
-    if (isEnabled) {
-      fillGrad.addColorStop(0, "#a9ef57");
-      fillGrad.addColorStop(1, "#56c719");
-    } else {
-      fillGrad.addColorStop(0, "#b8c0cd");
-      fillGrad.addColorStop(1, "#8e99aa");
-    }
-    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, radius);
-    ctx.fillStyle = fillGrad;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = isEnabled ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.3)";
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    ctx.globalAlpha = isEnabled ? 0.28 : 0.16;
-    roundedRect(ctx, rect.x + 10, rect.y + 8, rect.w - 20, Math.round(rect.h * 0.4), Math.max(14, radius - 10));
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.restore();
-
-    const text = "Next level";
-    ctx.save();
-    ctx.font = "900 42px \"Baloo 2\", \"Arial Rounded MT Bold\", \"Trebuchet MS\", Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = isEnabled ? "rgba(22, 76, 16, 0.62)" : "rgba(63, 73, 90, 0.52)";
-    ctx.fillStyle = "#ffffff";
-    const textX = rect.x + rect.w * 0.5;
-    const textY = rect.y + rect.h * 0.5 + 1;
-    ctx.strokeText(text, textX, textY);
-    ctx.fillText(text, textX, textY);
-    ctx.restore();
-
-    if (!isEnabled) {
-      return;
-    }
-    ctx.save();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.86)";
-    ctx.lineWidth = 6;
-    ctx.lineCap = "round";
-    const arrowX = rect.x + rect.w - 46;
-    const arrowY = rect.y + rect.h * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(arrowX - 24, arrowY - 14);
-    ctx.lineTo(arrowX - 4, arrowY);
-    ctx.lineTo(arrowX - 24, arrowY + 14);
-    ctx.stroke();
-    ctx.restore();
   }
 
   drawVolumetricBlock(ctx, block, x, y, options = {}) {
@@ -8641,7 +8538,6 @@ class Game {
       this.drawTopTimerPanel(ctx);
       this.drawTopCoinsPanel(ctx);
       this.drawBackButton(ctx);
-      this.drawVictoryNextButton(ctx, !!this.getNextPlayableLevelId());
       this.drawLevelStartFade(ctx);
       ctx.restore();
       this.needsRender = false;
@@ -8809,10 +8705,9 @@ class Game {
       return;
     }
     if (this.gameState === "victory") {
-      const overNextLevel = !!this.getNextPlayableLevelId() && isInsideRect(x, y, this.getVictoryNextButtonRect());
       const overBack = isInsideRect(x, y, this.backButtonRect);
       const overRestart = isInsideRect(x, y, this.restartButtonRect);
-      this.canvas.style.cursor = overNextLevel || overBack || overRestart ? "pointer" : "default";
+      this.canvas.style.cursor = overBack || overRestart ? "pointer" : "default";
       return;
     }
     const overBack = isInsideRect(x, y, this.backButtonRect);
@@ -8869,13 +8764,6 @@ class Game {
         dispatchUnitySubscriptionRequestEvent();
       }
       return;
-    }
-    if (this.gameState === "victory" && isInsideRect(x, y, this.getVictoryNextButtonRect())) {
-      if (this.getNextPlayableLevelId()) {
-        this.playSound("lvl_complete_button");
-        this.goToNextLevelFromVictory();
-        return;
-      }
     }
     if (isInsideRect(x, y, this.backButtonRect)) {
       dispatchUnityCloseEvent(this);
@@ -10603,6 +10491,21 @@ function dispatchUnityCloseEvent(gameInstance) {
   const closeUrl = `uniwebview://close?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
   try {
     window.location.href = closeUrl;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnityCompleteEvent(gameInstance) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const coinsCount = resolveExternalCoinsCount(gameInstance);
+  const heartsCount = resolveExternalHeartsCount(gameInstance);
+  const completeUrl = `uniwebview://complete?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
+  try {
+    window.location.href = completeUrl;
     return true;
   } catch {
     return false;
