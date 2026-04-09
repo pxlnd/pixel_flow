@@ -10079,7 +10079,9 @@ class Game {
 
 let pendingExternalLevelSelection = null;
 let pendingExternalCoinsCount = null;
+let pendingExternalHeartsCount = null;
 const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
+const EXTERNAL_HEARTS_STORAGE_KEY = "pixelflow.external.hearts.v1";
 
 function normalizeExternalCoinsCount(value) {
   const raw = String(value ?? "").trim();
@@ -10105,6 +10107,30 @@ function persistExternalCoinsCount(value) {
   }
 }
 
+function normalizeExternalHeartsCount(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function persistExternalHeartsCount(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_HEARTS_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 if (typeof window !== "undefined") {
   window.setLevel = (indexOrId) => {
     pendingExternalLevelSelection = indexOrId;
@@ -10117,6 +10143,14 @@ if (typeof window !== "undefined") {
       return false;
     }
     return persistExternalCoinsCount(normalized);
+  };
+  window.setHearts = (heartsCount) => {
+    pendingExternalHeartsCount = heartsCount;
+    const normalized = normalizeExternalHeartsCount(heartsCount);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalHeartsCount(normalized);
   };
 }
 
@@ -10192,6 +10226,15 @@ async function bootstrapGame() {
     game.externalCoinsCount = normalized;
     return persistExternalCoinsCount(normalized);
   };
+  window.setHearts = (heartsCount) => {
+    pendingExternalHeartsCount = heartsCount;
+    const normalized = normalizeExternalHeartsCount(heartsCount);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalHeartsCount = normalized;
+    return persistExternalHeartsCount(normalized);
+  };
   window.advanceTime = (ms) => game.advanceTime(ms);
   window.render_game_to_text = () => game.renderGameToText();
   window.debug6 = () => game.triggerDebug6();
@@ -10201,6 +10244,9 @@ async function bootstrapGame() {
   }
   if (pendingExternalCoinsCount !== null && pendingExternalCoinsCount !== undefined) {
     window.setCoins(pendingExternalCoinsCount);
+  }
+  if (pendingExternalHeartsCount !== null && pendingExternalHeartsCount !== undefined) {
+    window.setHearts(pendingExternalHeartsCount);
   }
 }
 
