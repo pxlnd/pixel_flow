@@ -8008,7 +8008,7 @@ class Game {
   }
 
   getLosePopupRect() {
-    const targetScale = 1.4;
+    const targetScale = 0.98;
     let w = LOSE_POPUP_UI.w * targetScale;
     let h = LOSE_POPUP_UI.h * targetScale;
     const fitScale = Math.min((this.width * 0.96) / w, (this.height * 0.9) / h, 1);
