@@ -10081,8 +10081,10 @@ class Game {
 let pendingExternalLevelSelection = null;
 let pendingExternalCoinsCount = null;
 let pendingExternalHeartsCount = null;
+let pendingExternalMaxLivesCount = null;
 const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
 const EXTERNAL_HEARTS_STORAGE_KEY = "pixelflow.external.hearts.v1";
+const EXTERNAL_MAX_LIVES_STORAGE_KEY = "pixelflow.external.max_lives.v1";
 
 function normalizeExternalCoinsCount(value) {
   const raw = String(value ?? "").trim();
@@ -10126,6 +10128,30 @@ function persistExternalHeartsCount(value) {
   }
   try {
     window.localStorage.setItem(EXTERNAL_HEARTS_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeExternalMaxLivesCount(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function persistExternalMaxLivesCount(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_MAX_LIVES_STORAGE_KEY, String(value));
     return true;
   } catch {
     return false;
@@ -10213,6 +10239,14 @@ if (typeof window !== "undefined") {
     }
     return persistExternalHeartsCount(normalized);
   };
+  window.setMaxLives = (maxLivesCount) => {
+    pendingExternalMaxLivesCount = maxLivesCount;
+    const normalized = normalizeExternalMaxLivesCount(maxLivesCount);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalMaxLivesCount(normalized);
+  };
 }
 
 async function bootstrapGame() {
@@ -10296,6 +10330,15 @@ async function bootstrapGame() {
     game.externalHeartsCount = normalized;
     return persistExternalHeartsCount(normalized);
   };
+  window.setMaxLives = (maxLivesCount) => {
+    pendingExternalMaxLivesCount = maxLivesCount;
+    const normalized = normalizeExternalMaxLivesCount(maxLivesCount);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalMaxLivesCount = normalized;
+    return persistExternalMaxLivesCount(normalized);
+  };
   window.advanceTime = (ms) => game.advanceTime(ms);
   window.render_game_to_text = () => game.renderGameToText();
   window.debug6 = () => game.triggerDebug6();
@@ -10308,6 +10351,9 @@ async function bootstrapGame() {
   }
   if (pendingExternalHeartsCount !== null && pendingExternalHeartsCount !== undefined) {
     window.setHearts(pendingExternalHeartsCount);
+  }
+  if (pendingExternalMaxLivesCount !== null && pendingExternalMaxLivesCount !== undefined) {
+    window.setMaxLives(pendingExternalMaxLivesCount);
   }
 }
 
