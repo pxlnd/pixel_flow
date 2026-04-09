@@ -109,7 +109,6 @@ const SOUND_DEFINITIONS = {
   back_to_cell: { src: "sounds/back_to_cell.wav", channels: 3, volume: 0.8 },
   cant_select: { src: "sounds/cant_select.wav", channels: 2, volume: 0.9 },
   fail: { src: "sounds/Fail.mp3", channels: 1, volume: 0.9 },
-  lvl_complete_button: { src: "sounds/lvl_complete_button.mp3", channels: 2, volume: 0.9 },
   no_moves: { src: "sounds/no_moves.wav", channels: 1, volume: 0.9 },
   win: { src: "sounds/Win.mp3", channels: 1, volume: 0.9 },
   buble: { src: "sounds/Bubble.mp3", channels: 5, volume: 0.75 },
@@ -394,12 +393,6 @@ const VICTORY_FLOAT_SPEED = 0.85;
 const VICTORY_FLOAT_AMPLITUDE = 12;
 const VICTORY_ART_OFFSET_Y = 110;
 const VICTORY_CONFETTI_RATE = 42;
-const VICTORY_NEXT_BUTTON_UI = {
-  w: 356,
-  h: 98,
-  radius: 30,
-  bottomMargin: 60,
-};
 const LAUNCH_DURATION = 0.24;
 const LAND_DURATION = 0.2;
 const STREAK_DECAY_TIME = 1.45;
@@ -456,6 +449,42 @@ const LOSE_POPUP_UI = {
   closeSize: 40,
 };
 const LOSE_POPUP_BIRDS_DROP_RATIO = 0.15;
+const LOSE_OFFER_UI = {
+  gapFromPopupBottom: 75,
+  widthToPopupRatio: 1,
+  sidePadding: 18,
+  bottomSafeMargin: 20,
+  fallbackW: 663,
+  fallbackH: 433,
+  fallbackButtonW: 392,
+  fallbackButtonH: 138,
+  buttonWidthRatio: 0.6,
+  buttonBottomOverlapFactor: 0.92,
+  buttonOffsetY: 30,
+};
+const LOSE_TOP_STATS_UI = {
+  topOffset: -8,
+  sidePadding: 18,
+  gap: 62,
+  targetHeight: 96,
+  maxScale: 1.08,
+  minScale: 0.72,
+  heartTextXRatio: 0.18,
+  heartTextYRatio: 0.57,
+  heartTextColor: "#ffffff",
+  heartTextStroke: "rgba(173, 21, 51, 0.95)",
+  livesTimerTextXRatio: 0.76,
+  livesTimerTextYRatio: 0.57,
+  livesTimerTextOffsetX: -12,
+  livesTimerTextOffsetY: -2,
+  coinsTextXRatio: 0.76,
+  coinsTextYRatio: 0.54,
+  coinsTextOffsetX: -20,
+  coinsTextOffsetY: -5,
+  coinsTextFontScale: 1.3,
+  coinsTextColor: "#17439c",
+  coinsTextStroke: "rgba(255, 255, 255, 0.9)",
+};
 const BASE_TOP_UI = {
   timerY: TIMER_PANEL_UI.y,
   timerW: TIMER_PANEL_UI.w,
@@ -2320,6 +2349,24 @@ class Game {
     this.losePopupBirdsImage = new Image();
     this.losePopupBirdsImage.src = "ui/loose.png";
     this.losePopupBirdsImage.decoding = "async";
+    this.loseTopHeartPanelImage = new Image();
+    this.loseTopHeartPanelImage.src = "ui/Lose/heart.png";
+    this.loseTopHeartPanelImage.decoding = "async";
+    this.loseTopCoinsPanelImage = new Image();
+    this.loseTopCoinsPanelImage.src = "ui/Lose/coins.png";
+    this.loseTopCoinsPanelImage.decoding = "async";
+    this.loseCoinsButtonImage = new Image();
+    this.loseCoinsButtonImage.src = "ui/Lose/coins_button.png";
+    this.loseCoinsButtonImage.decoding = "async";
+    this.loseAdsButtonImage = new Image();
+    this.loseAdsButtonImage.src = "ui/Lose/ads_button.png";
+    this.loseAdsButtonImage.decoding = "async";
+    this.loseOfferImage = new Image();
+    this.loseOfferImage.src = "ui/Lose/Offer.png";
+    this.loseOfferImage.decoding = "async";
+    this.loseOfferPurchaseButtonImage = new Image();
+    this.loseOfferPurchaseButtonImage.src = "ui/Lose/purchase_button.png";
+    this.loseOfferPurchaseButtonImage.decoding = "async";
     this.woodImage = new Image();
     this.woodImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "panel");
     this.woodImage.decoding = "async";
@@ -2403,8 +2450,8 @@ class Game {
     this.restartButtonRect = { x: 0, y: 0, w: COINS_UI.panelW, h: COINS_UI.panelH };
     this.loseCloseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
-    this.victoryNextButtonRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.loseOfferPurchaseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.cards = [];
     this.wagon = {
       x: LAYOUT.spawnPoint.x,
@@ -2435,6 +2482,7 @@ class Game {
     this.victoryConfettiTime = 0;
     this.victoryFloatTime = 0;
     this.victoryConfettiSpawnCarry = 0;
+    this.victoryCompleteEventPending = false;
     this.levelStartFade = 0;
     this.losePopupAppear = 1;
     this.debugPanel = document.getElementById("debugPanel");
@@ -2578,6 +2626,24 @@ class Game {
       this.invalidate(false);
     };
     this.losePopupBirdsImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseTopHeartPanelImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseTopCoinsPanelImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseCoinsButtonImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseAdsButtonImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseOfferImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseOfferPurchaseButtonImage.onload = () => {
       this.invalidate(false);
     };
     this.woodImage.onload = () => {
@@ -3937,6 +4003,7 @@ class Game {
     this.victoryConfettiTime = 0;
     this.victoryFloatTime = 0;
     this.victoryConfettiSpawnCarry = 0;
+    this.victoryCompleteEventPending = false;
     this.levelStartFade = 1;
     this.losePopupAppear = 1;
 
@@ -6557,6 +6624,7 @@ class Game {
     this.cameraShakeX = 0;
     this.cameraShakeY = 0;
     this.spawnConfettiBurst(64);
+    this.victoryCompleteEventPending = true;
   }
 
   startLoseSequence() {
@@ -6602,8 +6670,27 @@ class Game {
   }
 
   continueFromLoseWithOneSlot() {
+    return this.continueFromLoseWithOneSlotCore({ spendCoins: true });
+  }
+
+  continueFromLoseWithAd() {
+    return dispatchUnityRewardEvent();
+  }
+
+  continueFromLoseWithOneSlotCore({ spendCoins = true } = {}) {
     if (this.gameState !== "lose") {
       return false;
+    }
+    if (spendCoins) {
+      const continueCost = this.getLoseContinueCoinsCost();
+      const currentCoins = this.getCurrentExternalCoinsCount();
+      if (currentCoins < continueCost) {
+        return false;
+      }
+      const nextCoins = Math.max(0, currentCoins - continueCost);
+      this.externalCoinsCount = nextCoins;
+      pendingExternalCoinsCount = nextCoins;
+      persistExternalCoinsCount(nextCoins);
     }
 
     const parkedUnits = this.units
@@ -6662,6 +6749,18 @@ class Game {
     this.streakTimer = 0;
     this.invalidate(true);
     return true;
+  }
+
+  getCurrentExternalCoinsCount() {
+    return resolveExternalCoinsCount(this);
+  }
+
+  getLoseContinueCoinsCost() {
+    return resolveExternalTimeOutCoinsCost(this);
+  }
+
+  canContinueFromLoseForCoins() {
+    return this.getCurrentExternalCoinsCount() >= this.getLoseContinueCoinsCost();
   }
 
   triggerDebug6() {
@@ -6755,6 +6854,14 @@ class Game {
       this.victoryFloatTime += dt;
       this.updateConfetti(dt);
       this.cameraZoom += (this.cameraZoomTarget - this.cameraZoom) * Math.min(1, dt * VICTORY_ZOOM_SPEED);
+      if (
+        this.victoryCompleteEventPending &&
+        this.victoryConfettiTime <= 0 &&
+        Math.abs(this.cameraZoomTarget - this.cameraZoom) <= 0.01
+      ) {
+        this.victoryCompleteEventPending = false;
+        dispatchUnityCompleteEvent(this);
+      }
       this.cameraShakeTime = 0;
       this.cameraShakeX = 0;
       this.cameraShakeY = 0;
@@ -6992,112 +7099,6 @@ class Game {
         bevelStrength: 0.34,
       });
     }
-  }
-
-  getVictoryNextButtonRect() {
-    const width = Math.round(clamp(VICTORY_NEXT_BUTTON_UI.w, 240, this.width * 0.72));
-    const height = VICTORY_NEXT_BUTTON_UI.h;
-    const y = Math.max(0, Math.round(this.height - height - VICTORY_NEXT_BUTTON_UI.bottomMargin));
-    return {
-      x: Math.round((this.width - width) * 0.5),
-      y,
-      w: width,
-      h: height,
-    };
-  }
-
-  getNextPlayableLevelId() {
-    const levels = this.getTopLevelDebugList();
-    if (levels.length === 0) {
-      return null;
-    }
-    const currentId = this.getValidLevelId(this.currentLevelId);
-    const currentIndex = levels.findIndex((level) => String(level.id) === currentId);
-    if (currentIndex < 0) {
-      return String(levels[0].id);
-    }
-    if (currentIndex + 1 >= levels.length) {
-      return null;
-    }
-    return String(levels[currentIndex + 1].id);
-  }
-
-  goToNextLevelFromVictory() {
-    const nextLevelId = this.getNextPlayableLevelId();
-    if (!nextLevelId) {
-      return false;
-    }
-    this.applyLevelConfig(nextLevelId, { restart: true });
-    this.debugSaveTargetDirty = false;
-    this.syncDebugContentSelectors();
-    this.saveDebugSettings();
-    return true;
-  }
-
-  drawVictoryNextButton(ctx, enabled) {
-    const rect = this.getVictoryNextButtonRect();
-    this.victoryNextButtonRect = rect;
-    const radius = VICTORY_NEXT_BUTTON_UI.radius;
-    const isEnabled = !!enabled;
-
-    ctx.save();
-    ctx.shadowColor = isEnabled ? "rgba(24, 74, 20, 0.44)" : "rgba(40, 48, 60, 0.28)";
-    ctx.shadowBlur = isEnabled ? 22 : 14;
-    ctx.shadowOffsetY = isEnabled ? 8 : 5;
-    const fillGrad = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
-    if (isEnabled) {
-      fillGrad.addColorStop(0, "#a9ef57");
-      fillGrad.addColorStop(1, "#56c719");
-    } else {
-      fillGrad.addColorStop(0, "#b8c0cd");
-      fillGrad.addColorStop(1, "#8e99aa");
-    }
-    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, radius);
-    ctx.fillStyle = fillGrad;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = isEnabled ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.3)";
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    ctx.globalAlpha = isEnabled ? 0.28 : 0.16;
-    roundedRect(ctx, rect.x + 10, rect.y + 8, rect.w - 20, Math.round(rect.h * 0.4), Math.max(14, radius - 10));
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.restore();
-
-    const text = "Next level";
-    ctx.save();
-    ctx.font = "900 42px \"Baloo 2\", \"Arial Rounded MT Bold\", \"Trebuchet MS\", Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = isEnabled ? "rgba(22, 76, 16, 0.62)" : "rgba(63, 73, 90, 0.52)";
-    ctx.fillStyle = "#ffffff";
-    const textX = rect.x + rect.w * 0.5;
-    const textY = rect.y + rect.h * 0.5 + 1;
-    ctx.strokeText(text, textX, textY);
-    ctx.fillText(text, textX, textY);
-    ctx.restore();
-
-    if (!isEnabled) {
-      return;
-    }
-    ctx.save();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.86)";
-    ctx.lineWidth = 6;
-    ctx.lineCap = "round";
-    const arrowX = rect.x + rect.w - 46;
-    const arrowY = rect.y + rect.h * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(arrowX - 24, arrowY - 14);
-    ctx.lineTo(arrowX - 4, arrowY);
-    ctx.lineTo(arrowX - 24, arrowY + 14);
-    ctx.stroke();
-    ctx.restore();
   }
 
   drawVolumetricBlock(ctx, block, x, y, options = {}) {
@@ -7964,14 +7965,131 @@ class Game {
     };
   }
 
+  getLoseTopStatsRects() {
+    const sourceHeartW =
+      this.loseTopHeartPanelImage?.naturalWidth > 0 ? this.loseTopHeartPanelImage.naturalWidth : 240;
+    const sourceHeartH =
+      this.loseTopHeartPanelImage?.naturalHeight > 0 ? this.loseTopHeartPanelImage.naturalHeight : 96;
+    const sourceCoinsW =
+      this.loseTopCoinsPanelImage?.naturalWidth > 0 ? this.loseTopCoinsPanelImage.naturalWidth : 244;
+    const sourceCoinsH =
+      this.loseTopCoinsPanelImage?.naturalHeight > 0 ? this.loseTopCoinsPanelImage.naturalHeight : 96;
+    const baseHeight = LOSE_TOP_STATS_UI.targetHeight;
+    const heartScale = baseHeight / sourceHeartH;
+    const coinsScale = baseHeight / sourceCoinsH;
+    let heartW = sourceHeartW * heartScale;
+    let heartH = sourceHeartH * heartScale;
+    let coinsW = sourceCoinsW * coinsScale;
+    let coinsH = sourceCoinsH * coinsScale;
+    let gap = LOSE_TOP_STATS_UI.gap;
+    let totalW = heartW + coinsW + gap;
+    const maxTotalW = Math.max(100, this.width - LOSE_TOP_STATS_UI.sidePadding * 2);
+    const maxScaleFromWidth = maxTotalW / totalW;
+    const scaled = clamp(maxScaleFromWidth, LOSE_TOP_STATS_UI.minScale, LOSE_TOP_STATS_UI.maxScale);
+    heartW *= scaled;
+    heartH *= scaled;
+    coinsW *= scaled;
+    coinsH *= scaled;
+    gap *= scaled;
+    totalW = heartW + coinsW + gap;
+    const x = (this.width - totalW) * 0.5;
+    const y = Math.max(14, TIMER_PANEL_UI.y + LOSE_TOP_STATS_UI.topOffset);
+    return {
+      heart: { x, y, w: heartW, h: heartH },
+      coins: { x: x + heartW + gap, y, w: coinsW, h: coinsH },
+    };
+  }
+
+  drawLoseTopStats(ctx, alpha = 1) {
+    const heartsCountValue = resolveExternalHeartsCount(this);
+    const heartsCount = String(heartsCountValue);
+    const maxLivesCountValue = resolveExternalMaxLivesCount(this);
+    const livesTimerText = resolveExternalLivesTimer(this);
+    const isLivesFull = maxLivesCountValue > 0 && heartsCountValue >= maxLivesCountValue;
+    const heartsTimerDisplayText = isLivesFull ? "full" : livesTimerText || "--:--";
+    const coinsCount = String(this.getCurrentExternalCoinsCount());
+    const { heart, coins } = this.getLoseTopStatsRects();
+
+    const drawPanel = (image, rect, fallbackTop = "#dce8ff", fallbackBottom = "#b8cff5") => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = "rgba(8, 14, 36, 0.26)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
+      if (image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        ctx.imageSmoothingEnabled = true;
+        if ("imageSmoothingQuality" in ctx) {
+          ctx.imageSmoothingQuality = "high";
+        }
+        ctx.drawImage(image, rect.x, rect.y, rect.w, rect.h);
+      } else {
+        const grad = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+        grad.addColorStop(0, fallbackTop);
+        grad.addColorStop(1, fallbackBottom);
+        roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.round(rect.h * 0.28));
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+      ctx.restore();
+    };
+
+    drawPanel(this.loseTopHeartPanelImage, heart, "#ff7b68", "#f04f44");
+    drawPanel(this.loseTopCoinsPanelImage, coins, "#f5f9ff", "#d7e5ff");
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = LOSE_TOP_STATS_UI.heartTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.heartTextStroke;
+    ctx.lineWidth = Math.max(3, heart.h * 0.05);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `900 ${Math.max(20, Math.round(heart.h * 0.44))}px "Open Sans", Arial, sans-serif`;
+    const heartsX = heart.x + heart.w * LOSE_TOP_STATS_UI.heartTextXRatio;
+    const heartsY = heart.y + heart.h * LOSE_TOP_STATS_UI.heartTextYRatio;
+    ctx.strokeText(heartsCount, heartsX, heartsY);
+    ctx.fillText(heartsCount, heartsX, heartsY);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = LOSE_TOP_STATS_UI.coinsTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.coinsTextStroke;
+    ctx.lineWidth = Math.max(2, heart.h * 0.045);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `800 ${Math.max(20, Math.round(heart.h * 0.32 * LOSE_TOP_STATS_UI.coinsTextFontScale))}px "Open Sans", Arial, sans-serif`;
+    const livesTimerX = heart.x + heart.w * LOSE_TOP_STATS_UI.livesTimerTextXRatio + LOSE_TOP_STATS_UI.livesTimerTextOffsetX;
+    const livesTimerY = heart.y + heart.h * LOSE_TOP_STATS_UI.livesTimerTextYRatio + LOSE_TOP_STATS_UI.livesTimerTextOffsetY;
+    ctx.strokeText(heartsTimerDisplayText, livesTimerX, livesTimerY);
+    ctx.fillText(heartsTimerDisplayText, livesTimerX, livesTimerY);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = LOSE_TOP_STATS_UI.coinsTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.coinsTextStroke;
+    ctx.lineWidth = Math.max(2, coins.h * 0.045);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `800 ${Math.max(20, Math.round(coins.h * 0.32 * LOSE_TOP_STATS_UI.coinsTextFontScale))}px "Open Sans", Arial, sans-serif`;
+    const coinsX = coins.x + coins.w * LOSE_TOP_STATS_UI.coinsTextXRatio + LOSE_TOP_STATS_UI.coinsTextOffsetX;
+    const coinsY = coins.y + coins.h * LOSE_TOP_STATS_UI.coinsTextYRatio + LOSE_TOP_STATS_UI.coinsTextOffsetY;
+    ctx.strokeText(coinsCount, coinsX, coinsY);
+    ctx.fillText(coinsCount, coinsX, coinsY);
+    ctx.restore();
+  }
+
   getLosePopupRect() {
-    const targetScale = 1.4;
+    const targetScale = 1.1;
     let w = LOSE_POPUP_UI.w * targetScale;
     let h = LOSE_POPUP_UI.h * targetScale;
     const fitScale = Math.min((this.width * 0.96) / w, (this.height * 0.9) / h, 1);
     w *= fitScale;
     h *= fitScale;
-    const centeredY = (this.height - h) * 0.5;
+    const centeredY = (this.height - h) * 0.5 - 60;
     const y = clamp(centeredY, 20, this.height - h - 20);
     return {
       x: (this.width - w) * 0.5,
@@ -7995,20 +8113,68 @@ class Game {
     const popup = popupRect || this.getLosePopupRect();
     const sx = popup.w / 646;
     const sy = popup.h / 663;
-    const buttonY = popup.y + popup.h - 126 * sy;
+    const buttonScale = 0.9;
+    const baseButtonW = 269 * sx;
+    const baseButtonH = 114 * sy;
+    const buttonW = baseButtonW * buttonScale;
+    const buttonH = baseButtonH * buttonScale;
+    const baseButtonY = popup.y + popup.h - 174 * sy;
+    const buttonY = baseButtonY + (baseButtonH - buttonH) * 0.5;
+    const sideInset = 40 * sx;
     const left = {
-      x: popup.x + 40 * sx,
+      x: popup.x + sideInset + (baseButtonW - buttonW) * 0.5,
       y: buttonY,
-      w: 184 * sx,
-      h: 68 * sy,
+      w: buttonW,
+      h: buttonH,
     };
     const right = {
-      x: popup.x + popup.w - 40 * sx - 184 * sx,
+      x: popup.x + popup.w - sideInset - baseButtonW + (baseButtonW - buttonW) * 0.5,
       y: buttonY,
-      w: 184 * sx,
-      h: 68 * sy,
+      w: buttonW,
+      h: buttonH,
     };
     return { left, right };
+  }
+
+  getLoseOfferRects(popupRect = null) {
+    const popup = popupRect || this.getLosePopupRect();
+    const sourceOfferW = this.loseOfferImage?.naturalWidth > 0 ? this.loseOfferImage.naturalWidth : LOSE_OFFER_UI.fallbackW;
+    const sourceOfferH = this.loseOfferImage?.naturalHeight > 0 ? this.loseOfferImage.naturalHeight : LOSE_OFFER_UI.fallbackH;
+    const sourceButtonW = this.loseOfferPurchaseButtonImage?.naturalWidth > 0
+      ? this.loseOfferPurchaseButtonImage.naturalWidth
+      : LOSE_OFFER_UI.fallbackButtonW;
+    const sourceButtonH = this.loseOfferPurchaseButtonImage?.naturalHeight > 0
+      ? this.loseOfferPurchaseButtonImage.naturalHeight
+      : LOSE_OFFER_UI.fallbackButtonH;
+    const sidePadding = LOSE_OFFER_UI.sidePadding;
+    const gap = LOSE_OFFER_UI.gapFromPopupBottom;
+    let offerW = Math.min(popup.w * LOSE_OFFER_UI.widthToPopupRatio, this.width - sidePadding * 2);
+    let offerH = offerW * (sourceOfferH / sourceOfferW);
+    const maxOfferHeight = this.height - (popup.y + popup.h + gap) - LOSE_OFFER_UI.bottomSafeMargin;
+    if (maxOfferHeight > 0 && offerH > maxOfferHeight) {
+      const scale = maxOfferHeight / offerH;
+      offerW *= scale;
+      offerH *= scale;
+    }
+    const offerRect = {
+      x: (this.width - offerW) * 0.5,
+      y: popup.y + popup.h + gap,
+      w: offerW,
+      h: offerH,
+    };
+    const buttonW = offerRect.w * LOSE_OFFER_UI.buttonWidthRatio;
+    const buttonH = buttonW * (sourceButtonH / sourceButtonW);
+    const buttonRect = {
+      x: offerRect.x + (offerRect.w - buttonW) * 0.5,
+      y: offerRect.y + offerRect.h - buttonH * LOSE_OFFER_UI.buttonBottomOverlapFactor + LOSE_OFFER_UI.buttonOffsetY,
+      w: buttonW,
+      h: buttonH,
+    };
+    return { offer: offerRect, button: buttonRect };
+  }
+
+  shouldShowLoseOffer() {
+    return !resolveExternalSubscriptionStatus(this);
   }
 
   drawLoseBirdRow(ctx, popupX, popupY, popupW, popupH, alpha = 1) {
@@ -8117,135 +8283,118 @@ class Game {
   }
 
   drawLoseButtons(ctx, popupX, popupY, popupW, popupH) {
-    const buttonY = popupY + popupH - 126;
-    const leftX = popupX + 40;
-    const leftW = 184;
-    const leftH = 68;
-    const rightW = 184;
-    const rightH = 68;
-    const rightX = popupX + popupW - rightW - 40;
-
-    ctx.save();
-    ctx.shadowColor = "rgba(20, 38, 87, 0.24)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-    const leftGrad = ctx.createLinearGradient(0, buttonY, 0, buttonY + leftH);
-    leftGrad.addColorStop(0, "#9ce53f");
-    leftGrad.addColorStop(1, "#53ca1c");
-    roundedRect(ctx, leftX, buttonY, leftW, leftH, 24);
-    ctx.fillStyle = leftGrad;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.34)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
-
-    const coinX = leftX + 22;
-    const coinY = buttonY + 12;
-    const coinR = 22;
-    ctx.save();
-    const coinGrad = ctx.createLinearGradient(coinX, coinY, coinX, coinY + coinR * 2);
-    coinGrad.addColorStop(0, "#ffea55");
-    coinGrad.addColorStop(1, "#f0980f");
-    ctx.fillStyle = coinGrad;
-    ctx.beginPath();
-    ctx.arc(coinX + coinR, coinY + coinR, coinR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#ffbe2b";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = "#ffef65";
-    ctx.beginPath();
-    ctx.arc(coinX + coinR, coinY + coinR, coinR * 0.66, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#f0a300";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    ctx.fillStyle = "#ffc700";
-    ctx.strokeStyle = "#ed8f00";
-    ctx.lineWidth = 1.5;
-    const sx = coinX + coinR;
-    const sy = coinY + coinR;
-    const rOuter = coinR * 0.42;
-    const rInner = coinR * 0.2;
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const angle = -Math.PI / 2 + (Math.PI * 2 * i) / 10;
-      const r = i % 2 === 0 ? rOuter : rInner;
-      const px = sx + Math.cos(angle) * r;
-      const py = sy + Math.sin(angle) * r;
-      if (i === 0) {
-        ctx.moveTo(px, py);
+    const popup = { x: popupX, y: popupY, w: popupW, h: popupH };
+    const { left, right } = this.getLoseButtonRects(popup);
+    const continueCost = this.getLoseContinueCoinsCost();
+    const canContinueForCoins = this.canContinueFromLoseForCoins();
+    const continueButtonAlpha = canContinueForCoins ? 1 : 0.46;
+    const drawButton = (image, rect, alpha = 1, fallbackTop = "#7bcfff", fallbackBottom = "#4a95ef") => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = "rgba(20, 38, 87, 0.24)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
+      if (image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        ctx.imageSmoothingEnabled = true;
+        if ("imageSmoothingQuality" in ctx) {
+          ctx.imageSmoothingQuality = "high";
+        }
+        ctx.drawImage(image, rect.x, rect.y, rect.w, rect.h);
       } else {
-        ctx.lineTo(px, py);
+        const grad = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+        grad.addColorStop(0, fallbackTop);
+        grad.addColorStop(1, fallbackBottom);
+        roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.round(rect.h * 0.36));
+        ctx.fillStyle = grad;
+        ctx.fill();
       }
+      ctx.restore();
+    };
+
+    drawButton(
+      this.loseCoinsButtonImage,
+      left,
+      continueButtonAlpha,
+      canContinueForCoins ? "#9ce53f" : "#9ba7a5",
+      canContinueForCoins ? "#53ca1c" : "#727f7b"
+    );
+    drawButton(this.loseAdsButtonImage, right, 1, "#7bcfff", "#4a95ef");
+
+    ctx.save();
+    const textAreaStartRatio = 0.46;
+    const leftFontSize = Math.max(16, Math.round(left.h * 0.3744));
+    ctx.font = `800 ${leftFontSize}px "Open Sans", Arial, sans-serif`;
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.globalAlpha = continueButtonAlpha;
+    const leftTextX = left.x + left.w * (textAreaStartRatio + (1 - textAreaStartRatio) * 0.5) - 25;
+    const leftTextY = left.y + left.h * 0.5 - 15;
+    ctx.fillText(String(continueCost), leftTextX, leftTextY);
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = "#ffffff";
+    const rightFontSize = Math.max(14, Math.round(right.h * 0.36));
+    ctx.font = `800 ${rightFontSize}px "Open Sans", Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const rightTextX = right.x + right.w * (textAreaStartRatio + (1 - textAreaStartRatio) * 0.5) - 25;
+    const rightTextY = right.y + right.h * 0.5 - 15;
+    ctx.fillText("FREE", rightTextX, rightTextY);
+    ctx.restore();
+  }
+
+  drawLoseOffer(ctx, popupRect, alpha = 1) {
+    const { offer, button } = this.getLoseOfferRects(popupRect);
+    this.loseOfferPurchaseRect = button;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = "rgba(12, 19, 44, 0.26)";
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 6;
+    if (this.loseOfferImage.complete && this.loseOfferImage.naturalWidth > 0 && this.loseOfferImage.naturalHeight > 0) {
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.drawImage(this.loseOfferImage, offer.x, offer.y, offer.w, offer.h);
+    } else {
+      const fallbackGrad = ctx.createLinearGradient(offer.x, offer.y, offer.x, offer.y + offer.h);
+      fallbackGrad.addColorStop(0, "#f6c451");
+      fallbackGrad.addColorStop(1, "#ef8d32");
+      roundedRect(ctx, offer.x, offer.y, offer.w, offer.h, Math.round(offer.h * 0.14));
+      ctx.fillStyle = fallbackGrad;
+      ctx.fill();
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
     ctx.restore();
 
     ctx.save();
-    ctx.font = "900 56px Arial";
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "rgba(0, 74, 10, 0.42)";
-    ctx.lineWidth = 5;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.strokeText("50", leftX + 92, buttonY + leftH * 0.53);
-    ctx.fillText("50", leftX + 92, buttonY + leftH * 0.53);
-    ctx.restore();
-
-    ctx.save();
-    ctx.shadowColor = "rgba(20, 38, 87, 0.24)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-    const rightGrad = ctx.createLinearGradient(0, buttonY, 0, buttonY + rightH);
-    rightGrad.addColorStop(0, "#7bcfff");
-    rightGrad.addColorStop(1, "#4a95ef");
-    roundedRect(ctx, rightX, buttonY, rightW, rightH, 24);
-    ctx.fillStyle = rightGrad;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.38)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
-
-    const filmX = rightX + 20;
-    const filmY = buttonY + 12;
-    const filmW = 52;
-    const filmH = 44;
-    ctx.save();
-    const filmGrad = ctx.createLinearGradient(filmX, filmY, filmX, filmY + filmH);
-    filmGrad.addColorStop(0, "#d7f0ff");
-    filmGrad.addColorStop(1, "#75b6ff");
-    roundedRect(ctx, filmX, filmY, filmW, filmH, 12);
-    ctx.fillStyle = filmGrad;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(31, 95, 184, 0.8)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = "#4f8fe0";
-    ctx.beginPath();
-    ctx.moveTo(filmX + 21, filmY + 12);
-    ctx.lineTo(filmX + 21, filmY + 32);
-    ctx.lineTo(filmX + 38, filmY + 22);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 54px Arial";
-    ctx.strokeStyle = "rgba(15, 63, 143, 0.72)";
-    ctx.lineWidth = 5;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.strokeText("FREE", rightX + 84, buttonY + rightH * 0.53);
-    ctx.fillText("FREE", rightX + 84, buttonY + rightH * 0.53);
+    ctx.globalAlpha = alpha;
+    if (
+      this.loseOfferPurchaseButtonImage.complete &&
+      this.loseOfferPurchaseButtonImage.naturalWidth > 0 &&
+      this.loseOfferPurchaseButtonImage.naturalHeight > 0
+    ) {
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.drawImage(this.loseOfferPurchaseButtonImage, button.x, button.y, button.w, button.h);
+    } else {
+      const buttonGrad = ctx.createLinearGradient(button.x, button.y, button.x, button.y + button.h);
+      buttonGrad.addColorStop(0, "#98e24f");
+      buttonGrad.addColorStop(1, "#60be2f");
+      roundedRect(ctx, button.x, button.y, button.w, button.h, Math.round(button.h * 0.42));
+      ctx.fillStyle = buttonGrad;
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `800 ${Math.max(18, Math.round(button.h * 0.44))}px "Open Sans", Arial, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Get now!", button.x + button.w * 0.5, button.y + button.h * 0.52);
+    }
     ctx.restore();
   }
 
@@ -8267,12 +8416,19 @@ class Game {
     const loseButtons = this.getLoseButtonRects(drawRect);
     this.loseContinueRect = loseButtons.left;
     this.loseFreeRect = loseButtons.right;
+    if (this.shouldShowLoseOffer()) {
+      const loseOfferRects = this.getLoseOfferRects(drawRect);
+      this.loseOfferPurchaseRect = loseOfferRects.button;
+    } else {
+      this.loseOfferPurchaseRect = { x: 0, y: 0, w: 0, h: 0 };
+    }
 
     ctx.save();
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.fillStyle = `rgba(7, 14, 28, ${0.74 * fade})`;
     ctx.fillRect(0, 0, this.screenWidth, this.screenHeight);
     ctx.restore();
+    this.drawLoseTopStats(ctx, fade);
 
     if (this.losePopupImage.complete && this.losePopupImage.naturalWidth > 0) {
       ctx.save();
@@ -8293,6 +8449,10 @@ class Game {
       }
       ctx.drawImage(this.losePopupImage, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
       this.drawLoseBirdRow(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h, fade);
+      this.drawLoseButtons(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
+      if (this.shouldShowLoseOffer()) {
+        this.drawLoseOffer(ctx, drawRect, fade);
+      }
       ctx.restore();
       return;
     }
@@ -8364,6 +8524,9 @@ class Game {
 
     this.drawLoseSpaceBadge(ctx, drawRect.x + drawRect.w * 0.5, drawRect.y + 314, 430, 250);
     this.drawLoseButtons(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
+    if (this.shouldShowLoseOffer()) {
+      this.drawLoseOffer(ctx, drawRect, fade);
+    }
   }
 
   render() {
@@ -8399,7 +8562,6 @@ class Game {
       this.drawTopTimerPanel(ctx);
       this.drawTopCoinsPanel(ctx);
       this.drawBackButton(ctx);
-      this.drawVictoryNextButton(ctx, !!this.getNextPlayableLevelId());
       this.drawLevelStartFade(ctx);
       ctx.restore();
       this.needsRender = false;
@@ -8551,21 +8713,25 @@ class Game {
       return;
     }
     if (this.gameState === "playing" && this.tutorial?.active) {
+      const overRestart = isInsideRect(x, y, this.restartButtonRect);
       const target = this.getTutorialTapTarget();
-      this.canvas.style.cursor = target && this.isPointOnTutorialTarget(target, x, y) ? "pointer" : "default";
+      this.canvas.style.cursor = overRestart || (target && this.isPointOnTutorialTarget(target, x, y))
+        ? "pointer"
+        : "default";
       return;
     }
     if (this.gameState === "lose") {
       const overClose = isInsideRect(x, y, this.loseCloseRect);
-      const overContinue = isInsideRect(x, y, this.loseContinueRect);
-      this.canvas.style.cursor = overClose || overContinue ? "pointer" : "default";
+      const overContinue = this.canContinueFromLoseForCoins() && isInsideRect(x, y, this.loseContinueRect);
+      const overFree = isInsideRect(x, y, this.loseFreeRect);
+      const overOfferPurchase = this.shouldShowLoseOffer() && isInsideRect(x, y, this.loseOfferPurchaseRect);
+      this.canvas.style.cursor = overClose || overContinue || overFree || overOfferPurchase ? "pointer" : "default";
       return;
     }
     if (this.gameState === "victory") {
-      const overNextLevel = !!this.getNextPlayableLevelId() && isInsideRect(x, y, this.getVictoryNextButtonRect());
       const overBack = isInsideRect(x, y, this.backButtonRect);
       const overRestart = isInsideRect(x, y, this.restartButtonRect);
-      this.canvas.style.cursor = overNextLevel || overBack || overRestart ? "pointer" : "default";
+      this.canvas.style.cursor = overBack || overRestart ? "pointer" : "default";
       return;
     }
     const overBack = isInsideRect(x, y, this.backButtonRect);
@@ -8578,6 +8744,10 @@ class Game {
       if (this.applyDebugPaintAt(x, y)) {
         this.invalidate(false);
       }
+      return;
+    }
+    if (isInsideRect(x, y, this.restartButtonRect)) {
+      this.restart();
       return;
     }
     if (this.gameState === "playing" && this.tutorial?.active) {
@@ -8603,24 +8773,24 @@ class Game {
     }
     if (this.gameState === "lose") {
       if (isInsideRect(x, y, this.loseCloseRect)) {
-        this.restart();
+        dispatchUnityCloseEvent(this);
       } else if (isInsideRect(x, y, this.loseContinueRect)) {
+        if (!this.canContinueFromLoseForCoins()) {
+          this.playSound("cant_select");
+          return;
+        }
         this.continueFromLoseWithOneSlot();
+      } else if (isInsideRect(x, y, this.loseFreeRect)) {
+        if (!this.continueFromLoseWithAd()) {
+          this.playSound("cant_select");
+        }
+      } else if (this.shouldShowLoseOffer() && isInsideRect(x, y, this.loseOfferPurchaseRect)) {
+        dispatchUnitySubscriptionRequestEvent();
       }
       return;
-    }
-    if (this.gameState === "victory" && isInsideRect(x, y, this.getVictoryNextButtonRect())) {
-      if (this.getNextPlayableLevelId()) {
-        this.playSound("lvl_complete_button");
-        this.goToNextLevelFromVictory();
-        return;
-      }
     }
     if (isInsideRect(x, y, this.backButtonRect)) {
-      return;
-    }
-    if (isInsideRect(x, y, this.restartButtonRect)) {
-      this.restart();
+      dispatchUnityCloseEvent(this);
       return;
     }
     if (this.gameState !== "playing") {
@@ -10074,6 +10244,408 @@ class Game {
   }
 }
 
+let pendingExternalLevelSelection = null;
+let pendingExternalCoinsCount = null;
+let pendingExternalHeartsCount = null;
+let pendingExternalMaxLivesCount = null;
+let pendingExternalLivesTimer = null;
+let pendingExternalSubscriptionStatus = null;
+let pendingExternalTimeOutCoinsCost = null;
+const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
+const EXTERNAL_HEARTS_STORAGE_KEY = "pixelflow.external.hearts.v1";
+const EXTERNAL_MAX_LIVES_STORAGE_KEY = "pixelflow.external.max_lives.v1";
+const EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY = "pixelflow.external.subscription_status.v1";
+const EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY = "pixelflow.external.timeout_coins_cost.v1";
+const DEFAULT_TIMEOUT_COINS_COST = 50;
+
+function normalizeExternalCoinsCount(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function persistExternalCoinsCount(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_COINS_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeExternalHeartsCount(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function persistExternalHeartsCount(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_HEARTS_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeExternalMaxLivesCount(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  if (normalizedRaw.length === 0) {
+    return null;
+  }
+  const numeric = Number(normalizedRaw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function normalizeExternalLivesTimer(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  if (normalizedRaw.length === 0) {
+    return null;
+  }
+  return normalizedRaw;
+}
+
+function persistExternalMaxLivesCount(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_MAX_LIVES_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeExternalSubscriptionStatus(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  const lowered = normalizedRaw.toLowerCase();
+  if (lowered === "true" || lowered === "1" || lowered === "yes") {
+    return true;
+  }
+  if (lowered === "false" || lowered === "0" || lowered === "no") {
+    return false;
+  }
+  return null;
+}
+
+function persistExternalSubscriptionStatus(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY, value ? "1" : "0");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeExternalTimeOutCoinsCost(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  if (normalizedRaw.length === 0) {
+    return null;
+  }
+  const numeric = Number(normalizedRaw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function persistExternalTimeOutCoinsCost(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadExternalCountFromStorage(storageKey) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (raw === null || raw === undefined) {
+      return null;
+    }
+    const numeric = Number(raw);
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+    return Math.max(0, Math.trunc(numeric));
+  } catch {
+    return null;
+  }
+}
+
+function resolveExternalCoinsCount(gameInstance) {
+  const fromGame = normalizeExternalCoinsCount(gameInstance?.externalCoinsCount);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalCoinsCount(pendingExternalCoinsCount);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_COINS_STORAGE_KEY);
+  return fromStorage ?? 0;
+}
+
+function resolveExternalHeartsCount(gameInstance) {
+  const fromGame = normalizeExternalHeartsCount(gameInstance?.externalHeartsCount);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalHeartsCount(pendingExternalHeartsCount);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_HEARTS_STORAGE_KEY);
+  return fromStorage ?? 0;
+}
+
+function resolveExternalMaxLivesCount(gameInstance) {
+  const fromGame = normalizeExternalMaxLivesCount(gameInstance?.externalMaxLivesCount);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalMaxLivesCount(pendingExternalMaxLivesCount);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_MAX_LIVES_STORAGE_KEY);
+  return fromStorage ?? 0;
+}
+
+function resolveExternalLivesTimer(gameInstance) {
+  const fromGame = normalizeExternalLivesTimer(gameInstance?.externalLivesTimer);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalLivesTimer(pendingExternalLivesTimer);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  return null;
+}
+
+function resolveExternalSubscriptionStatus(gameInstance) {
+  const fromGame = normalizeExternalSubscriptionStatus(gameInstance?.externalSubscriptionStatus);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalSubscriptionStatus(pendingExternalSubscriptionStatus);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    const fromStorage = normalizeExternalSubscriptionStatus(
+      window.localStorage.getItem(EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY)
+    );
+    return fromStorage ?? false;
+  } catch {
+    return false;
+  }
+}
+
+function resolveExternalTimeOutCoinsCost(gameInstance) {
+  const fromGame = normalizeExternalTimeOutCoinsCost(gameInstance?.externalTimeOutCoinsCost);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalTimeOutCoinsCost(pendingExternalTimeOutCoinsCost);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY);
+  if (fromStorage !== null) {
+    return fromStorage;
+  }
+  return DEFAULT_TIMEOUT_COINS_COST;
+}
+
+function dispatchUnityCloseEvent(gameInstance) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const coinsCount = resolveExternalCoinsCount(gameInstance);
+  const heartsCount = resolveExternalHeartsCount(gameInstance);
+  const closeUrl = `uniwebview://close?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
+  try {
+    window.location.href = closeUrl;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnityCompleteEvent(gameInstance) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const coinsCount = resolveExternalCoinsCount(gameInstance);
+  const heartsCount = resolveExternalHeartsCount(gameInstance);
+  const completeUrl = `uniwebview://complete?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
+  try {
+    window.location.href = completeUrl;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnityRewardEvent() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    window.location.href = "uniwebview://reward";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnitySubscriptionRequestEvent() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    window.location.href = "uniwebview://subscription_request";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (typeof window !== "undefined") {
+  const applyExternalTimeOutCoinsCost = (timeOutCoinsCost) => {
+    pendingExternalTimeOutCoinsCost = timeOutCoinsCost;
+    const normalized = normalizeExternalTimeOutCoinsCost(timeOutCoinsCost);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalTimeOutCoinsCost(normalized);
+  };
+  window.setLevel = (indexOrId) => {
+    pendingExternalLevelSelection = indexOrId;
+    return false;
+  };
+  window.setCoins = (coinsCount) => {
+    pendingExternalCoinsCount = coinsCount;
+    const normalized = normalizeExternalCoinsCount(coinsCount);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalCoinsCount(normalized);
+  };
+  window.setHearts = (heartsCount) => {
+    pendingExternalHeartsCount = heartsCount;
+    const normalized = normalizeExternalHeartsCount(heartsCount);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalHeartsCount(normalized);
+  };
+  window.setMaxLives = (maxLivesCount) => {
+    pendingExternalMaxLivesCount = maxLivesCount;
+    const normalized = normalizeExternalMaxLivesCount(maxLivesCount);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalMaxLivesCount(normalized);
+  };
+  window.setLivesTimer = (livesTimer) => {
+    pendingExternalLivesTimer = livesTimer;
+    return normalizeExternalLivesTimer(livesTimer) !== null;
+  };
+  window.setSubscriptionStatus = (subscriptionStatus) => {
+    pendingExternalSubscriptionStatus = subscriptionStatus;
+    const normalized = normalizeExternalSubscriptionStatus(subscriptionStatus);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalSubscriptionStatus(normalized);
+  };
+  window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.rewardResult = () => false;
+}
+
 async function bootstrapGame() {
   const loadedLevels = await loadLevelDefinitions();
   const fallbackLevels = LEVEL_DEFINITIONS_FALLBACK.length ? LEVEL_DEFINITIONS_FALLBACK : [BUILTIN_FALLBACK_LEVEL];
@@ -10086,11 +10658,153 @@ async function bootstrapGame() {
 
   const canvas = document.getElementById("gameCanvas");
   const game = new Game(canvas);
+  game.externalMaxLivesCount = resolveExternalMaxLivesCount(game);
+  game.externalLivesTimer = resolveExternalLivesTimer(game);
+  game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
+
+  const resolveExternalLevelId = (value) => {
+    const levels = Array.isArray(game.availableLevels) ? game.availableLevels : [];
+    if (levels.length === 0) {
+      return null;
+    }
+
+    const raw = String(value ?? "").trim();
+    if (raw.length === 0) {
+      return null;
+    }
+
+    if (levels.some((level) => level.id === raw)) {
+      return raw;
+    }
+
+    const numeric = Number(raw);
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+    const index = Math.trunc(numeric);
+    if (index < 0) {
+      return null;
+    }
+
+    // Preferred path for Unity: index in available levels (0-based).
+    if (index < levels.length) {
+      return levels[index].id;
+    }
+
+    // Backward compatibility: direct level number/id.
+    const numericId = String(index);
+    if (levels.some((level) => level.id === numericId)) {
+      return numericId;
+    }
+
+    return null;
+  };
 
   window.game = game;
+  window.setLevel = (indexOrId) => {
+    pendingExternalLevelSelection = indexOrId;
+    const targetLevelId = resolveExternalLevelId(indexOrId);
+    if (!targetLevelId) {
+      return false;
+    }
+    game.applyLevelConfig(targetLevelId, { restart: true });
+    game.syncDebugContentSelectors();
+    game.saveDebugSettings();
+    return true;
+  };
+  window.setCoins = (coinsCount) => {
+    pendingExternalCoinsCount = coinsCount;
+    const normalized = normalizeExternalCoinsCount(coinsCount);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalCoinsCount = normalized;
+    game.invalidate(false);
+    return persistExternalCoinsCount(normalized);
+  };
+  window.setHearts = (heartsCount) => {
+    pendingExternalHeartsCount = heartsCount;
+    const normalized = normalizeExternalHeartsCount(heartsCount);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalHeartsCount = normalized;
+    return persistExternalHeartsCount(normalized);
+  };
+  window.setMaxLives = (maxLivesCount) => {
+    pendingExternalMaxLivesCount = maxLivesCount;
+    const normalized = normalizeExternalMaxLivesCount(maxLivesCount);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalMaxLivesCount = normalized;
+    game.invalidate(false);
+    return persistExternalMaxLivesCount(normalized);
+  };
+  window.setLivesTimer = (livesTimer) => {
+    pendingExternalLivesTimer = livesTimer;
+    const normalized = normalizeExternalLivesTimer(livesTimer);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalLivesTimer = normalized;
+    game.invalidate(false);
+    return true;
+  };
+  window.setSubscriptionStatus = (subscriptionStatus) => {
+    pendingExternalSubscriptionStatus = subscriptionStatus;
+    const normalized = normalizeExternalSubscriptionStatus(subscriptionStatus);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalSubscriptionStatus = normalized;
+    game.invalidate(false);
+    return persistExternalSubscriptionStatus(normalized);
+  };
+  const applyExternalTimeOutCoinsCost = (timeOutCoinsCost) => {
+    pendingExternalTimeOutCoinsCost = timeOutCoinsCost;
+    const normalized = normalizeExternalTimeOutCoinsCost(timeOutCoinsCost);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalTimeOutCoinsCost = normalized;
+    game.invalidate(false);
+    return persistExternalTimeOutCoinsCost(normalized);
+  };
+  window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.rewardResult = (result) => {
+    const normalized = String(result ?? "").trim().toLowerCase();
+    if (normalized !== "true") {
+      return false;
+    }
+    return game.continueFromLoseWithOneSlotCore({ spendCoins: false });
+  };
   window.advanceTime = (ms) => game.advanceTime(ms);
   window.render_game_to_text = () => game.renderGameToText();
   window.debug6 = () => game.triggerDebug6();
+
+  if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined) {
+    window.setLevel(pendingExternalLevelSelection);
+  }
+  if (pendingExternalCoinsCount !== null && pendingExternalCoinsCount !== undefined) {
+    window.setCoins(pendingExternalCoinsCount);
+  }
+  if (pendingExternalHeartsCount !== null && pendingExternalHeartsCount !== undefined) {
+    window.setHearts(pendingExternalHeartsCount);
+  }
+  if (pendingExternalMaxLivesCount !== null && pendingExternalMaxLivesCount !== undefined) {
+    window.setMaxLives(pendingExternalMaxLivesCount);
+  }
+  if (pendingExternalLivesTimer !== null && pendingExternalLivesTimer !== undefined) {
+    window.setLivesTimer(pendingExternalLivesTimer);
+  }
+  if (pendingExternalSubscriptionStatus !== null && pendingExternalSubscriptionStatus !== undefined) {
+    window.setSubscriptionStatus(pendingExternalSubscriptionStatus);
+  }
+  if (pendingExternalTimeOutCoinsCost !== null && pendingExternalTimeOutCoinsCost !== undefined) {
+    window.setTimeOutCoinsCost(pendingExternalTimeOutCoinsCost);
+  }
 }
 
 void bootstrapGame();
