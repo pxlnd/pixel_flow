@@ -10078,11 +10078,45 @@ class Game {
 }
 
 let pendingExternalLevelSelection = null;
+let pendingExternalCoinsCount = null;
+const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
+
+function normalizeExternalCoinsCount(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function persistExternalCoinsCount(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_COINS_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 if (typeof window !== "undefined") {
   window.setLevel = (indexOrId) => {
     pendingExternalLevelSelection = indexOrId;
     return false;
+  };
+  window.setCoins = (coinsCount) => {
+    pendingExternalCoinsCount = coinsCount;
+    const normalized = normalizeExternalCoinsCount(coinsCount);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalCoinsCount(normalized);
   };
 }
 
@@ -10149,12 +10183,24 @@ async function bootstrapGame() {
     game.saveDebugSettings();
     return true;
   };
+  window.setCoins = (coinsCount) => {
+    pendingExternalCoinsCount = coinsCount;
+    const normalized = normalizeExternalCoinsCount(coinsCount);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalCoinsCount = normalized;
+    return persistExternalCoinsCount(normalized);
+  };
   window.advanceTime = (ms) => game.advanceTime(ms);
   window.render_game_to_text = () => game.renderGameToText();
   window.debug6 = () => game.triggerDebug6();
 
   if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined) {
     window.setLevel(pendingExternalLevelSelection);
+  }
+  if (pendingExternalCoinsCount !== null && pendingExternalCoinsCount !== undefined) {
+    window.setCoins(pendingExternalCoinsCount);
   }
 }
 
