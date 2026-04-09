@@ -456,6 +456,19 @@ const LOSE_POPUP_UI = {
   closeSize: 40,
 };
 const LOSE_POPUP_BIRDS_DROP_RATIO = 0.15;
+const LOSE_OFFER_UI = {
+  gapFromPopupBottom: 50,
+  widthToPopupRatio: 1,
+  sidePadding: 18,
+  bottomSafeMargin: 20,
+  fallbackW: 663,
+  fallbackH: 433,
+  fallbackButtonW: 392,
+  fallbackButtonH: 138,
+  buttonWidthRatio: 0.6,
+  buttonBottomOverlapFactor: 0.92,
+  buttonOffsetY: 30,
+};
 const BASE_TOP_UI = {
   timerY: TIMER_PANEL_UI.y,
   timerW: TIMER_PANEL_UI.w,
@@ -2326,6 +2339,12 @@ class Game {
     this.loseAdsButtonImage = new Image();
     this.loseAdsButtonImage.src = "ui/Lose/ads_button.png";
     this.loseAdsButtonImage.decoding = "async";
+    this.loseOfferImage = new Image();
+    this.loseOfferImage.src = "ui/Lose/Offer.png";
+    this.loseOfferImage.decoding = "async";
+    this.loseOfferPurchaseButtonImage = new Image();
+    this.loseOfferPurchaseButtonImage.src = "ui/Lose/purchase_button.png";
+    this.loseOfferPurchaseButtonImage.decoding = "async";
     this.woodImage = new Image();
     this.woodImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "panel");
     this.woodImage.decoding = "async";
@@ -2411,6 +2430,7 @@ class Game {
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
     this.victoryNextButtonRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.loseOfferPurchaseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.cards = [];
     this.wagon = {
       x: LAYOUT.spawnPoint.x,
@@ -2590,6 +2610,12 @@ class Game {
       this.invalidate(false);
     };
     this.loseAdsButtonImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseOfferImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseOfferPurchaseButtonImage.onload = () => {
       this.invalidate(false);
     };
     this.woodImage.onload = () => {
@@ -8061,6 +8087,43 @@ class Game {
     return { left, right };
   }
 
+  getLoseOfferRects(popupRect = null) {
+    const popup = popupRect || this.getLosePopupRect();
+    const sourceOfferW = this.loseOfferImage?.naturalWidth > 0 ? this.loseOfferImage.naturalWidth : LOSE_OFFER_UI.fallbackW;
+    const sourceOfferH = this.loseOfferImage?.naturalHeight > 0 ? this.loseOfferImage.naturalHeight : LOSE_OFFER_UI.fallbackH;
+    const sourceButtonW = this.loseOfferPurchaseButtonImage?.naturalWidth > 0
+      ? this.loseOfferPurchaseButtonImage.naturalWidth
+      : LOSE_OFFER_UI.fallbackButtonW;
+    const sourceButtonH = this.loseOfferPurchaseButtonImage?.naturalHeight > 0
+      ? this.loseOfferPurchaseButtonImage.naturalHeight
+      : LOSE_OFFER_UI.fallbackButtonH;
+    const sidePadding = LOSE_OFFER_UI.sidePadding;
+    const gap = LOSE_OFFER_UI.gapFromPopupBottom;
+    let offerW = Math.min(popup.w * LOSE_OFFER_UI.widthToPopupRatio, this.width - sidePadding * 2);
+    let offerH = offerW * (sourceOfferH / sourceOfferW);
+    const maxOfferHeight = this.height - (popup.y + popup.h + gap) - LOSE_OFFER_UI.bottomSafeMargin;
+    if (maxOfferHeight > 0 && offerH > maxOfferHeight) {
+      const scale = maxOfferHeight / offerH;
+      offerW *= scale;
+      offerH *= scale;
+    }
+    const offerRect = {
+      x: (this.width - offerW) * 0.5,
+      y: popup.y + popup.h + gap,
+      w: offerW,
+      h: offerH,
+    };
+    const buttonW = offerRect.w * LOSE_OFFER_UI.buttonWidthRatio;
+    const buttonH = buttonW * (sourceButtonH / sourceButtonW);
+    const buttonRect = {
+      x: offerRect.x + (offerRect.w - buttonW) * 0.5,
+      y: offerRect.y + offerRect.h - buttonH * LOSE_OFFER_UI.buttonBottomOverlapFactor + LOSE_OFFER_UI.buttonOffsetY,
+      w: buttonW,
+      h: buttonH,
+    };
+    return { offer: offerRect, button: buttonRect };
+  }
+
   drawLoseBirdRow(ctx, popupX, popupY, popupW, popupH, alpha = 1) {
     const sx = popupW / 646;
     const sy = popupH / 663;
@@ -8229,6 +8292,59 @@ class Game {
     ctx.restore();
   }
 
+  drawLoseOffer(ctx, popupRect, alpha = 1) {
+    const { offer, button } = this.getLoseOfferRects(popupRect);
+    this.loseOfferPurchaseRect = button;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = "rgba(12, 19, 44, 0.26)";
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 6;
+    if (this.loseOfferImage.complete && this.loseOfferImage.naturalWidth > 0 && this.loseOfferImage.naturalHeight > 0) {
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.drawImage(this.loseOfferImage, offer.x, offer.y, offer.w, offer.h);
+    } else {
+      const fallbackGrad = ctx.createLinearGradient(offer.x, offer.y, offer.x, offer.y + offer.h);
+      fallbackGrad.addColorStop(0, "#f6c451");
+      fallbackGrad.addColorStop(1, "#ef8d32");
+      roundedRect(ctx, offer.x, offer.y, offer.w, offer.h, Math.round(offer.h * 0.14));
+      ctx.fillStyle = fallbackGrad;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (
+      this.loseOfferPurchaseButtonImage.complete &&
+      this.loseOfferPurchaseButtonImage.naturalWidth > 0 &&
+      this.loseOfferPurchaseButtonImage.naturalHeight > 0
+    ) {
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.drawImage(this.loseOfferPurchaseButtonImage, button.x, button.y, button.w, button.h);
+    } else {
+      const buttonGrad = ctx.createLinearGradient(button.x, button.y, button.x, button.y + button.h);
+      buttonGrad.addColorStop(0, "#98e24f");
+      buttonGrad.addColorStop(1, "#60be2f");
+      roundedRect(ctx, button.x, button.y, button.w, button.h, Math.round(button.h * 0.42));
+      ctx.fillStyle = buttonGrad;
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `800 ${Math.max(18, Math.round(button.h * 0.44))}px "Open Sans", Arial, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Get now!", button.x + button.w * 0.5, button.y + button.h * 0.52);
+    }
+    ctx.restore();
+  }
+
   drawLosePopup(ctx) {
     const popup = this.getLosePopupRect();
     const animT = clamp(this.losePopupAppear, 0, 1);
@@ -8247,6 +8363,8 @@ class Game {
     const loseButtons = this.getLoseButtonRects(drawRect);
     this.loseContinueRect = loseButtons.left;
     this.loseFreeRect = loseButtons.right;
+    const loseOfferRects = this.getLoseOfferRects(drawRect);
+    this.loseOfferPurchaseRect = loseOfferRects.button;
 
     ctx.save();
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -8274,6 +8392,7 @@ class Game {
       ctx.drawImage(this.losePopupImage, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
       this.drawLoseBirdRow(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h, fade);
       this.drawLoseButtons(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
+      this.drawLoseOffer(ctx, drawRect, fade);
       ctx.restore();
       return;
     }
@@ -8345,6 +8464,7 @@ class Game {
 
     this.drawLoseSpaceBadge(ctx, drawRect.x + drawRect.w * 0.5, drawRect.y + 314, 430, 250);
     this.drawLoseButtons(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
+    this.drawLoseOffer(ctx, drawRect, fade);
   }
 
   render() {
@@ -8543,7 +8663,8 @@ class Game {
       const overClose = isInsideRect(x, y, this.loseCloseRect);
       const overContinue = this.canContinueFromLoseForCoins() && isInsideRect(x, y, this.loseContinueRect);
       const overFree = isInsideRect(x, y, this.loseFreeRect);
-      this.canvas.style.cursor = overClose || overContinue || overFree ? "pointer" : "default";
+      const overOfferPurchase = isInsideRect(x, y, this.loseOfferPurchaseRect);
+      this.canvas.style.cursor = overClose || overContinue || overFree || overOfferPurchase ? "pointer" : "default";
       return;
     }
     if (this.gameState === "victory") {
@@ -8603,6 +8724,8 @@ class Game {
         if (!this.continueFromLoseWithAd()) {
           this.playSound("cant_select");
         }
+      } else if (isInsideRect(x, y, this.loseOfferPurchaseRect)) {
+        dispatchUnitySubscriptionRequestEvent();
       }
       return;
     }
@@ -10268,6 +10391,18 @@ function dispatchUnityRewardEvent() {
   }
   try {
     window.location.href = "uniwebview://reward";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnitySubscriptionRequestEvent() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    window.location.href = "uniwebview://subscription_request";
     return true;
   } catch {
     return false;
