@@ -6605,6 +6605,15 @@ class Game {
     if (this.gameState !== "lose") {
       return false;
     }
+    const continueCost = this.getLoseContinueCoinsCost();
+    const currentCoins = this.getCurrentExternalCoinsCount();
+    if (currentCoins < continueCost) {
+      return false;
+    }
+    const nextCoins = Math.max(0, currentCoins - continueCost);
+    this.externalCoinsCount = nextCoins;
+    pendingExternalCoinsCount = nextCoins;
+    persistExternalCoinsCount(nextCoins);
 
     const parkedUnits = this.units
       .filter((unit) => unit.alive && unit.state === "parked" && unit.slotIndex !== null && unit.ammo > 0)
@@ -6662,6 +6671,18 @@ class Game {
     this.streakTimer = 0;
     this.invalidate(true);
     return true;
+  }
+
+  getCurrentExternalCoinsCount() {
+    return resolveExternalCoinsCount(this);
+  }
+
+  getLoseContinueCoinsCost() {
+    return resolveExternalTimeOutCoinsCost(this);
+  }
+
+  canContinueFromLoseForCoins() {
+    return this.getCurrentExternalCoinsCount() >= this.getLoseContinueCoinsCost();
   }
 
   triggerDebug6() {
@@ -8124,14 +8145,18 @@ class Game {
     const rightW = 184;
     const rightH = 68;
     const rightX = popupX + popupW - rightW - 40;
+    const continueCost = this.getLoseContinueCoinsCost();
+    const canContinueForCoins = this.canContinueFromLoseForCoins();
+    const continueButtonAlpha = canContinueForCoins ? 1 : 0.46;
 
     ctx.save();
+    ctx.globalAlpha = continueButtonAlpha;
     ctx.shadowColor = "rgba(20, 38, 87, 0.24)";
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 4;
     const leftGrad = ctx.createLinearGradient(0, buttonY, 0, buttonY + leftH);
-    leftGrad.addColorStop(0, "#9ce53f");
-    leftGrad.addColorStop(1, "#53ca1c");
+    leftGrad.addColorStop(0, canContinueForCoins ? "#9ce53f" : "#9ba7a5");
+    leftGrad.addColorStop(1, canContinueForCoins ? "#53ca1c" : "#727f7b");
     roundedRect(ctx, leftX, buttonY, leftW, leftH, 24);
     ctx.fillStyle = leftGrad;
     ctx.fill();
@@ -8144,6 +8169,7 @@ class Game {
     const coinY = buttonY + 12;
     const coinR = 22;
     ctx.save();
+    ctx.globalAlpha = continueButtonAlpha;
     const coinGrad = ctx.createLinearGradient(coinX, coinY, coinX, coinY + coinR * 2);
     coinGrad.addColorStop(0, "#ffea55");
     coinGrad.addColorStop(1, "#f0980f");
@@ -8164,6 +8190,7 @@ class Game {
     ctx.restore();
 
     ctx.save();
+    ctx.globalAlpha = continueButtonAlpha;
     ctx.fillStyle = "#ffc700";
     ctx.strokeStyle = "#ed8f00";
     ctx.lineWidth = 1.5;
@@ -8191,12 +8218,13 @@ class Game {
     ctx.save();
     ctx.font = "900 56px Arial";
     ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "rgba(0, 74, 10, 0.42)";
+    ctx.strokeStyle = canContinueForCoins ? "rgba(0, 74, 10, 0.42)" : "rgba(53, 59, 57, 0.62)";
     ctx.lineWidth = 5;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.strokeText("50", leftX + 92, buttonY + leftH * 0.53);
-    ctx.fillText("50", leftX + 92, buttonY + leftH * 0.53);
+    ctx.globalAlpha = continueButtonAlpha;
+    ctx.strokeText(String(continueCost), leftX + 92, buttonY + leftH * 0.53);
+    ctx.fillText(String(continueCost), leftX + 92, buttonY + leftH * 0.53);
     ctx.restore();
 
     ctx.save();
@@ -8560,7 +8588,7 @@ class Game {
     }
     if (this.gameState === "lose") {
       const overClose = isInsideRect(x, y, this.loseCloseRect);
-      const overContinue = isInsideRect(x, y, this.loseContinueRect);
+      const overContinue = this.canContinueFromLoseForCoins() && isInsideRect(x, y, this.loseContinueRect);
       this.canvas.style.cursor = overClose || overContinue ? "pointer" : "default";
       return;
     }
@@ -8612,6 +8640,10 @@ class Game {
       if (isInsideRect(x, y, this.loseCloseRect)) {
         this.restart();
       } else if (isInsideRect(x, y, this.loseContinueRect)) {
+        if (!this.canContinueFromLoseForCoins()) {
+          this.playSound("cant_select");
+          return;
+        }
         this.continueFromLoseWithOneSlot();
       }
       return;
@@ -10082,9 +10114,12 @@ let pendingExternalLevelSelection = null;
 let pendingExternalCoinsCount = null;
 let pendingExternalHeartsCount = null;
 let pendingExternalMaxLivesCount = null;
+let pendingExternalTimeOutCoinsCost = null;
 const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
 const EXTERNAL_HEARTS_STORAGE_KEY = "pixelflow.external.hearts.v1";
 const EXTERNAL_MAX_LIVES_STORAGE_KEY = "pixelflow.external.max_lives.v1";
+const EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY = "pixelflow.external.timeout_coins_cost.v1";
+const DEFAULT_TIMEOUT_COINS_COST = 50;
 
 function normalizeExternalCoinsCount(value) {
   const raw = String(value ?? "").trim();
@@ -10158,6 +10193,41 @@ function persistExternalMaxLivesCount(value) {
   }
 }
 
+function normalizeExternalTimeOutCoinsCost(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  if (normalizedRaw.length === 0) {
+    return null;
+  }
+  const numeric = Number(normalizedRaw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function persistExternalTimeOutCoinsCost(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function loadExternalCountFromStorage(storageKey) {
   if (typeof window === "undefined" || !window.localStorage) {
     return null;
@@ -10203,6 +10273,22 @@ function resolveExternalHeartsCount(gameInstance) {
   return fromStorage ?? 0;
 }
 
+function resolveExternalTimeOutCoinsCost(gameInstance) {
+  const fromGame = normalizeExternalTimeOutCoinsCost(gameInstance?.externalTimeOutCoinsCost);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalTimeOutCoinsCost(pendingExternalTimeOutCoinsCost);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY);
+  if (fromStorage !== null) {
+    return fromStorage;
+  }
+  return DEFAULT_TIMEOUT_COINS_COST;
+}
+
 function dispatchUnityCloseEvent(gameInstance) {
   if (typeof window === "undefined") {
     return false;
@@ -10219,6 +10305,14 @@ function dispatchUnityCloseEvent(gameInstance) {
 }
 
 if (typeof window !== "undefined") {
+  const applyExternalTimeOutCoinsCost = (timeOutCoinsCost) => {
+    pendingExternalTimeOutCoinsCost = timeOutCoinsCost;
+    const normalized = normalizeExternalTimeOutCoinsCost(timeOutCoinsCost);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalTimeOutCoinsCost(normalized);
+  };
   window.setLevel = (indexOrId) => {
     pendingExternalLevelSelection = indexOrId;
     return false;
@@ -10247,6 +10341,8 @@ if (typeof window !== "undefined") {
     }
     return persistExternalMaxLivesCount(normalized);
   };
+  window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
 }
 
 async function bootstrapGame() {
@@ -10319,6 +10415,7 @@ async function bootstrapGame() {
       return false;
     }
     game.externalCoinsCount = normalized;
+    game.invalidate(false);
     return persistExternalCoinsCount(normalized);
   };
   window.setHearts = (heartsCount) => {
@@ -10339,6 +10436,18 @@ async function bootstrapGame() {
     game.externalMaxLivesCount = normalized;
     return persistExternalMaxLivesCount(normalized);
   };
+  const applyExternalTimeOutCoinsCost = (timeOutCoinsCost) => {
+    pendingExternalTimeOutCoinsCost = timeOutCoinsCost;
+    const normalized = normalizeExternalTimeOutCoinsCost(timeOutCoinsCost);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalTimeOutCoinsCost = normalized;
+    game.invalidate(false);
+    return persistExternalTimeOutCoinsCost(normalized);
+  };
+  window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
   window.advanceTime = (ms) => game.advanceTime(ms);
   window.render_game_to_text = () => game.renderGameToText();
   window.debug6 = () => game.triggerDebug6();
@@ -10354,6 +10463,9 @@ async function bootstrapGame() {
   }
   if (pendingExternalMaxLivesCount !== null && pendingExternalMaxLivesCount !== undefined) {
     window.setMaxLives(pendingExternalMaxLivesCount);
+  }
+  if (pendingExternalTimeOutCoinsCost !== null && pendingExternalTimeOutCoinsCost !== undefined) {
+    window.setTimeOutCoinsCost(pendingExternalTimeOutCoinsCost);
   }
 }
 
