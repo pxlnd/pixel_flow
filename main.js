@@ -457,7 +457,7 @@ const LOSE_POPUP_UI = {
 };
 const LOSE_POPUP_BIRDS_DROP_RATIO = 0.15;
 const LOSE_OFFER_UI = {
-  gapFromPopupBottom: 50,
+  gapFromPopupBottom: 75,
   widthToPopupRatio: 1,
   sidePadding: 18,
   bottomSafeMargin: 20,
@@ -468,6 +468,25 @@ const LOSE_OFFER_UI = {
   buttonWidthRatio: 0.6,
   buttonBottomOverlapFactor: 0.92,
   buttonOffsetY: 30,
+};
+const LOSE_TOP_STATS_UI = {
+  topOffset: -8,
+  sidePadding: 18,
+  gap: 62,
+  targetHeight: 96,
+  maxScale: 1.08,
+  minScale: 0.72,
+  heartTextXRatio: 0.18,
+  heartTextYRatio: 0.57,
+  heartTextColor: "#ffffff",
+  heartTextStroke: "rgba(173, 21, 51, 0.95)",
+  coinsTextXRatio: 0.76,
+  coinsTextYRatio: 0.54,
+  coinsTextOffsetX: -20,
+  coinsTextOffsetY: -5,
+  coinsTextFontScale: 1.3,
+  coinsTextColor: "#17439c",
+  coinsTextStroke: "rgba(255, 255, 255, 0.9)",
 };
 const BASE_TOP_UI = {
   timerY: TIMER_PANEL_UI.y,
@@ -2333,6 +2352,12 @@ class Game {
     this.losePopupBirdsImage = new Image();
     this.losePopupBirdsImage.src = "ui/loose.png";
     this.losePopupBirdsImage.decoding = "async";
+    this.loseTopHeartPanelImage = new Image();
+    this.loseTopHeartPanelImage.src = "ui/Lose/heart.png";
+    this.loseTopHeartPanelImage.decoding = "async";
+    this.loseTopCoinsPanelImage = new Image();
+    this.loseTopCoinsPanelImage.src = "ui/Lose/coins.png";
+    this.loseTopCoinsPanelImage.decoding = "async";
     this.loseCoinsButtonImage = new Image();
     this.loseCoinsButtonImage.src = "ui/Lose/coins_button.png";
     this.loseCoinsButtonImage.decoding = "async";
@@ -2604,6 +2629,12 @@ class Game {
       this.invalidate(false);
     };
     this.losePopupBirdsImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseTopHeartPanelImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseTopCoinsPanelImage.onload = () => {
       this.invalidate(false);
     };
     this.loseCoinsButtonImage.onload = () => {
@@ -8033,14 +8064,111 @@ class Game {
     };
   }
 
+  getLoseTopStatsRects() {
+    const sourceHeartW =
+      this.loseTopHeartPanelImage?.naturalWidth > 0 ? this.loseTopHeartPanelImage.naturalWidth : 240;
+    const sourceHeartH =
+      this.loseTopHeartPanelImage?.naturalHeight > 0 ? this.loseTopHeartPanelImage.naturalHeight : 96;
+    const sourceCoinsW =
+      this.loseTopCoinsPanelImage?.naturalWidth > 0 ? this.loseTopCoinsPanelImage.naturalWidth : 244;
+    const sourceCoinsH =
+      this.loseTopCoinsPanelImage?.naturalHeight > 0 ? this.loseTopCoinsPanelImage.naturalHeight : 96;
+    const baseHeight = LOSE_TOP_STATS_UI.targetHeight;
+    const heartScale = baseHeight / sourceHeartH;
+    const coinsScale = baseHeight / sourceCoinsH;
+    let heartW = sourceHeartW * heartScale;
+    let heartH = sourceHeartH * heartScale;
+    let coinsW = sourceCoinsW * coinsScale;
+    let coinsH = sourceCoinsH * coinsScale;
+    let gap = LOSE_TOP_STATS_UI.gap;
+    let totalW = heartW + coinsW + gap;
+    const maxTotalW = Math.max(100, this.width - LOSE_TOP_STATS_UI.sidePadding * 2);
+    const maxScaleFromWidth = maxTotalW / totalW;
+    const scaled = clamp(maxScaleFromWidth, LOSE_TOP_STATS_UI.minScale, LOSE_TOP_STATS_UI.maxScale);
+    heartW *= scaled;
+    heartH *= scaled;
+    coinsW *= scaled;
+    coinsH *= scaled;
+    gap *= scaled;
+    totalW = heartW + coinsW + gap;
+    const x = (this.width - totalW) * 0.5;
+    const y = Math.max(14, TIMER_PANEL_UI.y + LOSE_TOP_STATS_UI.topOffset);
+    return {
+      heart: { x, y, w: heartW, h: heartH },
+      coins: { x: x + heartW + gap, y, w: coinsW, h: coinsH },
+    };
+  }
+
+  drawLoseTopStats(ctx, alpha = 1) {
+    const heartsCount = String(resolveExternalHeartsCount(this));
+    const coinsCount = String(this.getCurrentExternalCoinsCount());
+    const { heart, coins } = this.getLoseTopStatsRects();
+
+    const drawPanel = (image, rect, fallbackTop = "#dce8ff", fallbackBottom = "#b8cff5") => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = "rgba(8, 14, 36, 0.26)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
+      if (image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        ctx.imageSmoothingEnabled = true;
+        if ("imageSmoothingQuality" in ctx) {
+          ctx.imageSmoothingQuality = "high";
+        }
+        ctx.drawImage(image, rect.x, rect.y, rect.w, rect.h);
+      } else {
+        const grad = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+        grad.addColorStop(0, fallbackTop);
+        grad.addColorStop(1, fallbackBottom);
+        roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.round(rect.h * 0.28));
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+      ctx.restore();
+    };
+
+    drawPanel(this.loseTopHeartPanelImage, heart, "#ff7b68", "#f04f44");
+    drawPanel(this.loseTopCoinsPanelImage, coins, "#f5f9ff", "#d7e5ff");
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = LOSE_TOP_STATS_UI.heartTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.heartTextStroke;
+    ctx.lineWidth = Math.max(3, heart.h * 0.05);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `900 ${Math.max(20, Math.round(heart.h * 0.44))}px "Open Sans", Arial, sans-serif`;
+    const heartsX = heart.x + heart.w * LOSE_TOP_STATS_UI.heartTextXRatio;
+    const heartsY = heart.y + heart.h * LOSE_TOP_STATS_UI.heartTextYRatio;
+    ctx.strokeText(heartsCount, heartsX, heartsY);
+    ctx.fillText(heartsCount, heartsX, heartsY);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = LOSE_TOP_STATS_UI.coinsTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.coinsTextStroke;
+    ctx.lineWidth = Math.max(2, coins.h * 0.045);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `800 ${Math.max(20, Math.round(coins.h * 0.32 * LOSE_TOP_STATS_UI.coinsTextFontScale))}px "Open Sans", Arial, sans-serif`;
+    const coinsX = coins.x + coins.w * LOSE_TOP_STATS_UI.coinsTextXRatio + LOSE_TOP_STATS_UI.coinsTextOffsetX;
+    const coinsY = coins.y + coins.h * LOSE_TOP_STATS_UI.coinsTextYRatio + LOSE_TOP_STATS_UI.coinsTextOffsetY;
+    ctx.strokeText(coinsCount, coinsX, coinsY);
+    ctx.fillText(coinsCount, coinsX, coinsY);
+    ctx.restore();
+  }
+
   getLosePopupRect() {
-    const targetScale = 0.98;
+    const targetScale = 1.1;
     let w = LOSE_POPUP_UI.w * targetScale;
     let h = LOSE_POPUP_UI.h * targetScale;
     const fitScale = Math.min((this.width * 0.96) / w, (this.height * 0.9) / h, 1);
     w *= fitScale;
     h *= fitScale;
-    const centeredY = (this.height - h) * 0.5;
+    const centeredY = (this.height - h) * 0.5 - 60;
     const y = clamp(centeredY, 20, this.height - h - 20);
     return {
       x: (this.width - w) * 0.5,
@@ -8371,6 +8499,7 @@ class Game {
     ctx.fillStyle = `rgba(7, 14, 28, ${0.74 * fade})`;
     ctx.fillRect(0, 0, this.screenWidth, this.screenHeight);
     ctx.restore();
+    this.drawLoseTopStats(ctx, fade);
 
     if (this.losePopupImage.complete && this.losePopupImage.naturalWidth > 0) {
       ctx.save();
