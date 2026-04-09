@@ -8624,6 +8624,7 @@ class Game {
       }
     }
     if (isInsideRect(x, y, this.backButtonRect)) {
+      dispatchUnityCloseEvent(this);
       return;
     }
     if (this.gameState !== "playing") {
@@ -10125,6 +10126,66 @@ function persistExternalHeartsCount(value) {
   }
   try {
     window.localStorage.setItem(EXTERNAL_HEARTS_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadExternalCountFromStorage(storageKey) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (raw === null || raw === undefined) {
+      return null;
+    }
+    const numeric = Number(raw);
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+    return Math.max(0, Math.trunc(numeric));
+  } catch {
+    return null;
+  }
+}
+
+function resolveExternalCoinsCount(gameInstance) {
+  const fromGame = normalizeExternalCoinsCount(gameInstance?.externalCoinsCount);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalCoinsCount(pendingExternalCoinsCount);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_COINS_STORAGE_KEY);
+  return fromStorage ?? 0;
+}
+
+function resolveExternalHeartsCount(gameInstance) {
+  const fromGame = normalizeExternalHeartsCount(gameInstance?.externalHeartsCount);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalHeartsCount(pendingExternalHeartsCount);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_HEARTS_STORAGE_KEY);
+  return fromStorage ?? 0;
+}
+
+function dispatchUnityCloseEvent(gameInstance) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const coinsCount = resolveExternalCoinsCount(gameInstance);
+  const heartsCount = resolveExternalHeartsCount(gameInstance);
+  const closeUrl = `uniwebview://close?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
+  try {
+    window.location.href = closeUrl;
     return true;
   } catch {
     return false;
