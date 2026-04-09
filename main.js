@@ -473,6 +473,10 @@ const LOSE_TOP_STATS_UI = {
   heartTextYRatio: 0.57,
   heartTextColor: "#ffffff",
   heartTextStroke: "rgba(173, 21, 51, 0.95)",
+  livesTimerTextXRatio: 0.76,
+  livesTimerTextYRatio: 0.57,
+  livesTimerTextOffsetX: -12,
+  livesTimerTextOffsetY: -2,
   coinsTextXRatio: 0.76,
   coinsTextYRatio: 0.54,
   coinsTextOffsetX: -20,
@@ -7997,7 +8001,12 @@ class Game {
   }
 
   drawLoseTopStats(ctx, alpha = 1) {
-    const heartsCount = String(resolveExternalHeartsCount(this));
+    const heartsCountValue = resolveExternalHeartsCount(this);
+    const heartsCount = String(heartsCountValue);
+    const maxLivesCountValue = resolveExternalMaxLivesCount(this);
+    const livesTimerText = resolveExternalLivesTimer(this);
+    const isLivesFull = maxLivesCountValue > 0 && heartsCountValue >= maxLivesCountValue;
+    const heartsTimerDisplayText = isLivesFull ? "full" : livesTimerText || "--:--";
     const coinsCount = String(this.getCurrentExternalCoinsCount());
     const { heart, coins } = this.getLoseTopStatsRects();
 
@@ -8040,6 +8049,21 @@ class Game {
     const heartsY = heart.y + heart.h * LOSE_TOP_STATS_UI.heartTextYRatio;
     ctx.strokeText(heartsCount, heartsX, heartsY);
     ctx.fillText(heartsCount, heartsX, heartsY);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = LOSE_TOP_STATS_UI.coinsTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.coinsTextStroke;
+    ctx.lineWidth = Math.max(2, heart.h * 0.045);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `800 ${Math.max(20, Math.round(heart.h * 0.32 * LOSE_TOP_STATS_UI.coinsTextFontScale))}px "Open Sans", Arial, sans-serif`;
+    const livesTimerX = heart.x + heart.w * LOSE_TOP_STATS_UI.livesTimerTextXRatio + LOSE_TOP_STATS_UI.livesTimerTextOffsetX;
+    const livesTimerY = heart.y + heart.h * LOSE_TOP_STATS_UI.livesTimerTextYRatio + LOSE_TOP_STATS_UI.livesTimerTextOffsetY;
+    ctx.strokeText(heartsTimerDisplayText, livesTimerX, livesTimerY);
+    ctx.fillText(heartsTimerDisplayText, livesTimerX, livesTimerY);
     ctx.restore();
 
     ctx.save();
@@ -10224,6 +10248,7 @@ let pendingExternalLevelSelection = null;
 let pendingExternalCoinsCount = null;
 let pendingExternalHeartsCount = null;
 let pendingExternalMaxLivesCount = null;
+let pendingExternalLivesTimer = null;
 let pendingExternalSubscriptionStatus = null;
 let pendingExternalTimeOutCoinsCost = null;
 const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
@@ -10302,6 +10327,25 @@ function normalizeExternalMaxLivesCount(value) {
     return null;
   }
   return Math.max(0, Math.trunc(numeric));
+}
+
+function normalizeExternalLivesTimer(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  if (normalizedRaw.length === 0) {
+    return null;
+  }
+  return normalizedRaw;
 }
 
 function persistExternalMaxLivesCount(value) {
@@ -10444,6 +10488,18 @@ function resolveExternalMaxLivesCount(gameInstance) {
   return fromStorage ?? 0;
 }
 
+function resolveExternalLivesTimer(gameInstance) {
+  const fromGame = normalizeExternalLivesTimer(gameInstance?.externalLivesTimer);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalLivesTimer(pendingExternalLivesTimer);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  return null;
+}
+
 function resolveExternalSubscriptionStatus(gameInstance) {
   const fromGame = normalizeExternalSubscriptionStatus(gameInstance?.externalSubscriptionStatus);
   if (fromGame !== null) {
@@ -10573,6 +10629,10 @@ if (typeof window !== "undefined") {
     }
     return persistExternalMaxLivesCount(normalized);
   };
+  window.setLivesTimer = (livesTimer) => {
+    pendingExternalLivesTimer = livesTimer;
+    return normalizeExternalLivesTimer(livesTimer) !== null;
+  };
   window.setSubscriptionStatus = (subscriptionStatus) => {
     pendingExternalSubscriptionStatus = subscriptionStatus;
     const normalized = normalizeExternalSubscriptionStatus(subscriptionStatus);
@@ -10599,6 +10659,7 @@ async function bootstrapGame() {
   const canvas = document.getElementById("gameCanvas");
   const game = new Game(canvas);
   game.externalMaxLivesCount = resolveExternalMaxLivesCount(game);
+  game.externalLivesTimer = resolveExternalLivesTimer(game);
   game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
 
   const resolveExternalLevelId = (value) => {
@@ -10677,7 +10738,18 @@ async function bootstrapGame() {
       return false;
     }
     game.externalMaxLivesCount = normalized;
+    game.invalidate(false);
     return persistExternalMaxLivesCount(normalized);
+  };
+  window.setLivesTimer = (livesTimer) => {
+    pendingExternalLivesTimer = livesTimer;
+    const normalized = normalizeExternalLivesTimer(livesTimer);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalLivesTimer = normalized;
+    game.invalidate(false);
+    return true;
   };
   window.setSubscriptionStatus = (subscriptionStatus) => {
     pendingExternalSubscriptionStatus = subscriptionStatus;
@@ -10723,6 +10795,9 @@ async function bootstrapGame() {
   }
   if (pendingExternalMaxLivesCount !== null && pendingExternalMaxLivesCount !== undefined) {
     window.setMaxLives(pendingExternalMaxLivesCount);
+  }
+  if (pendingExternalLivesTimer !== null && pendingExternalLivesTimer !== undefined) {
+    window.setLivesTimer(pendingExternalLivesTimer);
   }
   if (pendingExternalSubscriptionStatus !== null && pendingExternalSubscriptionStatus !== undefined) {
     window.setSubscriptionStatus(pendingExternalSubscriptionStatus);
