@@ -10077,6 +10077,15 @@ class Game {
   }
 }
 
+let pendingExternalLevelSelection = null;
+
+if (typeof window !== "undefined") {
+  window.setLevel = (indexOrId) => {
+    pendingExternalLevelSelection = indexOrId;
+    return false;
+  };
+}
+
 async function bootstrapGame() {
   const loadedLevels = await loadLevelDefinitions();
   const fallbackLevels = LEVEL_DEFINITIONS_FALLBACK.length ? LEVEL_DEFINITIONS_FALLBACK : [BUILTIN_FALLBACK_LEVEL];
@@ -10090,10 +10099,63 @@ async function bootstrapGame() {
   const canvas = document.getElementById("gameCanvas");
   const game = new Game(canvas);
 
+  const resolveExternalLevelId = (value) => {
+    const levels = Array.isArray(game.availableLevels) ? game.availableLevels : [];
+    if (levels.length === 0) {
+      return null;
+    }
+
+    const raw = String(value ?? "").trim();
+    if (raw.length === 0) {
+      return null;
+    }
+
+    if (levels.some((level) => level.id === raw)) {
+      return raw;
+    }
+
+    const numeric = Number(raw);
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+    const index = Math.trunc(numeric);
+    if (index < 0) {
+      return null;
+    }
+
+    // Preferred path for Unity: index in available levels (0-based).
+    if (index < levels.length) {
+      return levels[index].id;
+    }
+
+    // Backward compatibility: direct level number/id.
+    const numericId = String(index);
+    if (levels.some((level) => level.id === numericId)) {
+      return numericId;
+    }
+
+    return null;
+  };
+
   window.game = game;
+  window.setLevel = (indexOrId) => {
+    pendingExternalLevelSelection = indexOrId;
+    const targetLevelId = resolveExternalLevelId(indexOrId);
+    if (!targetLevelId) {
+      return false;
+    }
+    game.applyLevelConfig(targetLevelId, { restart: true });
+    game.syncDebugContentSelectors();
+    game.saveDebugSettings();
+    return true;
+  };
   window.advanceTime = (ms) => game.advanceTime(ms);
   window.render_game_to_text = () => game.renderGameToText();
   window.debug6 = () => game.triggerDebug6();
+
+  if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined) {
+    window.setLevel(pendingExternalLevelSelection);
+  }
 }
 
 void bootstrapGame();
