@@ -8551,8 +8551,11 @@ class Game {
       return;
     }
     if (this.gameState === "playing" && this.tutorial?.active) {
+      const overRestart = isInsideRect(x, y, this.restartButtonRect);
       const target = this.getTutorialTapTarget();
-      this.canvas.style.cursor = target && this.isPointOnTutorialTarget(target, x, y) ? "pointer" : "default";
+      this.canvas.style.cursor = overRestart || (target && this.isPointOnTutorialTarget(target, x, y))
+        ? "pointer"
+        : "default";
       return;
     }
     if (this.gameState === "lose") {
@@ -8578,6 +8581,10 @@ class Game {
       if (this.applyDebugPaintAt(x, y)) {
         this.invalidate(false);
       }
+      return;
+    }
+    if (isInsideRect(x, y, this.restartButtonRect)) {
+      this.restart();
       return;
     }
     if (this.gameState === "playing" && this.tutorial?.active) {
@@ -8617,10 +8624,6 @@ class Game {
       }
     }
     if (isInsideRect(x, y, this.backButtonRect)) {
-      return;
-    }
-    if (isInsideRect(x, y, this.restartButtonRect)) {
-      this.restart();
       return;
     }
     if (this.gameState !== "playing") {
