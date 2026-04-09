@@ -2320,6 +2320,12 @@ class Game {
     this.losePopupBirdsImage = new Image();
     this.losePopupBirdsImage.src = "ui/loose.png";
     this.losePopupBirdsImage.decoding = "async";
+    this.loseCoinsButtonImage = new Image();
+    this.loseCoinsButtonImage.src = "ui/Lose/coins_button.png";
+    this.loseCoinsButtonImage.decoding = "async";
+    this.loseAdsButtonImage = new Image();
+    this.loseAdsButtonImage.src = "ui/Lose/ads_button.png";
+    this.loseAdsButtonImage.decoding = "async";
     this.woodImage = new Image();
     this.woodImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "panel");
     this.woodImage.decoding = "async";
@@ -2578,6 +2584,12 @@ class Game {
       this.invalidate(false);
     };
     this.losePopupBirdsImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseCoinsButtonImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseAdsButtonImage.onload = () => {
       this.invalidate(false);
     };
     this.woodImage.onload = () => {
@@ -6602,18 +6614,28 @@ class Game {
   }
 
   continueFromLoseWithOneSlot() {
+    return this.continueFromLoseWithOneSlotCore({ spendCoins: true });
+  }
+
+  continueFromLoseWithAd() {
+    return dispatchUnityRewardEvent();
+  }
+
+  continueFromLoseWithOneSlotCore({ spendCoins = true } = {}) {
     if (this.gameState !== "lose") {
       return false;
     }
-    const continueCost = this.getLoseContinueCoinsCost();
-    const currentCoins = this.getCurrentExternalCoinsCount();
-    if (currentCoins < continueCost) {
-      return false;
+    if (spendCoins) {
+      const continueCost = this.getLoseContinueCoinsCost();
+      const currentCoins = this.getCurrentExternalCoinsCount();
+      if (currentCoins < continueCost) {
+        return false;
+      }
+      const nextCoins = Math.max(0, currentCoins - continueCost);
+      this.externalCoinsCount = nextCoins;
+      pendingExternalCoinsCount = nextCoins;
+      persistExternalCoinsCount(nextCoins);
     }
-    const nextCoins = Math.max(0, currentCoins - continueCost);
-    this.externalCoinsCount = nextCoins;
-    pendingExternalCoinsCount = nextCoins;
-    persistExternalCoinsCount(nextCoins);
 
     const parkedUnits = this.units
       .filter((unit) => unit.alive && unit.state === "parked" && unit.slotIndex !== null && unit.ammo > 0)
@@ -8016,18 +8038,25 @@ class Game {
     const popup = popupRect || this.getLosePopupRect();
     const sx = popup.w / 646;
     const sy = popup.h / 663;
-    const buttonY = popup.y + popup.h - 126 * sy;
+    const buttonScale = 0.9;
+    const baseButtonW = 269 * sx;
+    const baseButtonH = 114 * sy;
+    const buttonW = baseButtonW * buttonScale;
+    const buttonH = baseButtonH * buttonScale;
+    const baseButtonY = popup.y + popup.h - 174 * sy;
+    const buttonY = baseButtonY + (baseButtonH - buttonH) * 0.5;
+    const sideInset = 40 * sx;
     const left = {
-      x: popup.x + 40 * sx,
+      x: popup.x + sideInset + (baseButtonW - buttonW) * 0.5,
       y: buttonY,
-      w: 184 * sx,
-      h: 68 * sy,
+      w: buttonW,
+      h: buttonH,
     };
     const right = {
-      x: popup.x + popup.w - 40 * sx - 184 * sx,
+      x: popup.x + popup.w - sideInset - baseButtonW + (baseButtonW - buttonW) * 0.5,
       y: buttonY,
-      w: 184 * sx,
-      h: 68 * sy,
+      w: buttonW,
+      h: buttonH,
     };
     return { left, right };
   }
@@ -8138,142 +8167,65 @@ class Game {
   }
 
   drawLoseButtons(ctx, popupX, popupY, popupW, popupH) {
-    const buttonY = popupY + popupH - 126;
-    const leftX = popupX + 40;
-    const leftW = 184;
-    const leftH = 68;
-    const rightW = 184;
-    const rightH = 68;
-    const rightX = popupX + popupW - rightW - 40;
+    const popup = { x: popupX, y: popupY, w: popupW, h: popupH };
+    const { left, right } = this.getLoseButtonRects(popup);
     const continueCost = this.getLoseContinueCoinsCost();
     const canContinueForCoins = this.canContinueFromLoseForCoins();
     const continueButtonAlpha = canContinueForCoins ? 1 : 0.46;
-
-    ctx.save();
-    ctx.globalAlpha = continueButtonAlpha;
-    ctx.shadowColor = "rgba(20, 38, 87, 0.24)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-    const leftGrad = ctx.createLinearGradient(0, buttonY, 0, buttonY + leftH);
-    leftGrad.addColorStop(0, canContinueForCoins ? "#9ce53f" : "#9ba7a5");
-    leftGrad.addColorStop(1, canContinueForCoins ? "#53ca1c" : "#727f7b");
-    roundedRect(ctx, leftX, buttonY, leftW, leftH, 24);
-    ctx.fillStyle = leftGrad;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.34)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
-
-    const coinX = leftX + 22;
-    const coinY = buttonY + 12;
-    const coinR = 22;
-    ctx.save();
-    ctx.globalAlpha = continueButtonAlpha;
-    const coinGrad = ctx.createLinearGradient(coinX, coinY, coinX, coinY + coinR * 2);
-    coinGrad.addColorStop(0, "#ffea55");
-    coinGrad.addColorStop(1, "#f0980f");
-    ctx.fillStyle = coinGrad;
-    ctx.beginPath();
-    ctx.arc(coinX + coinR, coinY + coinR, coinR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#ffbe2b";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = "#ffef65";
-    ctx.beginPath();
-    ctx.arc(coinX + coinR, coinY + coinR, coinR * 0.66, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#f0a300";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    ctx.globalAlpha = continueButtonAlpha;
-    ctx.fillStyle = "#ffc700";
-    ctx.strokeStyle = "#ed8f00";
-    ctx.lineWidth = 1.5;
-    const sx = coinX + coinR;
-    const sy = coinY + coinR;
-    const rOuter = coinR * 0.42;
-    const rInner = coinR * 0.2;
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const angle = -Math.PI / 2 + (Math.PI * 2 * i) / 10;
-      const r = i % 2 === 0 ? rOuter : rInner;
-      const px = sx + Math.cos(angle) * r;
-      const py = sy + Math.sin(angle) * r;
-      if (i === 0) {
-        ctx.moveTo(px, py);
+    const drawButton = (image, rect, alpha = 1, fallbackTop = "#7bcfff", fallbackBottom = "#4a95ef") => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = "rgba(20, 38, 87, 0.24)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
+      if (image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        ctx.imageSmoothingEnabled = true;
+        if ("imageSmoothingQuality" in ctx) {
+          ctx.imageSmoothingQuality = "high";
+        }
+        ctx.drawImage(image, rect.x, rect.y, rect.w, rect.h);
       } else {
-        ctx.lineTo(px, py);
+        const grad = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+        grad.addColorStop(0, fallbackTop);
+        grad.addColorStop(1, fallbackBottom);
+        roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.round(rect.h * 0.36));
+        ctx.fillStyle = grad;
+        ctx.fill();
       }
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+      ctx.restore();
+    };
+
+    drawButton(
+      this.loseCoinsButtonImage,
+      left,
+      continueButtonAlpha,
+      canContinueForCoins ? "#9ce53f" : "#9ba7a5",
+      canContinueForCoins ? "#53ca1c" : "#727f7b"
+    );
+    drawButton(this.loseAdsButtonImage, right, 1, "#7bcfff", "#4a95ef");
 
     ctx.save();
-    ctx.font = "900 56px Arial";
+    const textAreaStartRatio = 0.46;
+    const leftFontSize = Math.max(16, Math.round(left.h * 0.3744));
+    ctx.font = `800 ${leftFontSize}px "Open Sans", Arial, sans-serif`;
     ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = canContinueForCoins ? "rgba(0, 74, 10, 0.42)" : "rgba(53, 59, 57, 0.62)";
-    ctx.lineWidth = 5;
-    ctx.textAlign = "left";
+    ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.globalAlpha = continueButtonAlpha;
-    ctx.strokeText(String(continueCost), leftX + 92, buttonY + leftH * 0.53);
-    ctx.fillText(String(continueCost), leftX + 92, buttonY + leftH * 0.53);
-    ctx.restore();
-
-    ctx.save();
-    ctx.shadowColor = "rgba(20, 38, 87, 0.24)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-    const rightGrad = ctx.createLinearGradient(0, buttonY, 0, buttonY + rightH);
-    rightGrad.addColorStop(0, "#7bcfff");
-    rightGrad.addColorStop(1, "#4a95ef");
-    roundedRect(ctx, rightX, buttonY, rightW, rightH, 24);
-    ctx.fillStyle = rightGrad;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.38)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
-
-    const filmX = rightX + 20;
-    const filmY = buttonY + 12;
-    const filmW = 52;
-    const filmH = 44;
-    ctx.save();
-    const filmGrad = ctx.createLinearGradient(filmX, filmY, filmX, filmY + filmH);
-    filmGrad.addColorStop(0, "#d7f0ff");
-    filmGrad.addColorStop(1, "#75b6ff");
-    roundedRect(ctx, filmX, filmY, filmW, filmH, 12);
-    ctx.fillStyle = filmGrad;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(31, 95, 184, 0.8)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = "#4f8fe0";
-    ctx.beginPath();
-    ctx.moveTo(filmX + 21, filmY + 12);
-    ctx.lineTo(filmX + 21, filmY + 32);
-    ctx.lineTo(filmX + 38, filmY + 22);
-    ctx.closePath();
-    ctx.fill();
+    const leftTextX = left.x + left.w * (textAreaStartRatio + (1 - textAreaStartRatio) * 0.5) - 25;
+    const leftTextY = left.y + left.h * 0.5 - 15;
+    ctx.fillText(String(continueCost), leftTextX, leftTextY);
     ctx.restore();
 
     ctx.save();
     ctx.fillStyle = "#ffffff";
-    ctx.font = "900 54px Arial";
-    ctx.strokeStyle = "rgba(15, 63, 143, 0.72)";
-    ctx.lineWidth = 5;
-    ctx.textAlign = "left";
+    const rightFontSize = Math.max(14, Math.round(right.h * 0.36));
+    ctx.font = `800 ${rightFontSize}px "Open Sans", Arial, sans-serif`;
+    ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.strokeText("FREE", rightX + 84, buttonY + rightH * 0.53);
-    ctx.fillText("FREE", rightX + 84, buttonY + rightH * 0.53);
+    const rightTextX = right.x + right.w * (textAreaStartRatio + (1 - textAreaStartRatio) * 0.5) - 25;
+    const rightTextY = right.y + right.h * 0.5 - 15;
+    ctx.fillText("FREE", rightTextX, rightTextY);
     ctx.restore();
   }
 
@@ -8321,6 +8273,7 @@ class Game {
       }
       ctx.drawImage(this.losePopupImage, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
       this.drawLoseBirdRow(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h, fade);
+      this.drawLoseButtons(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
       ctx.restore();
       return;
     }
@@ -8589,7 +8542,8 @@ class Game {
     if (this.gameState === "lose") {
       const overClose = isInsideRect(x, y, this.loseCloseRect);
       const overContinue = this.canContinueFromLoseForCoins() && isInsideRect(x, y, this.loseContinueRect);
-      this.canvas.style.cursor = overClose || overContinue ? "pointer" : "default";
+      const overFree = isInsideRect(x, y, this.loseFreeRect);
+      this.canvas.style.cursor = overClose || overContinue || overFree ? "pointer" : "default";
       return;
     }
     if (this.gameState === "victory") {
@@ -8638,13 +8592,17 @@ class Game {
     }
     if (this.gameState === "lose") {
       if (isInsideRect(x, y, this.loseCloseRect)) {
-        this.restart();
+        dispatchUnityCloseEvent(this);
       } else if (isInsideRect(x, y, this.loseContinueRect)) {
         if (!this.canContinueFromLoseForCoins()) {
           this.playSound("cant_select");
           return;
         }
         this.continueFromLoseWithOneSlot();
+      } else if (isInsideRect(x, y, this.loseFreeRect)) {
+        if (!this.continueFromLoseWithAd()) {
+          this.playSound("cant_select");
+        }
       }
       return;
     }
@@ -10304,6 +10262,18 @@ function dispatchUnityCloseEvent(gameInstance) {
   }
 }
 
+function dispatchUnityRewardEvent() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    window.location.href = "uniwebview://reward";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 if (typeof window !== "undefined") {
   const applyExternalTimeOutCoinsCost = (timeOutCoinsCost) => {
     pendingExternalTimeOutCoinsCost = timeOutCoinsCost;
@@ -10343,6 +10313,7 @@ if (typeof window !== "undefined") {
   };
   window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
   window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.rewardResult = () => false;
 }
 
 async function bootstrapGame() {
@@ -10448,6 +10419,13 @@ async function bootstrapGame() {
   };
   window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
   window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.rewardResult = (result) => {
+    const normalized = String(result ?? "").trim().toLowerCase();
+    if (normalized !== "true") {
+      return false;
+    }
+    return game.continueFromLoseWithOneSlotCore({ spendCoins: false });
+  };
   window.advanceTime = (ms) => game.advanceTime(ms);
   window.render_game_to_text = () => game.renderGameToText();
   window.debug6 = () => game.triggerDebug6();
