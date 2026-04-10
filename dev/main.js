@@ -106,13 +106,13 @@ const BUILTIN_FALLBACK_THEME = {
 };
 
 const SOUND_DEFINITIONS = {
-  back_to_cell: { src: "sounds/back_to_cell.wav", channels: 3, volume: 0.8 },
-  cant_select: { src: "sounds/cant_select.wav", channels: 2, volume: 0.9 },
+  back_to_cell: { src: "sounds/back_to_cell.mp3", channels: 3, volume: 0.8 },
+  cant_select: { src: "sounds/cant_select.mp3", channels: 2, volume: 0.9 },
   fail: { src: "sounds/Fail.mp3", channels: 1, volume: 0.9 },
-  no_moves: { src: "sounds/no_moves.wav", channels: 1, volume: 0.9 },
+  no_moves: { src: "sounds/no_moves.mp3", channels: 1, volume: 0.9 },
   win: { src: "sounds/Win.mp3", channels: 1, volume: 0.9 },
   buble: { src: "sounds/Bubble.mp3", channels: 5, volume: 0.75 },
-  tap: { src: "sounds/tap.wav", channels: 3, volume: 0.85 },
+  tap: { src: "sounds/tap.mp3", channels: 3, volume: 0.85 },
 };
 
 let LEVEL_DEFINITIONS = [];
