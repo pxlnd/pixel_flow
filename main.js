@@ -340,6 +340,16 @@ const CARD_HITBOX_PADDING_TOP = 26;
 const CARD_HITBOX_PADDING_BOTTOM = 22;
 const PARKED_UNIT_TAP_RADIUS = 86;
 const LEVEL_ONE_TUTORIAL_ID = "1";
+const LEVEL_TUTORIAL_CONFIG_BY_ID = {
+  [LEVEL_ONE_TUTORIAL_ID]: {
+    secondaryColor: "green",
+    secondaryFirst: false,
+  },
+  "2": {
+    secondaryColor: "red",
+    secondaryFirst: true,
+  },
+};
 const LEVEL_ONE_TUTORIAL_STEPS = {
   tapBlackCard: "tap-black-card",
   waitBlackParked: "wait-black-parked",
@@ -5098,7 +5108,24 @@ class Game {
   }
 
   isLevelOneTutorialEnabled() {
-    return String(this.currentLevelId || "") === LEVEL_ONE_TUTORIAL_ID;
+    return !!this.getLevelTutorialConfig();
+  }
+
+  getLevelTutorialConfig() {
+    const levelId = String(this.currentLevelId || "");
+    return LEVEL_TUTORIAL_CONFIG_BY_ID[levelId] || null;
+  }
+
+  getTutorialSecondaryColor() {
+    return this.getLevelTutorialConfig()?.secondaryColor || "green";
+  }
+
+  isTutorialSecondaryFirst() {
+    return !!this.getLevelTutorialConfig()?.secondaryFirst;
+  }
+
+  getTutorialFinalParkedColor() {
+    return this.isTutorialSecondaryFirst() ? this.getTutorialSecondaryColor() : "black";
   }
 
   swapCardPayload(cardA, cardB) {
@@ -5124,6 +5151,7 @@ class Game {
     if (!this.isLevelOneTutorialEnabled()) {
       return;
     }
+    const secondaryColor = this.getTutorialSecondaryColor();
     const rightFront = this.getActiveFrontCardInLane(1);
     const leftFront = this.getActiveFrontCardInLane(0);
     if (rightFront && rightFront.color !== "black") {
@@ -5132,8 +5160,10 @@ class Game {
         this.swapCardPayload(rightFront, donor);
       }
     }
-    if (leftFront && leftFront.color !== "green") {
-      const donor = this.cards.find((card) => !card.used && card.color === "green" && card.index !== leftFront.index);
+    if (leftFront && leftFront.color !== secondaryColor) {
+      const donor = this.cards.find(
+        (card) => !card.used && card.color === secondaryColor && card.index !== leftFront.index
+      );
       if (donor) {
         this.swapCardPayload(leftFront, donor);
       }
@@ -5143,9 +5173,6 @@ class Game {
 
   ensurePlayableFrontQueueColor() {
     if (this.gameState !== "playing") {
-      return false;
-    }
-    if (this.isLevelOneTutorialEnabled()) {
       return false;
     }
     const target = this.getNextSpiralTarget();
@@ -5183,7 +5210,9 @@ class Game {
       return;
     }
     this.tutorial.active = true;
-    this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard;
+    this.tutorial.step = this.isTutorialSecondaryFirst()
+      ? LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard
+      : LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard;
   }
 
   finishTutorial() {
@@ -5195,15 +5224,16 @@ class Game {
     if (!this.tutorial?.active) {
       return null;
     }
+    const secondaryColor = this.getTutorialSecondaryColor();
     if (color === "black") {
       const rightFront = this.getActiveFrontCardInLane(1);
       if (rightFront && rightFront.color === "black") {
         return rightFront;
       }
     }
-    if (color === "green") {
+    if (color === secondaryColor) {
       const leftFront = this.getActiveFrontCardInLane(0);
-      if (leftFront && leftFront.color === "green") {
+      if (leftFront && leftFront.color === secondaryColor) {
         return leftFront;
       }
     }
@@ -5214,16 +5244,19 @@ class Game {
     if (!this.tutorial?.active) {
       return null;
     }
-    const firstUnitId = this.tutorial.firstBlackUnitId;
-    if (Number.isFinite(firstUnitId)) {
+    const targetColor = this.getTutorialFinalParkedColor();
+    const preferredUnitId = targetColor === "black"
+      ? this.tutorial.firstBlackUnitId
+      : this.tutorial.greenUnitId;
+    if (Number.isFinite(preferredUnitId)) {
       const unit = this.units.find(
-        (item) => item.id === firstUnitId && item.alive && item.state === "parked" && item.color === "black" && item.ammo > 0
+        (item) => item.id === preferredUnitId && item.alive && item.state === "parked" && item.color === targetColor && item.ammo > 0
       );
       if (unit) {
         return unit;
       }
     }
-    return this.units.find((unit) => unit.alive && unit.state === "parked" && unit.color === "black" && unit.ammo > 0) || null;
+    return this.units.find((unit) => unit.alive && unit.state === "parked" && unit.color === targetColor && unit.ammo > 0) || null;
   }
 
   getTutorialTapTarget() {
@@ -5236,7 +5269,7 @@ class Game {
       return card ? { type: "card", card } : null;
     }
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
-      const card = this.getTutorialTargetCard("green");
+      const card = this.getTutorialTargetCard(this.getTutorialSecondaryColor());
       return card ? { type: "card", card } : null;
     }
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked) {
@@ -5265,15 +5298,20 @@ class Game {
     if (!this.tutorial?.active || !unit) {
       return;
     }
+    const secondaryColor = this.getTutorialSecondaryColor();
     if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitBlackParked && unit.color === "black") {
       this.tutorial.firstBlackUnitId = unit.id;
-      this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard;
+      this.tutorial.step = this.isTutorialSecondaryFirst()
+        ? LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked
+        : LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard;
       this.invalidate(true);
       return;
     }
-    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenParked && unit.color === "green") {
+    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenParked && unit.color === secondaryColor) {
       this.tutorial.greenUnitId = unit.id;
-      this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked;
+      this.tutorial.step = this.isTutorialSecondaryFirst()
+        ? LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard
+        : LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked;
       this.invalidate(true);
     }
   }
@@ -5403,10 +5441,11 @@ class Game {
     this.units.push(unit);
     card.used = true;
     if (this.tutorial?.active) {
+      const secondaryColor = this.getTutorialSecondaryColor();
       if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard && card.color === "black") {
         this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitBlackParked;
         this.tutorial.firstBlackUnitId = unit.id;
-      } else if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard && card.color === "green") {
+      } else if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard && card.color === secondaryColor) {
         this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitGreenParked;
         this.tutorial.greenUnitId = unit.id;
       }
@@ -5460,7 +5499,11 @@ class Game {
     unit.parkBounce = 0;
     unit.renderRotation = null;
     unit.prevPosition = { ...unit.position };
-    if (this.tutorial?.active && this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked && unit.color === "black") {
+    if (
+      this.tutorial?.active &&
+      this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked &&
+      unit.color === this.getTutorialFinalParkedColor()
+    ) {
       this.finishTutorial();
     }
     this.invalidate(true);
