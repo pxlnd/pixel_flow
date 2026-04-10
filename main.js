@@ -1297,7 +1297,8 @@ function createBaseLayout(layout) {
   };
 }
 
-function syncLevelGlobals(levelConfig) {
+function syncLevelGlobals(levelConfig, options = {}) {
+  const { displayLevelNumber = null } = options;
   CURRENT_LEVEL = cloneData(levelConfig);
   BOTTOM_QUEUE_CARD_COUNT = clamp(
     Math.round(Number(CURRENT_LEVEL?.queueCardCount ?? BOTTOM_QUEUE_CARD_COUNT)),
@@ -1308,7 +1309,12 @@ function syncLevelGlobals(levelConfig) {
   LAYOUT = cloneLevelLayout(CURRENT_LEVEL.layout);
   BASE_LAYOUT = createBaseLayout(LAYOUT);
   FALLBACK_FIELD_PATTERN = [...(CURRENT_LEVEL.fallbackFieldPattern || [])];
-  TIMER_PANEL_UI.label = CURRENT_LEVEL.name || "Level";
+  const normalizedDisplayLevelNumber = Number.isFinite(displayLevelNumber)
+    ? Math.max(1, Math.trunc(displayLevelNumber))
+    : null;
+  TIMER_PANEL_UI.label = normalizedDisplayLevelNumber !== null
+    ? `Level ${normalizedDisplayLevelNumber}`
+    : (CURRENT_LEVEL.name || "Level");
   if (typeof document !== "undefined") {
     document.title = `PixelFlow - ${TIMER_PANEL_UI.label}`;
   }
@@ -4528,9 +4534,9 @@ class Game {
   }
 
   applyLevelConfig(levelId, options = {}) {
-    const { restart = true } = options;
+    const { restart = true, displayLevelNumber = null } = options;
     const nextLevelId = this.getValidLevelId(levelId);
-    syncLevelGlobals(getLevelConfig(nextLevelId));
+    syncLevelGlobals(getLevelConfig(nextLevelId), { displayLevelNumber });
     this.currentLevelId = nextLevelId;
     this.syncDebugImageInputsForLevel(this.currentLevelId);
     this.spiralOrderByCell = this.buildSpiralOrderMap(LAYOUT.fieldCols, LAYOUT.fieldRows);
@@ -10798,7 +10804,7 @@ async function bootstrapGame() {
   game.externalLivesTimer = resolveExternalLivesTimer(game);
   game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
 
-  const resolveExternalLevelId = (value) => {
+  const resolveExternalLevelSelection = (value) => {
     const levels = Array.isArray(game.availableLevels) ? game.availableLevels : [];
     if (levels.length === 0) {
       return null;
@@ -10810,7 +10816,11 @@ async function bootstrapGame() {
     }
 
     if (levels.some((level) => level.id === raw)) {
-      return raw;
+      const displayLevelNumber = isPositiveIntegerString(raw) ? Number(raw) : null;
+      return {
+        targetLevelId: raw,
+        displayLevelNumber,
+      };
     }
 
     const numeric = Number(raw);
@@ -10823,27 +10833,25 @@ async function bootstrapGame() {
     }
 
     // Preferred path for Unity: index in available levels (0-based).
-    if (index < levels.length) {
-      return levels[index].id;
-    }
-
-    // Backward compatibility: direct level number/id.
-    const numericId = String(index);
-    if (levels.some((level) => level.id === numericId)) {
-      return numericId;
-    }
-
-    return null;
+    // For indexes outside the range, loop cyclically through the available levels.
+    const normalizedIndex = index % levels.length;
+    return {
+      targetLevelId: levels[normalizedIndex].id,
+      displayLevelNumber: index > 0 ? index : 1,
+    };
   };
 
   window.game = game;
   window.setLevel = (indexOrId) => {
     pendingExternalLevelSelection = indexOrId;
-    const targetLevelId = resolveExternalLevelId(indexOrId);
-    if (!targetLevelId) {
+    const selection = resolveExternalLevelSelection(indexOrId);
+    if (!selection) {
       return false;
     }
-    game.applyLevelConfig(targetLevelId, { restart: true });
+    game.applyLevelConfig(selection.targetLevelId, {
+      restart: true,
+      displayLevelNumber: selection.displayLevelNumber,
+    });
     game.syncDebugContentSelectors();
     game.saveDebugSettings();
     return true;
