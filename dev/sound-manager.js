@@ -7,6 +7,7 @@ class SoundManager {
     this.audioContext = null;
     this.webAudioEnabled = false;
     this.unlocked = false;
+    this.warmupStarted = false;
 
     const AudioContextClass =
       typeof window !== "undefined"
@@ -34,37 +35,48 @@ class SoundManager {
         channelsCount,
         volume,
       });
-
-      if (typeof Audio !== "function") {
-        continue;
-      }
-      const channels = [];
-      for (let i = 0; i < channelsCount; i += 1) {
-        let audio = null;
-        try {
-          audio = new Audio(src);
-        } catch {
-          audio = null;
-        }
-        if (!audio) {
-          continue;
-        }
-        audio.preload = "auto";
-        audio.volume = volume;
-        channels.push(audio);
-      }
-      if (channels.length === 0) {
-        continue;
-      }
-      this.poolByName.set(name, {
-        channels,
-        cursor: 0,
-      });
     }
+  }
 
-    if (this.webAudioEnabled) {
+  ensureFallbackPool(name) {
+    if (this.poolByName.has(name)) {
+      return this.poolByName.get(name);
+    }
+    const definition = this.definitionByName.get(name);
+    if (!definition || typeof Audio !== "function") {
+      return null;
+    }
+    const channels = [];
+    for (let i = 0; i < definition.channelsCount; i += 1) {
+      let audio = null;
+      try {
+        audio = new Audio(definition.src);
+      } catch {
+        audio = null;
+      }
+      if (!audio) {
+        continue;
+      }
+      audio.preload = "auto";
+      audio.volume = definition.volume;
+      channels.push(audio);
+    }
+    if (channels.length === 0) {
+      return null;
+    }
+    const pool = { channels, cursor: 0 };
+    this.poolByName.set(name, pool);
+    return pool;
+  }
+
+  queueWarmupBuffers() {
+    if (!this.webAudioEnabled || this.warmupStarted) {
+      return;
+    }
+    this.warmupStarted = true;
+    setTimeout(() => {
       this.warmupBuffers();
-    }
+    }, 0);
   }
 
   warmupBuffers() {
@@ -225,7 +237,7 @@ class SoundManager {
   }
 
   playFromFallbackPool(name) {
-    const pool = this.poolByName.get(name);
+    const pool = this.poolByName.get(name) || this.ensureFallbackPool(name);
     if (!pool || pool.channels.length === 0) {
       return;
     }
@@ -266,13 +278,14 @@ class SoundManager {
     this.unlocked = true;
     if (this.webAudioEnabled && this.audioContext) {
       void this.audioContext.resume();
-      this.warmupBuffers();
+      this.queueWarmupBuffers();
     }
     this.unlockFallbackPools();
   }
 
   play(name) {
     if (this.webAudioEnabled) {
+      this.queueWarmupBuffers();
       if (this.playFromWebAudio(name)) {
         return;
       }
