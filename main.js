@@ -181,13 +181,25 @@ function getLevelOverridesStoragePayload() {
   };
 }
 
+function getSafeLocalStorage() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.localStorage || null;
+  } catch {
+    return null;
+  }
+}
+
 function saveLevelOverridesToStorage() {
-  if (typeof window === "undefined" || !window.localStorage) {
+  const storage = getSafeLocalStorage();
+  if (!storage) {
     return false;
   }
   try {
     const payload = getLevelOverridesStoragePayload();
-    window.localStorage.setItem(LEVEL_OVERRIDES_STORAGE_KEY, JSON.stringify(payload));
+    storage.setItem(LEVEL_OVERRIDES_STORAGE_KEY, JSON.stringify(payload));
     return true;
   } catch {
     return false;
@@ -196,12 +208,13 @@ function saveLevelOverridesToStorage() {
 
 function loadLevelOverridesFromStorage() {
   LEVEL_OVERRIDES_MAP = new Map();
-  if (typeof window === "undefined" || !window.localStorage) {
+  const storage = getSafeLocalStorage();
+  if (!storage) {
     return;
   }
   let parsed = null;
   try {
-    const raw = window.localStorage.getItem(LEVEL_OVERRIDES_STORAGE_KEY);
+    const raw = storage.getItem(LEVEL_OVERRIDES_STORAGE_KEY);
     if (!raw) {
       return;
     }
@@ -4636,15 +4649,18 @@ class Game {
       if (window.location.hash.startsWith("#dbg=")) {
         history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
       }
-      window.localStorage.removeItem(DEBUG_STORAGE_KEY);
-      for (const key of DEBUG_STORAGE_KEYS_FALLBACK) {
-        window.localStorage.removeItem(key);
-      }
-      const persistedTopNavVisible = window.localStorage.getItem(DEBUG_TOP_NAV_VISIBLE_STORAGE_KEY);
-      if (persistedTopNavVisible === "0") {
-        topLevelNavVisible = false;
-      } else if (persistedTopNavVisible === "1") {
-        topLevelNavVisible = true;
+      const storage = getSafeLocalStorage();
+      if (storage) {
+        storage.removeItem(DEBUG_STORAGE_KEY);
+        for (const key of DEBUG_STORAGE_KEYS_FALLBACK) {
+          storage.removeItem(key);
+        }
+        const persistedTopNavVisible = storage.getItem(DEBUG_TOP_NAV_VISIBLE_STORAGE_KEY);
+        if (persistedTopNavVisible === "0") {
+          topLevelNavVisible = false;
+        } else if (persistedTopNavVisible === "1") {
+          topLevelNavVisible = true;
+        }
       }
     } catch {
       // Ignore storage/history errors in restricted contexts.
@@ -4662,16 +4678,24 @@ class Game {
     if (this.suppressDebugSave) {
       return;
     }
+    const storage = getSafeLocalStorage();
+    if (!storage) {
+      return;
+    }
     try {
-      window.localStorage.setItem(DEBUG_TOP_NAV_VISIBLE_STORAGE_KEY, this.topLevelNavVisible ? "1" : "0");
+      storage.setItem(DEBUG_TOP_NAV_VISIBLE_STORAGE_KEY, this.topLevelNavVisible ? "1" : "0");
     } catch {
       // Ignore storage failures.
     }
   }
 
   clearDebugSettings() {
+    const storage = getSafeLocalStorage();
+    if (!storage) {
+      return;
+    }
     try {
-      window.localStorage.removeItem(DEBUG_TOP_NAV_VISIBLE_STORAGE_KEY);
+      storage.removeItem(DEBUG_TOP_NAV_VISIBLE_STORAGE_KEY);
     } catch {
       // Ignore storage failures.
     }
@@ -10326,11 +10350,12 @@ function normalizeExternalCoinsCount(value) {
 }
 
 function persistExternalCoinsCount(value) {
-  if (typeof window === "undefined" || !window.localStorage) {
+  const storage = getSafeLocalStorage();
+  if (!storage) {
     return false;
   }
   try {
-    window.localStorage.setItem(EXTERNAL_COINS_STORAGE_KEY, String(value));
+    storage.setItem(EXTERNAL_COINS_STORAGE_KEY, String(value));
     return true;
   } catch {
     return false;
@@ -10350,11 +10375,12 @@ function normalizeExternalHeartsCount(value) {
 }
 
 function persistExternalHeartsCount(value) {
-  if (typeof window === "undefined" || !window.localStorage) {
+  const storage = getSafeLocalStorage();
+  if (!storage) {
     return false;
   }
   try {
-    window.localStorage.setItem(EXTERNAL_HEARTS_STORAGE_KEY, String(value));
+    storage.setItem(EXTERNAL_HEARTS_STORAGE_KEY, String(value));
     return true;
   } catch {
     return false;
@@ -10404,11 +10430,12 @@ function normalizeExternalLivesTimer(value) {
 }
 
 function persistExternalMaxLivesCount(value) {
-  if (typeof window === "undefined" || !window.localStorage) {
+  const storage = getSafeLocalStorage();
+  if (!storage) {
     return false;
   }
   try {
-    window.localStorage.setItem(EXTERNAL_MAX_LIVES_STORAGE_KEY, String(value));
+    storage.setItem(EXTERNAL_MAX_LIVES_STORAGE_KEY, String(value));
     return true;
   } catch {
     return false;
@@ -10439,11 +10466,12 @@ function normalizeExternalSubscriptionStatus(value) {
 }
 
 function persistExternalSubscriptionStatus(value) {
-  if (typeof window === "undefined" || !window.localStorage) {
+  const storage = getSafeLocalStorage();
+  if (!storage) {
     return false;
   }
   try {
-    window.localStorage.setItem(EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY, value ? "1" : "0");
+    storage.setItem(EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY, value ? "1" : "0");
     return true;
   } catch {
     return false;
@@ -10474,11 +10502,12 @@ function normalizeExternalTimeOutCoinsCost(value) {
 }
 
 function persistExternalTimeOutCoinsCost(value) {
-  if (typeof window === "undefined" || !window.localStorage) {
+  const storage = getSafeLocalStorage();
+  if (!storage) {
     return false;
   }
   try {
-    window.localStorage.setItem(EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY, String(value));
+    storage.setItem(EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY, String(value));
     return true;
   } catch {
     return false;
@@ -10486,11 +10515,12 @@ function persistExternalTimeOutCoinsCost(value) {
 }
 
 function loadExternalCountFromStorage(storageKey) {
-  if (typeof window === "undefined" || !window.localStorage) {
+  const storage = getSafeLocalStorage();
+  if (!storage) {
     return null;
   }
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = storage.getItem(storageKey);
     if (raw === null || raw === undefined) {
       return null;
     }
@@ -10564,12 +10594,13 @@ function resolveExternalSubscriptionStatus(gameInstance) {
   if (fromPending !== null) {
     return fromPending;
   }
-  if (typeof window === "undefined" || !window.localStorage) {
+  const storage = getSafeLocalStorage();
+  if (!storage) {
     return false;
   }
   try {
     const fromStorage = normalizeExternalSubscriptionStatus(
-      window.localStorage.getItem(EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY)
+      storage.getItem(EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY)
     );
     return fromStorage ?? false;
   } catch {
