@@ -546,6 +546,7 @@ const DEBUG_DEFAULTS = {
 };
 
 const LEVELS_PATH = "game-data/levels";
+const LEVEL_MANIFEST_PATH = `${LEVELS_PATH}/manifest.json`;
 const MAX_AUTOLOAD_LEVELS = 50;
 const MAX_AUTOLOAD_MISSES_IN_A_ROW = 5;
 const LEVEL_LOAD_BATCH_SIZE = 6;
@@ -597,7 +598,72 @@ async function loadLevelJSONByNumber(levelNumber) {
   }
 }
 
+function normalizeLevelNumber(value) {
+  const normalized = Math.trunc(Number(value));
+  if (!Number.isFinite(normalized)) {
+    return null;
+  }
+  if (normalized < 1 || normalized > MAX_AUTOLOAD_LEVELS) {
+    return null;
+  }
+  return normalized;
+}
+
+async function loadLevelManifestNumbers() {
+  try {
+    const response = await fetch(LEVEL_MANIFEST_PATH, { cache: "default" });
+    if (!response.ok) {
+      return [];
+    }
+    const parsed = await response.json();
+    const numbersRaw = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.levels)
+        ? parsed.levels
+        : Array.isArray(parsed?.levelNumbers)
+          ? parsed.levelNumbers
+          : [];
+    const uniqueNumbers = new Set();
+    for (const value of numbersRaw) {
+      const number = normalizeLevelNumber(value);
+      if (number !== null) {
+        uniqueNumbers.add(number);
+      }
+    }
+    return [...uniqueNumbers].sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
+}
+
+async function loadLevelDefinitionsByNumbers(levelNumbers) {
+  const normalizedNumbers = Array.isArray(levelNumbers)
+    ? levelNumbers
+      .map((value) => normalizeLevelNumber(value))
+      .filter((value) => value !== null)
+    : [];
+  if (normalizedNumbers.length === 0) {
+    return [];
+  }
+  const levels = [];
+  for (let index = 0; index < normalizedNumbers.length; index += LEVEL_LOAD_BATCH_SIZE) {
+    const batchNumbers = normalizedNumbers.slice(index, index + LEVEL_LOAD_BATCH_SIZE);
+    const batch = await Promise.all(batchNumbers.map((number) => loadLevelJSONByNumber(number)));
+    for (const level of batch) {
+      if (level) {
+        levels.push(level);
+      }
+    }
+  }
+  return levels;
+}
+
 async function loadLevelDefinitions() {
+  const manifestNumbers = await loadLevelManifestNumbers();
+  if (manifestNumbers.length > 0) {
+    return loadLevelDefinitionsByNumbers(manifestNumbers);
+  }
+
   const levels = [];
   let missesInARow = 0;
   let levelNumber = 1;
@@ -2750,8 +2816,11 @@ class Game {
       this.registerChickenSpriteImageSource(color, src);
     }
     // For file:// sessions directory listing is often unavailable; probe by predictable color filenames.
-    for (const color of Object.keys(BLOCK_TILE_SOURCE_BY_COLOR)) {
-      this.registerChickenSpriteImageSource(color, `ui/birds/${color}.png`);
+    const isFileProtocol = typeof window !== "undefined" && window.location?.protocol === "file:";
+    if (isFileProtocol) {
+      for (const color of Object.keys(BLOCK_TILE_SOURCE_BY_COLOR)) {
+        this.registerChickenSpriteImageSource(color, `ui/birds/${color}.png`);
+      }
     }
     void this.discoverChickenSpriteSourcesFromUiDirectory();
   }
@@ -2952,8 +3021,13 @@ class Game {
   }
 
   extractRepresentativeColorFromImage(image) {
-    const width = Math.max(1, Math.round(image.naturalWidth || image.width || 0));
-    const height = Math.max(1, Math.round(image.naturalHeight || image.height || 0));
+    const sourceWidth = Math.max(1, Math.round(image.naturalWidth || image.width || 0));
+    const sourceHeight = Math.max(1, Math.round(image.naturalHeight || image.height || 0));
+    const maxDimension = Math.max(sourceWidth, sourceHeight);
+    const sampleLimit = 64;
+    const sampleScale = maxDimension > sampleLimit ? sampleLimit / maxDimension : 1;
+    const width = Math.max(1, Math.round(sourceWidth * sampleScale));
+    const height = Math.max(1, Math.round(sourceHeight * sampleScale));
     if (width <= 0 || height <= 0) {
       return null;
     }
@@ -10710,9 +10784,8 @@ if (typeof window !== "undefined") {
 }
 
 async function bootstrapGame() {
-  const loadedLevels = await loadLevelDefinitions();
   const fallbackLevels = LEVEL_DEFINITIONS_FALLBACK.length ? LEVEL_DEFINITIONS_FALLBACK : [BUILTIN_FALLBACK_LEVEL];
-  rebuildLevelRegistry(loadedLevels.length ? loadedLevels : fallbackLevels);
+  rebuildLevelRegistry(fallbackLevels);
   loadLevelOverridesFromStorage();
   applyLoadedLevelOverrides();
 
@@ -10868,6 +10941,28 @@ async function bootstrapGame() {
   }
   if (pendingExternalTimeOutCoinsCost !== null && pendingExternalTimeOutCoinsCost !== undefined) {
     window.setTimeOutCoinsCost(pendingExternalTimeOutCoinsCost);
+  }
+
+  void hydrateLevelDefinitionsInBackground(game);
+}
+
+async function hydrateLevelDefinitionsInBackground(game) {
+  const loadedLevels = await loadLevelDefinitions();
+  if (!loadedLevels.length) {
+    return;
+  }
+
+  rebuildLevelRegistry(loadedLevels);
+  loadLevelOverridesFromStorage();
+  applyLoadedLevelOverrides();
+
+  if (game && typeof game.fillDebugContentSelectors === "function") {
+    game.fillDebugContentSelectors();
+    game.syncDebugContentSelectors();
+  }
+
+  if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined && typeof window.setLevel === "function") {
+    window.setLevel(pendingExternalLevelSelection);
   }
 }
 
