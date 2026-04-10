@@ -453,7 +453,7 @@ const LOSE_POPUP_BIRDS_DROP_RATIO = 0.15;
 const LOSE_OFFER_UI = {
   gapFromPopupBottom: 95,
   widthToPopupRatio: 1,
-  scale: 0.925,
+  scale: 1.05,
   sidePadding: 18,
   bottomSafeMargin: 20,
   fallbackW: 663,
