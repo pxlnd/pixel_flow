@@ -2488,6 +2488,7 @@ class Game {
     this.debugPanel = document.getElementById("debugPanel");
     this.debugToggleFab = document.getElementById("debugToggleFab");
     this.debugButton = document.getElementById("debug6");
+    this.debugLoseButton = document.getElementById("debugLose");
     this.debugResetButton = document.getElementById("debugReset");
     this.debugExportButton = document.getElementById("debugExport");
     this.debugExportLevelButton = document.getElementById("debugExportLevel");
@@ -6793,6 +6794,18 @@ class Game {
     return true;
   }
 
+  triggerDebugLose() {
+    if (this.gameState === "lose") {
+      return true;
+    }
+    if (this.gameState !== "playing") {
+      return false;
+    }
+    this.startLoseSequence();
+    this.invalidate(true);
+    return true;
+  }
+
   spawnConfettiBurst(amount) {
     for (let i = 0; i < amount; i++) {
       const x = Math.random() * this.width;
@@ -10092,6 +10105,12 @@ class Game {
         event.preventDefault();
       });
     }
+    if (this.debugLoseButton) {
+      this.debugLoseButton.addEventListener("click", (event) => {
+        this.triggerDebugLose();
+        event.preventDefault();
+      });
+    }
     if (this.debugResetButton) {
       this.debugResetButton.addEventListener("click", (event) => {
         this.resetDebugSettings();
@@ -10776,6 +10795,7 @@ async function bootstrapGame() {
   window.advanceTime = (ms) => game.advanceTime(ms);
   window.render_game_to_text = () => game.renderGameToText();
   window.debug6 = () => game.triggerDebug6();
+  window.debugLose = () => game.triggerDebugLose();
 
   if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined) {
     window.setLevel(pendingExternalLevelSelection);
