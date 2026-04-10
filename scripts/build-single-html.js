@@ -168,6 +168,8 @@ function buildNetworkAdapter(networkKey) {
   var didReportEnd = false;
   var lastMode = "";
   var canOpenStore = false;
+  var tapCount = 0;
+  var tapOpenThreshold = 3;
   var endOverlayShown = false;
   var nativeExitApiExit = (window.ExitApi && typeof window.ExitApi.exit === "function")
     ? window.ExitApi.exit.bind(window.ExitApi)
@@ -271,6 +273,14 @@ function buildNetworkAdapter(networkKey) {
     safeCall(["gameClose", "gameCloseV", "gameCloseY"]);
   }
 
+  function registerTap() {
+    markFirstInteraction();
+    tapCount += 1;
+    if (!canOpenStore && tapCount >= tapOpenThreshold) {
+      canOpenStore = true;
+    }
+  }
+
   if (typeof window.gameStart !== "function") {
     window.gameStart = function gameStart() {};
   }
@@ -371,8 +381,9 @@ function buildNetworkAdapter(networkKey) {
     }
   });
   window.addEventListener("pointerdown", markFirstInteraction, { passive: true, once: true });
-  // Allow full-screen tap-to-store only after game ends.
+  // Allow full-screen tap-to-store after game ends or on the 3rd screen tap.
   document.addEventListener("pointerup", function onAnyTap() {
+    registerTap();
     if (!canOpenStore) return;
     window.playableOpen(landingUrl);
   }, { passive: true });
