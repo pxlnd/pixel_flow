@@ -291,6 +291,7 @@ body {
 }
 
 #debug6,
+#debugLose,
 #debugReset,
 #debugExport,
 #debugExportLevel,
@@ -312,6 +313,7 @@ body {
 }
 
 #debug6:active,
+#debugLose:active,
 #debugReset:active,
 #debugExport:active,
 #debugExportLevel:active,
