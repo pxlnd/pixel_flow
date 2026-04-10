@@ -2454,6 +2454,7 @@ class Game {
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseOfferPurchaseRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.loseContinueSnapshot = [];
     this.cards = [];
     this.wagon = {
       x: LAYOUT.spawnPoint.x,
@@ -3989,6 +3990,7 @@ class Game {
     this.slotBursts = [];
     this.floatTexts = [];
     this.confetti = [];
+    this.loseContinueSnapshot = [];
     this.cards = this.cardManager.resetFromBlocks(this.blocks);
     this.enforceLevelOneTutorialQueue();
     this.slotManager.reset();
@@ -6628,12 +6630,50 @@ class Game {
     this.cameraShakeY = 0;
     this.spawnConfettiBurst(64);
     this.victoryCompleteEventPending = true;
+    this.loseContinueSnapshot = [];
+  }
+
+  buildLoseContinueSnapshotFromCurrentState() {
+    const snapshot = [];
+    for (const card of this.cards) {
+      if (!card || card.used || card.ammo <= 0) {
+        continue;
+      }
+      snapshot.push({
+        label: card.label,
+        color: card.color,
+        ammo: Math.max(1, Math.round(card.ammo)),
+        styleKey: card.styleKey || null,
+      });
+    }
+    for (const unit of this.units) {
+      if (!unit) {
+        continue;
+      }
+      const state = String(unit.state || "");
+      const isFieldState = state === "launching" || state === "moving" || state === "landing" || state === "parked";
+      if (!isFieldState) {
+        continue;
+      }
+      const ammo = Math.max(0, Math.round(unit.ammo));
+      if (ammo <= 0) {
+        continue;
+      }
+      snapshot.push({
+        label: unit.label,
+        color: unit.color,
+        ammo,
+        styleKey: unit.styleKey || null,
+      });
+    }
+    return snapshot;
   }
 
   startLoseSequence() {
     if (this.gameState !== "playing") {
       return;
     }
+    this.loseContinueSnapshot = this.buildLoseContinueSnapshotFromCurrentState();
     this.gameState = "lose";
     this.playSound("fail");
     const parkedUnits = this.units.filter(
@@ -6696,47 +6736,58 @@ class Game {
       persistExternalCoinsCount(nextCoins);
     }
 
-    const parkedUnits = this.units
-      .filter((unit) => unit.alive && unit.state === "parked" && unit.slotIndex !== null && unit.ammo > 0)
-      .slice()
-      .sort((a, b) => (a.slotIndex - b.slotIndex) || (a.id - b.id));
-    const cardByLabel = new Map(this.cards.map((card) => [String(card.label), card]));
-    const claimedCardIndexes = new Set();
-    const findCardForParkedUnit = (unit) => {
-      const labelCard = cardByLabel.get(String(unit.label));
-      if (labelCard && !claimedCardIndexes.has(labelCard.index)) {
-        return labelCard;
-      }
-      const emptyCard = this.cards.find(
-        (card) => !claimedCardIndexes.has(card.index) && (card.used || card.ammo <= 0)
-      );
-      if (emptyCard) {
-        return emptyCard;
-      }
-      return this.cards.find((card) => !claimedCardIndexes.has(card.index)) || null;
-    };
-
-    for (const unit of parkedUnits) {
-      const targetCard = findCardForParkedUnit(unit);
-      if (targetCard) {
-        claimedCardIndexes.add(targetCard.index);
-        targetCard.used = false;
-        targetCard.ammo = Math.max(1, Math.round(unit.ammo));
-        targetCard.color = unit.color;
-        if (unit.styleKey) {
-          targetCard.styleKey = unit.styleKey;
-        }
-      }
-      unit.alive = false;
-      unit.slotIndex = null;
-    }
+    const continueSnapshot = Array.isArray(this.loseContinueSnapshot) && this.loseContinueSnapshot.length > 0
+      ? this.loseContinueSnapshot
+      : this.buildLoseContinueSnapshotFromCurrentState();
+    this.loseContinueSnapshot = [];
 
     // Continue should fully clear birds from field/slots and rebuild queue from cards.
     this.units = [];
     this.slotManager.reset();
 
     for (const card of this.cards) {
-      card.used = !(card.ammo > 0);
+      card.used = true;
+      card.ammo = 0;
+    }
+
+    const cardsSorted = this.cards.slice().sort((a, b) => a.index - b.index);
+    const cardsByLabel = new Map();
+    for (const card of cardsSorted) {
+      const labelKey = String(card.label);
+      if (!cardsByLabel.has(labelKey)) {
+        cardsByLabel.set(labelKey, []);
+      }
+      cardsByLabel.get(labelKey).push(card);
+    }
+    const claimedCardIndexes = new Set();
+    const claimCardByLabel = (label) => {
+      const cardsForLabel = cardsByLabel.get(String(label)) || [];
+      for (const card of cardsForLabel) {
+        if (claimedCardIndexes.has(card.index)) {
+          continue;
+        }
+        return card;
+      }
+      return null;
+    };
+    const claimAnyCard = () => cardsSorted.find((card) => !claimedCardIndexes.has(card.index)) || null;
+
+    for (const entry of continueSnapshot) {
+      const ammo = Math.max(0, Math.round(entry?.ammo));
+      if (!entry || !entry.color || ammo <= 0) {
+        continue;
+      }
+      const targetCard = claimCardByLabel(entry.label) || claimAnyCard();
+      if (!targetCard) {
+        break;
+      }
+      claimedCardIndexes.add(targetCard.index);
+      targetCard.used = false;
+      targetCard.ammo = ammo;
+      targetCard.color = entry.color;
+      if (entry.styleKey) {
+        targetCard.styleKey = entry.styleKey;
+      }
     }
     this.normalizeShooterQueues(this.cards);
     this.gameState = "playing";
