@@ -448,10 +448,12 @@ const LOSE_POPUP_UI = {
   innerPadding: 18,
   closeSize: 40,
 };
+const LOSE_POPUP_Y_OFFSET = 70;
 const LOSE_POPUP_BIRDS_DROP_RATIO = 0.15;
 const LOSE_OFFER_UI = {
-  gapFromPopupBottom: 75,
+  gapFromPopupBottom: 95,
   widthToPopupRatio: 1,
+  scale: 0.925,
   sidePadding: 18,
   bottomSafeMargin: 20,
   fallbackW: 663,
@@ -463,7 +465,7 @@ const LOSE_OFFER_UI = {
   buttonOffsetY: 30,
 };
 const LOSE_TOP_STATS_UI = {
-  topOffset: -8,
+  topOffset: -16,
   sidePadding: 18,
   gap: 62,
   targetHeight: 96,
@@ -8095,7 +8097,7 @@ class Game {
     const fitScale = Math.min((this.width * 0.96) / w, (this.height * 0.9) / h, 1);
     w *= fitScale;
     h *= fitScale;
-    const centeredY = (this.height - h) * 0.5 - 60;
+    const centeredY = (this.height - h) * 0.5 - 60 + LOSE_POPUP_Y_OFFSET;
     const y = clamp(centeredY, 20, this.height - h - 20);
     return {
       x: (this.width - w) * 0.5,
@@ -8126,7 +8128,8 @@ class Game {
     const buttonH = baseButtonH * buttonScale;
     const baseButtonY = popup.y + popup.h - 174 * sy;
     const buttonY = baseButtonY + (baseButtonH - buttonH) * 0.5;
-    const sideInset = 40 * sx;
+    const targetGap = 25 * sx;
+    const sideInset = (popup.w - baseButtonW - buttonW - targetGap) * 0.5;
     const left = {
       x: popup.x + sideInset + (baseButtonW - buttonW) * 0.5,
       y: buttonY,
@@ -8154,14 +8157,11 @@ class Game {
       : LOSE_OFFER_UI.fallbackButtonH;
     const sidePadding = LOSE_OFFER_UI.sidePadding;
     const gap = LOSE_OFFER_UI.gapFromPopupBottom;
-    let offerW = Math.min(popup.w * LOSE_OFFER_UI.widthToPopupRatio, this.width - sidePadding * 2);
+    let offerW = Math.min(
+      popup.w * LOSE_OFFER_UI.widthToPopupRatio * LOSE_OFFER_UI.scale,
+      this.width - sidePadding * 2
+    );
     let offerH = offerW * (sourceOfferH / sourceOfferW);
-    const maxOfferHeight = this.height - (popup.y + popup.h + gap) - LOSE_OFFER_UI.bottomSafeMargin;
-    if (maxOfferHeight > 0 && offerH > maxOfferHeight) {
-      const scale = maxOfferHeight / offerH;
-      offerW *= scale;
-      offerH *= scale;
-    }
     const offerRect = {
       x: (this.width - offerW) * 0.5,
       y: popup.y + popup.h + gap,
@@ -8335,7 +8335,7 @@ class Game {
     ctx.textBaseline = "middle";
     ctx.globalAlpha = continueButtonAlpha;
     const leftTextX = left.x + left.w * (textAreaStartRatio + (1 - textAreaStartRatio) * 0.5) - 25;
-    const leftTextY = left.y + left.h * 0.5 - 15;
+    const leftTextY = left.y + left.h * 0.5 - 7.5;
     ctx.fillText(String(continueCost), leftTextX, leftTextY);
     ctx.restore();
 
@@ -8346,7 +8346,7 @@ class Game {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const rightTextX = right.x + right.w * (textAreaStartRatio + (1 - textAreaStartRatio) * 0.5) - 25;
-    const rightTextY = right.y + right.h * 0.5 - 15;
+    const rightTextY = right.y + right.h * 0.5 - 7.5;
     ctx.fillText("FREE", rightTextX, rightTextY);
     ctx.restore();
   }
