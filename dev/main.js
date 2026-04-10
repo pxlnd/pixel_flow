@@ -6697,20 +6697,26 @@ class Game {
       .filter((unit) => unit.alive && unit.state === "parked" && unit.slotIndex !== null && unit.ammo > 0)
       .slice()
       .sort((a, b) => (a.slotIndex - b.slotIndex) || (a.id - b.id));
-    const keeper = parkedUnits[0] || null;
-    const keeperId = keeper ? keeper.id : null;
     const cardByLabel = new Map(this.cards.map((card) => [String(card.label), card]));
+    const claimedCardIndexes = new Set();
+    const findCardForParkedUnit = (unit) => {
+      const labelCard = cardByLabel.get(String(unit.label));
+      if (labelCard && !claimedCardIndexes.has(labelCard.index)) {
+        return labelCard;
+      }
+      const emptyCard = this.cards.find(
+        (card) => !claimedCardIndexes.has(card.index) && (card.used || card.ammo <= 0)
+      );
+      if (emptyCard) {
+        return emptyCard;
+      }
+      return this.cards.find((card) => !claimedCardIndexes.has(card.index)) || null;
+    };
 
     for (const unit of parkedUnits) {
-      if (keeperId !== null && unit.id === keeperId) {
-        continue;
-      }
-      const labelKey = String(unit.label);
-      const targetCard =
-        cardByLabel.get(labelKey) ||
-        this.cards.find((card) => card.used && card.color === unit.color) ||
-        this.cards.find((card) => card.used);
+      const targetCard = findCardForParkedUnit(unit);
       if (targetCard) {
+        claimedCardIndexes.add(targetCard.index);
         targetCard.used = false;
         targetCard.ammo = Math.max(1, Math.round(unit.ammo));
         targetCard.color = unit.color;
@@ -6722,25 +6728,12 @@ class Game {
       unit.slotIndex = null;
     }
 
-    this.units = keeper ? [keeper] : [];
+    // Continue should fully clear birds from field/slots and rebuild queue from cards.
+    this.units = [];
     this.slotManager.reset();
-    if (keeper && keeper.slotIndex !== null && keeper.slotIndex >= 0 && keeper.slotIndex < this.slotManager.occupants.length) {
-      this.slotManager.occupants[keeper.slotIndex] = keeper.id;
-      const slotCenter = this.getSlotCenter(keeper.slotIndex);
-      if (slotCenter) {
-        keeper.position = { ...slotCenter };
-        keeper.prevPosition = { ...slotCenter };
-      }
-      keeper.state = "parked";
-      keeper.cooldown = 0;
-      keeper.parkBounce = 0;
-      keeper.renderRotation = null;
-    }
 
     for (const card of this.cards) {
-      if (card.ammo <= 0) {
-        card.used = true;
-      }
+      card.used = !(card.ammo > 0);
     }
     this.normalizeShooterQueues(this.cards);
     this.gameState = "playing";
