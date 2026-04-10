@@ -1,0 +1,35 @@
+{
+  "name": "pixelflow",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "build:single-html": "node scripts/build-single-html.js",
+    "build:single-html:level": "node scripts/build-single-html.js --level",
+    "build:single-html:compressed": "node scripts/build-single-html.js --quality=78 --quality-al=72 --quality-other=78",
+    "build:vite:ad": "vite build -c vite.ad.config.mjs",
+    "build:vite:playable": "vite build -c vite.playable.config.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pxlnd/pixelflow.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/pxlnd/pixelflow/issues"
+  },
+  "homepage": "https://github.com/pxlnd/pixelflow#readme",
+  "description": "",
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "sharp": "^0.34.5",
+    "vite": "^8.0.7",
+    "vite-plugin-singlefile": "^2.3.2"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "howler": "^2.2.4"
+  }
+}

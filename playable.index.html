@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="ad.orientation" content="portrait,landscape">
+  <title>PixelFlow - Level 1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="app">
+    <aside id="debugPanel" class="debug-panel" aria-label="Debug panel">
+      <div class="debug-title">ОТЛАДКА</div>
+      <div class="debug-actions">
+        <button id="debug6" type="button" aria-label="Мгновенная победа">победа</button>
+        <button id="debugReset" type="button" aria-label="Сбросить настройки отладки">сброс</button>
+        <button id="debugExport" type="button" aria-label="Сохранить настройки в JSON">debug json</button>
+        <button id="debugExportLevel" type="button" aria-label="Сохранить текущий уровень">уровень json</button>
+        <button id="debugImageLevelToggle" type="button" aria-label="Открыть генератор уровня">генератор</button>
+      </div>
+
+      <div class="debug-section">
+        <details class="debug-subsection" open>
+          <summary class="debug-subsection-title">Нижние ячейки и блоки</summary>
+          <details class="debug-subsection" open>
+            <summary class="debug-subsection-title">Мобила</summary>
+          <label class="debug-control" for="topUiYOffsetMobile">
+            <span>Сдвиг верхнего UI по Y (моб)</span>
+            <input id="topUiYOffsetMobile" type="range" min="-60" max="220" step="1" value="35">
+            <output id="topUiYOffsetMobileValue" for="topUiYOffsetMobile">35</output>
+          </label>
+          <label class="debug-control" for="trackYOffsetMobile">
+            <span>Сдвиг рельс по Y (моб)</span>
+            <input id="trackYOffsetMobile" type="range" min="-220" max="260" step="1" value="-33">
+            <output id="trackYOffsetMobileValue" for="trackYOffsetMobile">-33</output>
+          </label>
+          <label class="debug-control" for="slotSpacingXMobile">
+            <span>Расстояние ячеек X (моб)</span>
+            <input id="slotSpacingXMobile" type="range" min="0.60" max="1.80" step="0.01" value="1.03">
+            <output id="slotSpacingXMobileValue" for="slotSpacingXMobile">1.03x</output>
+          </label>
+          <label class="debug-control" for="trayBottomOffset">
+            <span>Низ плашки по Y (моб)</span>
+            <input id="trayBottomOffset" type="range" min="-320" max="320" step="1" value="82">
+            <output id="trayBottomOffsetValue" for="trayBottomOffset">82</output>
+          </label>
+          <label class="debug-control" for="trayScaleYMobile">
+            <span>Плашка scale по Y (моб)</span>
+            <input id="trayScaleYMobile" type="range" min="0.50" max="1.80" step="0.01" value="1.14">
+            <output id="trayScaleYMobileValue" for="trayScaleYMobile">1.14x</output>
+          </label>
+          <label class="debug-control" for="queueSpacingXMobile">
+            <span>Расстояние птиц X (моб)</span>
+            <input id="queueSpacingXMobile" type="range" min="0.60" max="1.80" step="0.01" value="1.00">
+            <output id="queueSpacingXMobileValue" for="queueSpacingXMobile">1.00x</output>
+          </label>
+          <label class="debug-control" for="mobileBottomClusterYOffset">
+            <span>Ячейки+очередь по Y (моб)</span>
+            <input id="mobileBottomClusterYOffset" type="range" min="-220" max="220" step="1" value="-42">
+            <output id="mobileBottomClusterYOffsetValue" for="mobileBottomClusterYOffset">-42</output>
+          </label>
+          </details>
+          <details class="debug-subsection">
+            <summary class="debug-subsection-title">ПК</summary>
+          <label class="debug-control" for="slotSpacingXDesktop">
+            <span>Расстояние ячеек X (ПК)</span>
+            <input id="slotSpacingXDesktop" type="range" min="0.60" max="1.80" step="0.01" value="0.88">
+            <output id="slotSpacingXDesktopValue" for="slotSpacingXDesktop">0.88x</output>
+          </label>
+          <label class="debug-control" for="trayBottomOffsetDesktop">
+            <span>Низ плашки по Y (ПК)</span>
+            <input id="trayBottomOffsetDesktop" type="range" min="-320" max="320" step="1" value="60">
+            <output id="trayBottomOffsetDesktopValue" for="trayBottomOffsetDesktop">60</output>
+          </label>
+          <label class="debug-control" for="trayScaleYDesktop">
+            <span>Плашка scale по Y (ПК)</span>
+            <input id="trayScaleYDesktop" type="range" min="0.50" max="1.80" step="0.01" value="1.05">
+            <output id="trayScaleYDesktopValue" for="trayScaleYDesktop">1.05x</output>
+          </label>
+          <label class="debug-control" for="queueSpacingXDesktop">
+            <span>Расстояние птиц X (ПК)</span>
+            <input id="queueSpacingXDesktop" type="range" min="0.60" max="1.80" step="0.01" value="0.80">
+            <output id="queueSpacingXDesktopValue" for="queueSpacingXDesktop">0.80x</output>
+          </label>
+          </details>
+          <details class="debug-subsection">
+            <summary class="debug-subsection-title">Общее</summary>
+          <label class="debug-control" for="slotSizeScale">
+            <span>Размер нижних ячеек</span>
+            <input id="slotSizeScale" type="range" min="0.60" max="1.70" step="0.01" value="1.49">
+            <output id="slotSizeScaleValue" for="slotSizeScale">1.49x</output>
+          </label>
+          <label class="debug-control" for="slotYOffset">
+            <span>Сдвиг ячеек по Y</span>
+            <input id="slotYOffset" type="range" min="-220" max="260" step="1" value="-72">
+            <output id="slotYOffsetValue" for="slotYOffset">-72</output>
+          </label>
+          <label class="debug-control" for="cardAllYOffset">
+            <span>Все нижние блоки по Y</span>
+            <input id="cardAllYOffset" type="range" min="-260" max="260" step="1" value="-72">
+            <output id="cardAllYOffsetValue" for="cardAllYOffset">-72</output>
+          </label>
+          <label class="debug-control" for="card1YOffset">
+            <span>Блок 1 по Y</span>
+            <input id="card1YOffset" type="range" min="-260" max="260" step="1" value="60">
+            <output id="card1YOffsetValue" for="card1YOffset">60</output>
+          </label>
+          <label class="debug-control" for="card2YOffset">
+            <span>Блок 2 по Y</span>
+            <input id="card2YOffset" type="range" min="-260" max="260" step="1" value="7">
+            <output id="card2YOffsetValue" for="card2YOffset">7</output>
+          </label>
+          <label class="debug-control" for="card3YOffset">
+            <span>Блок 3 по Y</span>
+            <input id="card3YOffset" type="range" min="-260" max="260" step="1" value="0">
+            <output id="card3YOffsetValue" for="card3YOffset">0</output>
+          </label>
+          <label class="debug-control" for="card4YOffset">
+            <span>Блок 4 по Y</span>
+            <input id="card4YOffset" type="range" min="-260" max="260" step="1" value="0">
+            <output id="card4YOffsetValue" for="card4YOffset">0</output>
+          </label>
+          </details>
+        </details>
+      </div>
+
+      <div class="debug-section">
+        <details class="debug-subsection" open>
+          <summary class="debug-subsection-title">Контент</summary>
+          <label class="debug-check" for="debugLevelTopNavToggle">
+            <input id="debugLevelTopNavToggle" type="checkbox">
+            <span>показывать верхнюю плашку уровней</span>
+          </label>
+          <label class="debug-select" for="debugLevelSelect">
+            <span>Уровень</span>
+            <select id="debugLevelSelect" aria-label="Выбор уровня"></select>
+          </label>
+          <label class="debug-select" for="debugThemeSelect">
+            <span>Тема</span>
+            <select id="debugThemeSelect" aria-label="Выбор темы"></select>
+          </label>
+          <div class="debug-grid">
+            <label class="debug-number" for="debugCurrentLevelName">
+              <span>Название уровня</span>
+              <input id="debugCurrentLevelName" type="text" value="Level 1" maxlength="64" aria-label="Название текущего уровня">
+            </label>
+            <button id="debugSaveCurrentLevelName" type="button" aria-label="Сохранить название текущего уровня">сохранить имя</button>
+          </div>
+        </details>
+      </div>
+
+      <div id="debugImageLevelSection" class="debug-section debug-image-level is-collapsed">
+        <details class="debug-subsection" open>
+          <summary class="debug-subsection-title">Генератор уровня</summary>
+          <div class="debug-note">Загрузи картинку, задай сетку и собери новый уровень прямо на текущей сцене.</div>
+          <label class="debug-file-picker" for="debugImageUpload">
+            <span class="debug-file-button">загрузить картинку</span>
+            <input id="debugImageUpload" type="file" accept="image/*" aria-label="Загрузить картинку для генерации уровня">
+          </label>
+          <div id="debugImageFileName" class="debug-file-name">файл не выбран</div>
+          <div class="debug-grid">
+            <label class="debug-number" for="debugImageGridCols">
+              <span>Колонки</span>
+              <input id="debugImageGridCols" type="number" min="4" max="40" step="1" value="18" inputmode="numeric">
+            </label>
+            <label class="debug-number" for="debugImageGridRows">
+              <span>Ряды</span>
+              <input id="debugImageGridRows" type="number" min="4" max="40" step="1" value="18" inputmode="numeric">
+            </label>
+          </div>
+          <label class="debug-control" for="debugImageScale">
+            <span>Размер рисунка</span>
+            <input id="debugImageScale" type="range" min="0.50" max="3.00" step="0.05" value="1.00">
+            <output id="debugImageScaleValue" for="debugImageScale">1.00x</output>
+          </label>
+          <label class="debug-control" for="debugImageOffsetY">
+            <span>Смещение рисунка по Y</span>
+            <input id="debugImageOffsetY" type="range" min="-240" max="240" step="1" value="-37">
+            <output id="debugImageOffsetYValue" for="debugImageOffsetY">-37</output>
+          </label>
+          <div class="debug-generator-actions">
+            <button id="debugImageCreate" type="button" aria-label="Создать уровень из картинки">создать</button>
+            <button id="debugImageRefresh" type="button" aria-label="Обновить картинку в новой сетке">обновить</button>
+          </div>
+          <label class="debug-check" for="debugPaintMode">
+            <input id="debugPaintMode" type="checkbox">
+            <span>редактировать рисунок на поле</span>
+          </label>
+          <div class="debug-grid debug-edit-controls">
+            <label class="debug-select" for="debugPaintTool">
+              <span>Инструмент</span>
+              <select id="debugPaintTool" aria-label="Инструмент редактирования">
+                <option value="paint">добавить/перекрасить</option>
+                <option value="erase">стереть</option>
+              </select>
+            </label>
+            <label class="debug-select" for="debugPaintColor">
+              <span>Цвет</span>
+              <select id="debugPaintColor" aria-label="Цвет блока"></select>
+            </label>
+          </div>
+          <div class="debug-grid debug-save-grid">
+            <label class="debug-number" for="debugSaveLevelNumber">
+              <span>Номер уровня</span>
+              <input id="debugSaveLevelNumber" type="number" min="1" max="999" step="1" value="2" inputmode="numeric">
+            </label>
+            <label class="debug-number" for="debugSaveLevelName">
+              <span>Название</span>
+              <input id="debugSaveLevelName" type="text" value="Level 2" maxlength="64">
+            </label>
+          </div>
+          <div class="debug-save-actions">
+            <button id="debugSaveCurrentLevel" type="button" aria-label="Перезаписать открытый уровень">заменить открытый</button>
+            <button id="debugSaveTargetLevel" type="button" aria-label="Сохранить уровень в выбранный номер">сохранить в номер</button>
+            <button id="debugPickLevelsFolder" type="button" aria-label="Выбрать папку уровней">папка уровней</button>
+          </div>
+          <div id="debugImageStatus" class="debug-status" aria-live="polite">Выбери изображение, затем укажи сетку и нажми создать.</div>
+        </details>
+      </div>
+
+      <div class="debug-section">
+        <details class="debug-subsection" open>
+          <summary class="debug-subsection-title">Геймплей</summary>
+          <label class="debug-control" for="shotBounceSize">
+            <span>Отдача: сила</span>
+            <input id="shotBounceSize" type="range" min="0.05" max="0.7" step="0.01" value="0.32">
+            <output id="shotBounceSizeValue" for="shotBounceSize">0.32</output>
+          </label>
+          <label class="debug-control" for="shotBounceSpeed">
+            <span>Отдача: скорость</span>
+            <input id="shotBounceSpeed" type="range" min="0.4" max="2.6" step="0.05" value="1">
+            <output id="shotBounceSpeedValue" for="shotBounceSpeed">1.00x</output>
+          </label>
+          <label class="debug-control" for="railSpeed">
+            <span>Скорость рельс</span>
+            <input id="railSpeed" type="range" min="420" max="1400" step="10" value="980">
+            <output id="railSpeedValue" for="railSpeed">980</output>
+          </label>
+          <label class="debug-control" for="queueCards">
+            <span>Карточек в очереди</span>
+            <input id="queueCards" type="range" min="2" max="24" step="1" value="7">
+            <output id="queueCardsValue" for="queueCards">7</output>
+          </label>
+          <label class="debug-control" for="chickenSizeScale">
+            <span>Размер птичек</span>
+            <input id="chickenSizeScale" type="range" min="0.60" max="1.80" step="0.01" value="1.60">
+            <output id="chickenSizeScaleValue" for="chickenSizeScale">1.60x</output>
+          </label>
+        </details>
+      </div>
+
+      <div class="debug-section">
+        <details class="debug-subsection" open>
+          <summary class="debug-subsection-title">Верхний UI</summary>
+          <label class="debug-control" for="topPanelFontSize">
+            <span>Шрифт верхнего UI</span>
+            <input id="topPanelFontSize" type="range" min="24" max="80" step="1" value="67">
+            <output id="topPanelFontSizeValue" for="topPanelFontSize">67</output>
+          </label>
+          <label class="debug-control" for="levelPanelScale">
+            <span>Размер плашки Level</span>
+            <input id="levelPanelScale" type="range" min="0.60" max="1.80" step="0.01" value="1.07">
+            <output id="levelPanelScaleValue" for="levelPanelScale">1.07x</output>
+          </label>
+          <label class="debug-control" for="coinsPanelScale">
+            <span>Размер правой плашки</span>
+            <input id="coinsPanelScale" type="range" min="0.60" max="1.80" step="0.01" value="0.80">
+            <output id="coinsPanelScaleValue" for="coinsPanelScale">0.80x</output>
+          </label>
+          <label class="debug-control" for="backButtonScale">
+            <span>Размер левой кнопки</span>
+            <input id="backButtonScale" type="range" min="0.60" max="1.80" step="0.01" value="1.02">
+            <output id="backButtonScaleValue" for="backButtonScale">1.02x</output>
+          </label>
+          <label class="debug-control" for="topUiYOffset">
+            <span>Сдвиг верхнего UI по Y (ПК)</span>
+            <input id="topUiYOffset" type="range" min="-60" max="220" step="1" value="65">
+            <output id="topUiYOffsetValue" for="topUiYOffset">65</output>
+          </label>
+        </details>
+      </div>
+
+      <div class="debug-section">
+        <details class="debug-subsection" open>
+          <summary class="debug-subsection-title">Центр и рельсы</summary>
+          <label class="debug-control" for="trackYOffset">
+            <span>Сдвиг рельс по Y (ПК)</span>
+            <input id="trackYOffset" type="range" min="-220" max="260" step="1" value="42">
+            <output id="trackYOffsetValue" for="trackYOffset">42</output>
+          </label>
+          <label class="debug-control" for="playfieldScale">
+            <span>Размер центра + рельс</span>
+            <input id="playfieldScale" type="range" min="0.70" max="1.50" step="0.01" value="0.88">
+            <output id="playfieldScaleValue" for="playfieldScale">0.88x</output>
+          </label>
+        </details>
+      </div>
+
+    </aside>
+    <div class="debug-level-nav" aria-label="Быстрое переключение уровня" hidden>
+      <button id="debugLevelPrevTop" type="button" aria-label="Предыдущий уровень">←</button>
+      <div id="debugLevelTopLabel" class="debug-level-nav-label">Level 1</div>
+      <button id="debugLevelNextTop" type="button" aria-label="Следующий уровень">→</button>
+    </div>
+    <button id="debugToggleFab" class="debug-fab" type="button" aria-label="Открыть отладку">DBG</button>
+    <canvas id="gameCanvas" aria-label="PixelFlow mini puzzle game"></canvas>
+  </main>
+  <script type="module" src="/src/playable-entry.js"></script>
+</body>
+</html>
