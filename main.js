@@ -105,6 +105,16 @@ const BUILTIN_FALLBACK_THEME = {
   confettiColors: ["#ff5f5f", "#ffd166", "#6ee7b7", "#60a5fa", "#f9a8d4", "#c4b5fd"],
 };
 
+const SOUND_DEFINITIONS = {
+  back_to_cell: { src: "sounds/back_to_cell.mp3", channels: 3, volume: 0.8 },
+  cant_select: { src: "sounds/cant_select.mp3", channels: 2, volume: 0.9 },
+  fail: { src: "sounds/Fail.mp3", channels: 1, volume: 0.9 },
+  no_moves: { src: "sounds/no_moves.mp3", channels: 1, volume: 0.9 },
+  win: { src: "sounds/Win.mp3", channels: 1, volume: 0.9 },
+  buble: { src: "sounds/Bubble.mp3", channels: 5, volume: 0.75 },
+  tap: { src: "sounds/tap.mp3", channels: 3, volume: 0.85 },
+};
+
 let LEVEL_DEFINITIONS = [];
 const THEME_DEFINITIONS = Array.isArray(THEME_REGISTRY.THEME_DEFINITIONS) ? THEME_REGISTRY.THEME_DEFINITIONS : [];
 let DEFAULT_LEVEL_ID = BUILTIN_FALLBACK_LEVEL.id;
@@ -285,7 +295,9 @@ const getThemeConfig = (themeId) => {
 const LOGICAL_WIDTH = 1024;
 const LOGICAL_HEIGHT = 1600;
 const FIXED_DT = 1 / 60;
-const MAX_ACTIVE_UNITS = 5;
+const MIN_ACTIVE_UNITS_LIMIT = 1;
+const MAX_ACTIVE_UNITS_LIMIT = 10;
+let ACTIVE_UNITS_LIMIT = 5;
 const FIRE_INTERVAL = 0.03;
 const MAX_BURST_SHOTS_PER_TICK = 24;
 const BULLET_RADIUS = 8;
@@ -354,13 +366,22 @@ const TRACK_FRAME_OUTSET = 40;
 const TRACK_CENTERING_UP_OFFSET = 48;
 const FIELD_CENTERING_UP_RATIO = 0.02;
 let BOARD_FILL_COLOR = "#6aa93a";
+const BACKGROUND_ASSET_ROOT = "ui/background";
+const DEFAULT_BACKGROUND_ID = "default";
+const BACKGROUND_VARIANT_IDS = ["default", "blue", "orange", "purple", "pink", "water"];
+const BACKGROUND_ASSET_NAMES = {
+  background: "background.png",
+  panel: "panel.png",
+  cell: "cell.png",
+  railway: "railway.png",
+};
 const RAILWAY_SOURCE_SIZE = { w: 401, h: 407 };
 const RAILWAY_PATH_NORMALIZED = {
   x: 28.5 / RAILWAY_SOURCE_SIZE.w,
   y: 22 / RAILWAY_SOURCE_SIZE.h,
   w: 341.5 / RAILWAY_SOURCE_SIZE.w,
   h: 320 / RAILWAY_SOURCE_SIZE.h,
-  // Tuned to the visual center of the lane in ui/railway.png.
+  // Tuned to the visual center of the lane in ui/background/default/railway.png.
   r: 50 / RAILWAY_SOURCE_SIZE.w,
 };
 // Chicken sprite is authored facing +X (to the right), where the beak is drawn.
@@ -427,7 +448,45 @@ const LOSE_POPUP_UI = {
   innerPadding: 18,
   closeSize: 40,
 };
+const LOSE_POPUP_Y_OFFSET = 70;
 const LOSE_POPUP_BIRDS_DROP_RATIO = 0.15;
+const LOSE_OFFER_UI = {
+  gapFromPopupBottom: 95,
+  widthToPopupRatio: 1,
+  scale: 1.05,
+  sidePadding: 18,
+  bottomSafeMargin: 20,
+  fallbackW: 663,
+  fallbackH: 433,
+  fallbackButtonW: 392,
+  fallbackButtonH: 138,
+  buttonWidthRatio: 0.6,
+  buttonBottomOverlapFactor: 0.92,
+  buttonOffsetY: 30,
+};
+const LOSE_TOP_STATS_UI = {
+  topOffset: -16,
+  sidePadding: 18,
+  gap: 62,
+  targetHeight: 96,
+  maxScale: 1.08,
+  minScale: 0.72,
+  heartTextXRatio: 0.18,
+  heartTextYRatio: 0.57,
+  heartTextColor: "#ffffff",
+  heartTextStroke: "rgba(173, 21, 51, 0.95)",
+  livesTimerTextXRatio: 0.76,
+  livesTimerTextYRatio: 0.57,
+  livesTimerTextOffsetX: -12,
+  livesTimerTextOffsetY: -2,
+  coinsTextXRatio: 0.76,
+  coinsTextYRatio: 0.54,
+  coinsTextOffsetX: -20,
+  coinsTextOffsetY: -5,
+  coinsTextFontScale: 1.3,
+  coinsTextColor: "#17439c",
+  coinsTextStroke: "rgba(255, 255, 255, 0.9)",
+};
 const BASE_TOP_UI = {
   timerY: TIMER_PANEL_UI.y,
   timerW: TIMER_PANEL_UI.w,
@@ -453,6 +512,7 @@ const DEBUG_DEFAULTS = {
   shotBounceSpeed: 1,
   trackUnitSpeed: 980,
   queueCardCount: 7,
+  activeUnitsLimit: 5,
   chickenSizeScale: 1.22,
   topPanelFontSize: 67,
   topLevelPanelScale: 1.2,
@@ -482,15 +542,34 @@ const DEBUG_DEFAULTS = {
   topLevelNavVisible: false,
   levelId: DEFAULT_LEVEL_ID,
   themeId: DEFAULT_THEME_ID,
+  backgroundId: DEFAULT_BACKGROUND_ID,
 };
 
 const LEVELS_PATH = "game-data/levels";
+const LEVEL_MANIFEST_PATH = `${LEVELS_PATH}/manifest.json`;
 const MAX_AUTOLOAD_LEVELS = 50;
 const MAX_AUTOLOAD_MISSES_IN_A_ROW = 5;
+const LEVEL_LOAD_BATCH_SIZE = 6;
+
+function normalizeBackgroundId(backgroundId) {
+  const normalized = String(backgroundId || "")
+    .trim()
+    .toLowerCase();
+  return BACKGROUND_VARIANT_IDS.includes(normalized) ? normalized : DEFAULT_BACKGROUND_ID;
+}
+
+function getBackgroundAssetPath(backgroundId, assetKey) {
+  const resolvedId = normalizeBackgroundId(backgroundId);
+  const fileName = BACKGROUND_ASSET_NAMES[assetKey];
+  if (!fileName) {
+    return "";
+  }
+  return `${BACKGROUND_ASSET_ROOT}/${resolvedId}/${fileName}`;
+}
 
 async function loadLevelJSONByNumber(levelNumber) {
   try {
-    const response = await fetch(`${LEVELS_PATH}/${levelNumber}.json`, { cache: "no-store" });
+    const response = await fetch(`${LEVELS_PATH}/${levelNumber}.json`, { cache: "default" });
     if (!response.ok) {
       return null;
     }
@@ -519,20 +598,97 @@ async function loadLevelJSONByNumber(levelNumber) {
   }
 }
 
+function normalizeLevelNumber(value) {
+  const normalized = Math.trunc(Number(value));
+  if (!Number.isFinite(normalized)) {
+    return null;
+  }
+  if (normalized < 1 || normalized > MAX_AUTOLOAD_LEVELS) {
+    return null;
+  }
+  return normalized;
+}
+
+async function loadLevelManifestNumbers() {
+  try {
+    const response = await fetch(LEVEL_MANIFEST_PATH, { cache: "default" });
+    if (!response.ok) {
+      return [];
+    }
+    const parsed = await response.json();
+    const numbersRaw = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.levels)
+        ? parsed.levels
+        : Array.isArray(parsed?.levelNumbers)
+          ? parsed.levelNumbers
+          : [];
+    const uniqueNumbers = new Set();
+    for (const value of numbersRaw) {
+      const number = normalizeLevelNumber(value);
+      if (number !== null) {
+        uniqueNumbers.add(number);
+      }
+    }
+    return [...uniqueNumbers].sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
+}
+
+async function loadLevelDefinitionsByNumbers(levelNumbers) {
+  const normalizedNumbers = Array.isArray(levelNumbers)
+    ? levelNumbers
+      .map((value) => normalizeLevelNumber(value))
+      .filter((value) => value !== null)
+    : [];
+  if (normalizedNumbers.length === 0) {
+    return [];
+  }
+  const levels = [];
+  for (let index = 0; index < normalizedNumbers.length; index += LEVEL_LOAD_BATCH_SIZE) {
+    const batchNumbers = normalizedNumbers.slice(index, index + LEVEL_LOAD_BATCH_SIZE);
+    const batch = await Promise.all(batchNumbers.map((number) => loadLevelJSONByNumber(number)));
+    for (const level of batch) {
+      if (level) {
+        levels.push(level);
+      }
+    }
+  }
+  return levels;
+}
+
 async function loadLevelDefinitions() {
+  const manifestNumbers = await loadLevelManifestNumbers();
+  if (manifestNumbers.length > 0) {
+    return loadLevelDefinitionsByNumbers(manifestNumbers);
+  }
+
   const levels = [];
   let missesInARow = 0;
-  for (let levelNumber = 1; levelNumber <= MAX_AUTOLOAD_LEVELS; levelNumber += 1) {
-    const level = await loadLevelJSONByNumber(levelNumber);
-    if (!level) {
-      missesInARow += 1;
-      if (missesInARow >= MAX_AUTOLOAD_MISSES_IN_A_ROW) {
-        break;
-      }
-      continue;
+  let levelNumber = 1;
+  while (levelNumber <= MAX_AUTOLOAD_LEVELS && missesInARow < MAX_AUTOLOAD_MISSES_IN_A_ROW) {
+    const batchNumbers = [];
+    for (
+      let i = 0;
+      i < LEVEL_LOAD_BATCH_SIZE && levelNumber <= MAX_AUTOLOAD_LEVELS;
+      i += 1, levelNumber += 1
+    ) {
+      batchNumbers.push(levelNumber);
     }
-    missesInARow = 0;
-    levels.push(level);
+
+    const batch = await Promise.all(batchNumbers.map((number) => loadLevelJSONByNumber(number)));
+    for (const level of batch) {
+      if (!level) {
+        missesInARow += 1;
+        if (missesInARow >= MAX_AUTOLOAD_MISSES_IN_A_ROW) {
+          break;
+        }
+        continue;
+      }
+      missesInARow = 0;
+      levels.push(level);
+    }
   }
   return levels;
 }
@@ -734,6 +890,13 @@ const DEBUG_IMAGE_SCALE_MIN = 0.5;
 const DEBUG_IMAGE_SCALE_MAX = 3;
 const DEBUG_IMAGE_OFFSET_Y_DEFAULT = -37;
 const MAX_SIMULATION_DT = 0.2;
+const MAX_SIM_STEPS_PER_FRAME = 8;
+const MAX_ACTIVE_FLOAT_TEXTS = 3;
+const MAX_ACTIVE_PARTICLES = 520;
+const MAX_ACTIVE_IMPACT_RINGS = 36;
+const MAX_ACTIVE_BLOCK_WAVES = 8;
+const MAX_ACTIVE_SLOT_BURSTS = 24;
+const WAVE_OFFSET_VISUAL_EPSILON = 0.18;
 
 const BLOCK_COLOR_CONFIG = {
   green: {
@@ -1134,7 +1297,8 @@ function createBaseLayout(layout) {
   };
 }
 
-function syncLevelGlobals(levelConfig) {
+function syncLevelGlobals(levelConfig, options = {}) {
+  const { displayLevelNumber = null } = options;
   CURRENT_LEVEL = cloneData(levelConfig);
   BOTTOM_QUEUE_CARD_COUNT = clamp(
     Math.round(Number(CURRENT_LEVEL?.queueCardCount ?? BOTTOM_QUEUE_CARD_COUNT)),
@@ -1145,7 +1309,12 @@ function syncLevelGlobals(levelConfig) {
   LAYOUT = cloneLevelLayout(CURRENT_LEVEL.layout);
   BASE_LAYOUT = createBaseLayout(LAYOUT);
   FALLBACK_FIELD_PATTERN = [...(CURRENT_LEVEL.fallbackFieldPattern || [])];
-  TIMER_PANEL_UI.label = CURRENT_LEVEL.name || "Level";
+  const normalizedDisplayLevelNumber = Number.isFinite(displayLevelNumber)
+    ? Math.max(1, Math.trunc(displayLevelNumber))
+    : null;
+  TIMER_PANEL_UI.label = normalizedDisplayLevelNumber !== null
+    ? `Level ${normalizedDisplayLevelNumber}`
+    : (CURRENT_LEVEL.name || "Level");
   if (typeof document !== "undefined") {
     document.title = `PixelFlow - ${TIMER_PANEL_UI.label}`;
   }
@@ -1608,11 +1777,13 @@ class Unit {
           }
           const freeSlotIndex = game.claimFreeSlot(this.id);
           if (freeSlotIndex === null) {
+            game.playSound("no_moves");
             this.alive = false;
             game.startLoseSequence();
             return;
           }
           this.slotIndex = freeSlotIndex;
+          game.playSound("back_to_cell");
           this.landTo = game.getSlotCenter(freeSlotIndex);
           this.landFrom = { ...this.position };
           const dx = this.landTo.x - this.landFrom.x;
@@ -2195,6 +2366,24 @@ class CardManager {
     }
     return best;
   }
+
+  findAnyTapTarget(x, y, options = {}) {
+    const visualLiftY = Number.isFinite(options.visualLiftY) ? options.visualLiftY : 0;
+    let best = null;
+    let bestDistance = Infinity;
+    for (const card of this.cards) {
+      if (!card || !this.isPointOnCard(card, x, y, { visualLiftY })) {
+        continue;
+      }
+      const center = this.getCardPigCenter(card);
+      const score = Math.hypot(x - center.x, y - (center.y - visualLiftY));
+      if (score < bestDistance) {
+        bestDistance = score;
+        best = card;
+      }
+    }
+    return best;
+  }
 }
 
 class Game {
@@ -2214,40 +2403,62 @@ class Game {
     this.availableLevels = [];
     this.availableThemes = THEME_DEFINITIONS.map((theme) => ({ id: theme.id, name: theme.name }));
     this.refreshAvailableLevels();
+    const SoundManagerClass = typeof SoundManager === "function" ? SoundManager : null;
+    this.soundManager = SoundManagerClass
+      ? new SoundManagerClass(SOUND_DEFINITIONS)
+      : { play: () => {} };
 
     this.backButtonImage = new Image();
     this.backButtonImage.src = getThemeAsset("backButton", "ui/back_button.png");
-    this.backButtonImage.decoding = "sync";
+    this.backButtonImage.decoding = "async";
     this.timerPanelImage = new Image();
     this.timerPanelImage.src = getThemeAsset("timerPanel", "ui/timer_panel.png");
-    this.timerPanelImage.decoding = "sync";
+    this.timerPanelImage.decoding = "async";
     this.restartButtonImage = new Image();
     this.restartButtonImage.src = getThemeAsset("restartButton", "ui/restart_button.png");
-    this.restartButtonImage.decoding = "sync";
+    this.restartButtonImage.decoding = "async";
     this.losePopupImage = new Image();
     this.losePopupImage.src = "ui/lose_popup_space_ref.png";
-    this.losePopupImage.decoding = "sync";
+    this.losePopupImage.decoding = "async";
     this.losePopupBirdsImage = new Image();
     this.losePopupBirdsImage.src = "ui/loose.png";
-    this.losePopupBirdsImage.decoding = "sync";
+    this.losePopupBirdsImage.decoding = "async";
+    this.loseTopHeartPanelImage = new Image();
+    this.loseTopHeartPanelImage.src = "ui/Lose/heart.png";
+    this.loseTopHeartPanelImage.decoding = "async";
+    this.loseTopCoinsPanelImage = new Image();
+    this.loseTopCoinsPanelImage.src = "ui/Lose/coins.png";
+    this.loseTopCoinsPanelImage.decoding = "async";
+    this.loseCoinsButtonImage = new Image();
+    this.loseCoinsButtonImage.src = "ui/Lose/coins_button.png";
+    this.loseCoinsButtonImage.decoding = "async";
+    this.loseAdsButtonImage = new Image();
+    this.loseAdsButtonImage.src = "ui/Lose/ads_button.png";
+    this.loseAdsButtonImage.decoding = "async";
+    this.loseOfferImage = new Image();
+    this.loseOfferImage.src = "ui/Lose/Offer.png";
+    this.loseOfferImage.decoding = "async";
+    this.loseOfferPurchaseButtonImage = new Image();
+    this.loseOfferPurchaseButtonImage.src = "ui/Lose/purchase_button.png";
+    this.loseOfferPurchaseButtonImage.decoding = "async";
     this.woodImage = new Image();
-    this.woodImage.src = "ui/wood.png";
-    this.woodImage.decoding = "sync";
+    this.woodImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "panel");
+    this.woodImage.decoding = "async";
     this.slotCellImage = new Image();
-    this.slotCellImage.src = "ui/slot_cell.png";
-    this.slotCellImage.decoding = "sync";
+    this.slotCellImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "cell");
+    this.slotCellImage.decoding = "async";
     this.railwayImage = new Image();
-    this.railwayImage.src = "ui/railway.png";
-    this.railwayImage.decoding = "sync";
+    this.railwayImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "railway");
+    this.railwayImage.decoding = "async";
     this.backdropImage = new Image();
-    this.backdropImage.src = "ui/bg.jpg";
-    this.backdropImage.decoding = "sync";
+    this.backdropImage.src = getBackgroundAssetPath(DEFAULT_BACKGROUND_ID, "background");
+    this.backdropImage.decoding = "async";
     this.tutorHandImage = new Image();
     this.tutorHandImage.src = "ui/tutor_hand.png";
-    this.tutorHandImage.decoding = "sync";
+    this.tutorHandImage.decoding = "async";
     this.blockTemplateImage = new Image();
     this.blockTemplateImage.src = "ui/block.png";
-    this.blockTemplateImage.decoding = "sync";
+    this.blockTemplateImage.decoding = "async";
     this.blockTileImageByColor = {};
     this.blockTileColorSampleByColor = {};
     this.blockTileUsesSourceImage = {};
@@ -2255,6 +2466,7 @@ class Game {
     this.debugBlockColorPalette = [];
     this.debugImageBucketColorCache = new Map();
     this.generatedBackdropCache = null;
+    this.referenceAssetsRebuildScheduled = false;
 
     this.sprites = {
       holeTile: null,
@@ -2281,6 +2493,7 @@ class Game {
     const blockFieldLayer = createBufferCanvas(this.width, this.height, true);
     this.blockFieldLayer = blockFieldLayer.canvas;
     this.blockFieldCtx = blockFieldLayer.ctx;
+    this.blockFieldLayerDirty = true;
 
     this.conveyor = new Conveyor();
     this.spiralOrderByCell = this.buildSpiralOrderMap(LAYOUT.fieldCols, LAYOUT.fieldRows);
@@ -2293,6 +2506,10 @@ class Game {
     this.trackProbeWindowCache = new Map();
     this.trackSideSamples = null;
     this.trackSideSamplesKey = "";
+    this.nextSpiralTargetsCache = [];
+    this.nextSpiralTargetsCacheVersion = -1;
+    this.contourGhostTargetsCache = [];
+    this.contourGhostTargetsCacheVersion = -1;
     this.units = [];
     this.projectiles = [];
     this.particles = [];
@@ -2308,6 +2525,8 @@ class Game {
     this.loseCloseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.loseOfferPurchaseRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.loseContinueSnapshot = [];
     this.cards = [];
     this.wagon = {
       x: LAYOUT.spawnPoint.x,
@@ -2338,11 +2557,13 @@ class Game {
     this.victoryConfettiTime = 0;
     this.victoryFloatTime = 0;
     this.victoryConfettiSpawnCarry = 0;
+    this.victoryCompleteEventPending = false;
     this.levelStartFade = 0;
     this.losePopupAppear = 1;
     this.debugPanel = document.getElementById("debugPanel");
     this.debugToggleFab = document.getElementById("debugToggleFab");
     this.debugButton = document.getElementById("debug6");
+    this.debugLoseButton = document.getElementById("debugLose");
     this.debugResetButton = document.getElementById("debugReset");
     this.debugExportButton = document.getElementById("debugExport");
     this.debugExportLevelButton = document.getElementById("debugExportLevel");
@@ -2350,6 +2571,14 @@ class Game {
     this.debugImageLevelSection = document.getElementById("debugImageLevelSection");
     this.debugLevelSelect = document.getElementById("debugLevelSelect");
     this.debugThemeSelect = document.getElementById("debugThemeSelect");
+    this.debugBackgroundButtons = {
+      default: document.getElementById("debugBgDefault"),
+      blue: document.getElementById("debugBgBlue"),
+      orange: document.getElementById("debugBgOrange"),
+      purple: document.getElementById("debugBgPurple"),
+      pink: document.getElementById("debugBgPink"),
+      water: document.getElementById("debugBgWater"),
+    };
     this.debugCurrentLevelNameInput = document.getElementById("debugCurrentLevelName");
     this.debugSaveCurrentLevelNameButton = document.getElementById("debugSaveCurrentLevelName");
     this.debugLevelTopNav = document.querySelector(".debug-level-nav");
@@ -2384,6 +2613,8 @@ class Game {
     this.railSpeedValue = document.getElementById("railSpeedValue");
     this.queueCardsInput = document.getElementById("queueCards");
     this.queueCardsValue = document.getElementById("queueCardsValue");
+    this.maxActiveUnitsInput = document.getElementById("maxActiveUnits");
+    this.maxActiveUnitsValue = document.getElementById("maxActiveUnitsValue");
     this.chickenSizeScaleInput = document.getElementById("chickenSizeScale");
     this.chickenSizeScaleValue = document.getElementById("chickenSizeScaleValue");
     this.topPanelFontSizeInput = document.getElementById("topPanelFontSize");
@@ -2449,6 +2680,7 @@ class Game {
     this.debugPaintTool = "paint";
     this.debugPaintColor = "blue";
     this.debugPaintHoverCell = null;
+    this.currentBackgroundId = DEFAULT_BACKGROUND_ID;
     this.topLevelNavVisible = true;
 
     this.loadDebugSettings();
@@ -2470,6 +2702,24 @@ class Game {
       this.invalidate(false);
     };
     this.losePopupBirdsImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseTopHeartPanelImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseTopCoinsPanelImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseCoinsButtonImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseAdsButtonImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseOfferImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.loseOfferPurchaseButtonImage.onload = () => {
       this.invalidate(false);
     };
     this.woodImage.onload = () => {
@@ -2501,6 +2751,10 @@ class Game {
 
     this.buildReferenceAssets();
     this.restart();
+  }
+
+  playSound(name) {
+    this.soundManager.play(name);
   }
 
   buildReferenceAssets() {
@@ -2551,13 +2805,28 @@ class Game {
     this.rebuildBlockFieldLayer();
   }
 
+  scheduleReferenceAssetsRebuild() {
+    if (this.referenceAssetsRebuildScheduled) {
+      return;
+    }
+    this.referenceAssetsRebuildScheduled = true;
+    requestAnimationFrame(() => {
+      this.referenceAssetsRebuildScheduled = false;
+      this.buildReferenceAssets();
+      this.invalidate(false);
+    });
+  }
+
   initChickenSpriteImages() {
     for (const [color, src] of Object.entries(CHICKEN_SPRITE_SOURCE_BY_COLOR)) {
       this.registerChickenSpriteImageSource(color, src);
     }
     // For file:// sessions directory listing is often unavailable; probe by predictable color filenames.
-    for (const color of Object.keys(BLOCK_TILE_SOURCE_BY_COLOR)) {
-      this.registerChickenSpriteImageSource(color, `ui/birds/${color}.png`);
+    const isFileProtocol = typeof window !== "undefined" && window.location?.protocol === "file:";
+    if (isFileProtocol) {
+      for (const color of Object.keys(BLOCK_TILE_SOURCE_BY_COLOR)) {
+        this.registerChickenSpriteImageSource(color, `ui/birds/${color}.png`);
+      }
     }
     void this.discoverChickenSpriteSourcesFromUiDirectory();
   }
@@ -2576,7 +2845,7 @@ class Game {
     }
     CHICKEN_SPRITE_SOURCE_BY_COLOR[normalizedColor] = normalizedSrc;
     const image = new Image();
-    image.decoding = "sync";
+    image.decoding = "async";
     image.src = normalizedSrc;
     image.onload = () => {
       try {
@@ -2587,8 +2856,7 @@ class Game {
       } catch {
         // On file://, reading pixels can throw SecurityError (tainted canvas).
       }
-      this.buildReferenceAssets();
-      this.invalidate(false);
+      this.scheduleReferenceAssetsRebuild();
     };
     image.onerror = () => {
       delete this.chickenSpriteColorSampleByColor[normalizedColor];
@@ -2686,7 +2954,7 @@ class Game {
     }
     BLOCK_TILE_SOURCE_BY_COLOR[normalizedColor] = normalizedSrc;
     const image = new Image();
-    image.decoding = "sync";
+    image.decoding = "async";
     image.src = normalizedSrc;
     image.onload = () => {
       try {
@@ -2699,8 +2967,7 @@ class Game {
         // On file://, reading pixels can throw SecurityError (tainted canvas).
       }
       this.rebuildBlockColorSamplerPalette();
-      this.buildReferenceAssets();
-      this.invalidate(false);
+      this.scheduleReferenceAssetsRebuild();
     };
     image.onerror = () => {
       delete this.blockTileColorSampleByColor[normalizedColor];
@@ -2760,8 +3027,13 @@ class Game {
   }
 
   extractRepresentativeColorFromImage(image) {
-    const width = Math.max(1, Math.round(image.naturalWidth || image.width || 0));
-    const height = Math.max(1, Math.round(image.naturalHeight || image.height || 0));
+    const sourceWidth = Math.max(1, Math.round(image.naturalWidth || image.width || 0));
+    const sourceHeight = Math.max(1, Math.round(image.naturalHeight || image.height || 0));
+    const maxDimension = Math.max(sourceWidth, sourceHeight);
+    const sampleLimit = 64;
+    const sampleScale = maxDimension > sampleLimit ? sampleLimit / maxDimension : 1;
+    const width = Math.max(1, Math.round(sourceWidth * sampleScale));
+    const height = Math.max(1, Math.round(sourceHeight * sampleScale));
     if (width <= 0 || height <= 0) {
       return null;
     }
@@ -3515,6 +3787,18 @@ class Game {
         offsetY: 0,
       });
     }
+    this.blockFieldLayerDirty = false;
+  }
+
+  markBlockFieldLayerDirty() {
+    this.blockFieldLayerDirty = true;
+  }
+
+  ensureBlockFieldLayerFresh() {
+    if (!this.blockFieldLayerDirty) {
+      return;
+    }
+    this.rebuildBlockFieldLayer();
   }
 
   drawTiledBackdrop(ctx, rect, fillColor, palette, shadeDark) {
@@ -3737,47 +4021,12 @@ class Game {
 
     const imgW = image.naturalWidth;
     const imgH = image.naturalHeight;
-    const rand = this.createSeededRandom((width * 73856093) ^ (height * 19349663) ^ (imgW * 83492791));
-
-    const phaseX = Math.floor(rand() * imgW);
-    const phaseY = Math.floor(rand() * imgH);
-    for (let y = -phaseY; y < height; y += imgH) {
-      for (let x = -phaseX; x < width; x += imgW) {
-        outCtx.drawImage(image, x, y, imgW, imgH);
-      }
-    }
-
-    const patchCount = Math.max(40, Math.round((width * height) / 28000));
-    for (let i = 0; i < patchCount; i += 1) {
-      const patch = Math.max(56, Math.round(56 + rand() * 104));
-      const srcX = Math.floor(rand() * Math.max(1, imgW - patch));
-      const srcY = Math.floor(rand() * Math.max(1, imgH - patch));
-      const dstX = Math.floor(rand() * Math.max(1, width - patch));
-      const dstY = Math.floor(rand() * Math.max(1, height - patch));
-      const rotate = rand() < 0.08;
-      const flipX = rand() < 0.2;
-      const flipY = rand() < 0.12;
-
-      outCtx.save();
-      outCtx.globalAlpha = 0.32 + rand() * 0.22;
-      outCtx.translate(dstX + patch * 0.5, dstY + patch * 0.5);
-      outCtx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-      if (rotate) {
-        outCtx.rotate((Math.PI / 2) * (1 + Math.floor(rand() * 3)));
-      }
-      outCtx.drawImage(
-        image,
-        srcX,
-        srcY,
-        patch,
-        patch,
-        -patch * 0.5,
-        -patch * 0.5,
-        patch,
-        patch
-      );
-      outCtx.restore();
-    }
+    const coverScale = Math.max(width / imgW, height / imgH);
+    const drawW = imgW * coverScale;
+    const drawH = imgH * coverScale;
+    const drawX = (width - drawW) * 0.5;
+    const drawY = (height - drawH) * 0.5;
+    outCtx.drawImage(image, drawX, drawY, drawW, drawH);
 
     this.generatedBackdropCache = { width, height, canvas: out };
     return out;
@@ -3821,6 +4070,7 @@ class Game {
     this.slotBursts = [];
     this.floatTexts = [];
     this.confetti = [];
+    this.loseContinueSnapshot = [];
     this.cards = this.cardManager.resetFromBlocks(this.blocks);
     this.enforceLevelOneTutorialQueue();
     this.slotManager.reset();
@@ -3838,6 +4088,7 @@ class Game {
     this.victoryConfettiTime = 0;
     this.victoryFloatTime = 0;
     this.victoryConfettiSpawnCarry = 0;
+    this.victoryCompleteEventPending = false;
     this.levelStartFade = 1;
     this.losePopupAppear = 1;
 
@@ -4236,10 +4487,56 @@ class Game {
     return true;
   }
 
+  syncDebugBackgroundButtons() {
+    const currentId = normalizeBackgroundId(this.currentBackgroundId);
+    if (!this.debugBackgroundButtons || typeof this.debugBackgroundButtons !== "object") {
+      return;
+    }
+    for (const backgroundId of BACKGROUND_VARIANT_IDS) {
+      const button = this.debugBackgroundButtons[backgroundId];
+      if (!button) {
+        continue;
+      }
+      const isActive = backgroundId === currentId;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    }
+  }
+
+  applyBackgroundConfig(backgroundId, options = {}) {
+    const { save = true } = options;
+    const nextBackgroundId = normalizeBackgroundId(backgroundId);
+    this.currentBackgroundId = nextBackgroundId;
+
+    const bgPath = getBackgroundAssetPath(nextBackgroundId, "background");
+    const panelPath = getBackgroundAssetPath(nextBackgroundId, "panel");
+    const cellPath = getBackgroundAssetPath(nextBackgroundId, "cell");
+    const railwayPath = getBackgroundAssetPath(nextBackgroundId, "railway");
+
+    this.setImageSource(this.backdropImage, bgPath);
+    this.setImageSource(this.woodImage, panelPath);
+    this.setImageSource(this.slotCellImage, cellPath);
+    this.setImageSource(this.railwayImage, railwayPath);
+    this.generatedBackdropCache = null;
+
+    if (typeof document !== "undefined" && document.body) {
+      document.body.style.backgroundImage = `url("${bgPath}")`;
+      document.body.style.backgroundSize = "402px 874px";
+    }
+
+    this.syncDebugBackgroundButtons();
+    this.rebuildStaticSceneLayer();
+    this.invalidate(false);
+
+    if (save) {
+      this.saveDebugSettings();
+    }
+  }
+
   applyLevelConfig(levelId, options = {}) {
-    const { restart = true } = options;
+    const { restart = true, displayLevelNumber = null } = options;
     const nextLevelId = this.getValidLevelId(levelId);
-    syncLevelGlobals(getLevelConfig(nextLevelId));
+    syncLevelGlobals(getLevelConfig(nextLevelId), { displayLevelNumber });
     this.currentLevelId = nextLevelId;
     this.syncDebugImageInputsForLevel(this.currentLevelId);
     this.spiralOrderByCell = this.buildSpiralOrderMap(LAYOUT.fieldCols, LAYOUT.fieldRows);
@@ -4298,6 +4595,7 @@ class Game {
       shotBounceSpeed: SHOT_BOUNCE_SPEED,
       trackUnitSpeed: TRACK_UNIT_SPEED,
       queueCardCount: BOTTOM_QUEUE_CARD_COUNT,
+      activeUnitsLimit: ACTIVE_UNITS_LIMIT,
       chickenSizeScale: CHICKEN_SIZE_SCALE,
       topPanelFontSize: TOP_PANEL_FONT_SIZE,
       topLevelPanelScale: TOP_LEVEL_PANEL_SCALE,
@@ -4328,6 +4626,7 @@ class Game {
       debugImageSettingsByLevel: cloneData(this.debugImageSettingsByLevel || {}),
       levelId: this.getValidLevelId(this.currentLevelId),
       themeId: this.getValidThemeId(this.currentThemeId),
+      backgroundId: normalizeBackgroundId(this.currentBackgroundId),
     };
   }
 
@@ -4339,6 +4638,11 @@ class Game {
       Math.round(Number(settings.queueCardCount ?? DEBUG_DEFAULTS.queueCardCount)),
       MIN_QUEUE_CARDS,
       MAX_QUEUE_CARDS
+    );
+    ACTIVE_UNITS_LIMIT = clamp(
+      Math.round(Number(settings.activeUnitsLimit ?? DEBUG_DEFAULTS.activeUnitsLimit)),
+      MIN_ACTIVE_UNITS_LIMIT,
+      MAX_ACTIVE_UNITS_LIMIT
     );
     CHICKEN_SIZE_SCALE = clamp(Number(settings.chickenSizeScale ?? DEBUG_DEFAULTS.chickenSizeScale), 0.6, 1.8);
     TOP_PANEL_FONT_SIZE = clamp(Number(settings.topPanelFontSize ?? DEBUG_DEFAULTS.topPanelFontSize), 24, 80);
@@ -4394,6 +4698,8 @@ class Game {
     }
     this.currentLevelId = this.getValidLevelId(settings.levelId ?? DEBUG_DEFAULTS.levelId);
     this.currentThemeId = this.getValidThemeId(settings.themeId ?? DEBUG_DEFAULTS.themeId);
+    this.currentBackgroundId = normalizeBackgroundId(settings.backgroundId ?? DEBUG_DEFAULTS.backgroundId);
+    this.applyBackgroundConfig(this.currentBackgroundId, { save: false });
   }
 
   loadDebugSettings() {
@@ -4784,6 +5090,7 @@ class Game {
       [this.shotBounceSpeedInput, SHOT_BOUNCE_SPEED],
       [this.railSpeedInput, TRACK_UNIT_SPEED],
       [this.queueCardsInput, BOTTOM_QUEUE_CARD_COUNT],
+      [this.maxActiveUnitsInput, ACTIVE_UNITS_LIMIT],
       [this.chickenSizeScaleInput, CHICKEN_SIZE_SCALE],
       [this.topPanelFontSizeInput, TOP_PANEL_FONT_SIZE],
       [this.levelPanelScaleInput, TOP_LEVEL_PANEL_SCALE],
@@ -5139,7 +5446,7 @@ class Game {
     }
 
     const activeUnitCount = this.units.reduce((count, unit) => count + (unit.alive ? 1 : 0), 0);
-    if (activeUnitCount >= MAX_ACTIVE_UNITS) {
+    if (activeUnitCount >= ACTIVE_UNITS_LIMIT) {
       return false;
     }
     const card = this.cards[cardIndex];
@@ -5316,6 +5623,9 @@ class Game {
   }
 
   spawnImpactRing(x, y, color, size = 1) {
+    while (this.impactRings.length >= MAX_ACTIVE_IMPACT_RINGS) {
+      this.impactRings.shift();
+    }
     const colorConfig = getBlockColorConfig(color);
     this.impactRings.push({
       x,
@@ -5330,6 +5640,9 @@ class Game {
   }
 
   spawnSlotBurst(x, y, color) {
+    while (this.slotBursts.length >= MAX_ACTIVE_SLOT_BURSTS) {
+      this.slotBursts.shift();
+    }
     const colorConfig = getBlockColorConfig(color);
     this.slotBursts.push({
       x,
@@ -5343,6 +5656,9 @@ class Game {
   }
 
   spawnFloatText(x, y, text, color = "#ffffff", scale = 1) {
+    while (this.floatTexts.length >= MAX_ACTIVE_FLOAT_TEXTS) {
+      this.floatTexts.shift();
+    }
     this.floatTexts.push({
       x,
       y,
@@ -5560,6 +5876,9 @@ class Game {
   }
 
   getNextSpiralTargets() {
+    if (this.nextSpiralTargetsCacheVersion === this.targetingCacheVersion) {
+      return this.nextSpiralTargetsCache;
+    }
     let minPendingSpiralIndex = Number.POSITIVE_INFINITY;
 
     for (const block of this.blocksBySpiral) {
@@ -5569,7 +5888,9 @@ class Game {
       minPendingSpiralIndex = Math.min(minPendingSpiralIndex, block.spiralIndex);
     }
     if (!Number.isFinite(minPendingSpiralIndex)) {
-      return [];
+      this.nextSpiralTargetsCache = [];
+      this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
+      return this.nextSpiralTargetsCache;
     }
 
     const targets = [];
@@ -5603,7 +5924,9 @@ class Game {
 
     if (targets.length > 0) {
       targets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-      return targets;
+      this.nextSpiralTargetsCache = targets;
+      this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
+      return this.nextSpiralTargetsCache;
     }
 
     // Safety fallback: if strict filter removed everything, keep inner ring available.
@@ -5614,16 +5937,26 @@ class Game {
       }
     }
     fallbackTargets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-    return fallbackTargets;
+    this.nextSpiralTargetsCache = fallbackTargets;
+    this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
+    return this.nextSpiralTargetsCache;
   }
 
   getContourGhostTargets() {
+    if (this.contourGhostTargetsCacheVersion === this.targetingCacheVersion) {
+      return this.contourGhostTargetsCache;
+    }
     if (this.remainingBlocks <= 0) {
-      return [];
+      this.contourGhostTargetsCache = [];
+      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
+      return this.contourGhostTargetsCache;
     }
     const hasFilledBlocks = this.remainingBlocks < this.blocks.length;
     if (!hasFilledBlocks) {
-      return this.getNextSpiralTargets();
+      const targets = this.getNextSpiralTargets();
+      this.contourGhostTargetsCache = targets;
+      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
+      return this.contourGhostTargetsCache;
     }
 
     const contourTargets = [];
@@ -5649,10 +5982,15 @@ class Game {
     }
 
     if (contourTargets.length === 0) {
-      return this.getNextSpiralTargets();
+      const targets = this.getNextSpiralTargets();
+      this.contourGhostTargetsCache = targets;
+      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
+      return this.contourGhostTargetsCache;
     }
     contourTargets.sort((a, b) => (a.spiralIndex - b.spiralIndex) || (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-    return contourTargets;
+    this.contourGhostTargetsCache = contourTargets;
+    this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
+    return this.contourGhostTargetsCache;
   }
 
   getSpiralBuildPriority(target, forwardDistance) {
@@ -5735,6 +6073,10 @@ class Game {
     this.targetingCacheVersion += 1;
     this.allowedReachableProbeCache.clear();
     this.trackProbeWindowCache.clear();
+    this.nextSpiralTargetsCache = [];
+    this.nextSpiralTargetsCacheVersion = -1;
+    this.contourGhostTargetsCache = [];
+    this.contourGhostTargetsCacheVersion = -1;
     if (clearTrackSamples) {
       this.trackSideSamples = null;
       this.trackSideSamplesKey = "";
@@ -6176,7 +6518,7 @@ class Game {
       if (!this.doesTargetMatchTrackRegionFrontierLock(target, frontierLock)) {
         continue;
       }
-      if (!this.isTargetOnTrackRegionFrontier(target, sourceRegion, activeTargets)) {
+      if (!frontierLock && !this.isTargetOnTrackRegionFrontier(target, sourceRegion, activeTargets)) {
         continue;
       }
       const allowedProbes = this.getAllowedReachableProbesForTarget(target);
@@ -6216,6 +6558,7 @@ class Game {
   }
 
   fireProjectile(unit, block) {
+    this.playSound("buble");
     const target = this.blockCenter(block);
     this.damageBlock(block, unit.color);
 
@@ -6244,7 +6587,7 @@ class Game {
     block.hitFlash = 1;
     this.remainingBlocks -= 1;
     this.invalidateTargetingCaches();
-    this.rebuildBlockFieldLayer();
+    this.markBlockFieldLayerDirty();
 
     const center = this.blockCenter(block);
     this.spawnParticles(center.x, center.y, color, 28);
@@ -6266,6 +6609,9 @@ class Game {
   }
 
   spawnBlockWave(x, y) {
+    while (this.blockWaves.length >= MAX_ACTIVE_BLOCK_WAVES) {
+      this.blockWaves.shift();
+    }
     this.blockWaves.push({
       x,
       y,
@@ -6286,6 +6632,9 @@ class Game {
       bandWidth: 46,
       jumpHeight: 7,
     });
+    while (this.blockWaves.length > MAX_ACTIVE_BLOCK_WAVES) {
+      this.blockWaves.shift();
+    }
   }
 
   blockCenter(block) {
@@ -6296,9 +6645,14 @@ class Game {
   }
 
   spawnParticles(x, y, color, amount) {
+    if (this.particles.length >= MAX_ACTIVE_PARTICLES) {
+      return;
+    }
     const particleColor = getBlockColorConfig(color).particle;
-    for (let i = 0; i < amount; i++) {
-      const angle = (Math.PI * 2 * i) / amount + Math.random() * 0.3;
+    const available = Math.max(0, MAX_ACTIVE_PARTICLES - this.particles.length);
+    const spawnAmount = Math.min(amount, available);
+    for (let i = 0; i < spawnAmount; i++) {
+      const angle = (Math.PI * 2 * i) / Math.max(1, spawnAmount) + Math.random() * 0.3;
       const speed = 36 + Math.random() * 80;
       this.particles.push({
         x,
@@ -6338,6 +6692,7 @@ class Game {
       return;
     }
     this.gameState = "victory";
+    this.playSound("win");
     this.cameraZoomTarget = VICTORY_ZOOM_TARGET;
     this.victoryConfettiTime = VICTORY_CONFETTI_DURATION;
     this.victoryFloatTime = 0;
@@ -6354,13 +6709,53 @@ class Game {
     this.cameraShakeX = 0;
     this.cameraShakeY = 0;
     this.spawnConfettiBurst(64);
+    this.victoryCompleteEventPending = true;
+    this.loseContinueSnapshot = [];
+  }
+
+  buildLoseContinueSnapshotFromCurrentState() {
+    const snapshot = [];
+    for (const card of this.cards) {
+      if (!card || card.used || card.ammo <= 0) {
+        continue;
+      }
+      snapshot.push({
+        label: card.label,
+        color: card.color,
+        ammo: Math.max(1, Math.round(card.ammo)),
+        styleKey: card.styleKey || null,
+      });
+    }
+    for (const unit of this.units) {
+      if (!unit) {
+        continue;
+      }
+      const state = String(unit.state || "");
+      const isFieldState = state === "launching" || state === "moving" || state === "landing" || state === "parked";
+      if (!isFieldState) {
+        continue;
+      }
+      const ammo = Math.max(0, Math.round(unit.ammo));
+      if (ammo <= 0) {
+        continue;
+      }
+      snapshot.push({
+        label: unit.label,
+        color: unit.color,
+        ammo,
+        styleKey: unit.styleKey || null,
+      });
+    }
+    return snapshot;
   }
 
   startLoseSequence() {
     if (this.gameState !== "playing") {
       return;
     }
+    this.loseContinueSnapshot = this.buildLoseContinueSnapshotFromCurrentState();
     this.gameState = "lose";
+    this.playSound("fail");
     const parkedUnits = this.units.filter(
       (unit) => unit.alive && unit.state === "parked" && unit.slotIndex !== null && unit.ammo > 0
     );
@@ -6398,57 +6793,80 @@ class Game {
   }
 
   continueFromLoseWithOneSlot() {
+    return this.continueFromLoseWithOneSlotCore({ spendCoins: true });
+  }
+
+  continueFromLoseWithAd() {
+    return dispatchUnityRewardEvent();
+  }
+
+  continueFromLoseWithOneSlotCore({ spendCoins = true } = {}) {
     if (this.gameState !== "lose") {
       return false;
     }
-
-    const parkedUnits = this.units
-      .filter((unit) => unit.alive && unit.state === "parked" && unit.slotIndex !== null && unit.ammo > 0)
-      .slice()
-      .sort((a, b) => (a.slotIndex - b.slotIndex) || (a.id - b.id));
-    const keeper = parkedUnits[0] || null;
-    const keeperId = keeper ? keeper.id : null;
-    const cardByLabel = new Map(this.cards.map((card) => [String(card.label), card]));
-
-    for (const unit of parkedUnits) {
-      if (keeperId !== null && unit.id === keeperId) {
-        continue;
+    if (spendCoins) {
+      const continueCost = this.getLoseContinueCoinsCost();
+      const currentCoins = this.getCurrentExternalCoinsCount();
+      if (currentCoins < continueCost) {
+        return false;
       }
-      const labelKey = String(unit.label);
-      const targetCard =
-        cardByLabel.get(labelKey) ||
-        this.cards.find((card) => card.used && card.color === unit.color) ||
-        this.cards.find((card) => card.used);
-      if (targetCard) {
-        targetCard.used = false;
-        targetCard.ammo = Math.max(1, Math.round(unit.ammo));
-        targetCard.color = unit.color;
-        if (unit.styleKey) {
-          targetCard.styleKey = unit.styleKey;
-        }
-      }
-      unit.alive = false;
-      unit.slotIndex = null;
+      const nextCoins = Math.max(0, currentCoins - continueCost);
+      this.externalCoinsCount = nextCoins;
+      pendingExternalCoinsCount = nextCoins;
+      persistExternalCoinsCount(nextCoins);
     }
 
-    this.units = keeper ? [keeper] : [];
+    const continueSnapshot = Array.isArray(this.loseContinueSnapshot) && this.loseContinueSnapshot.length > 0
+      ? this.loseContinueSnapshot
+      : this.buildLoseContinueSnapshotFromCurrentState();
+    this.loseContinueSnapshot = [];
+
+    // Continue should fully clear birds from field/slots and rebuild queue from cards.
+    this.units = [];
     this.slotManager.reset();
-    if (keeper && keeper.slotIndex !== null && keeper.slotIndex >= 0 && keeper.slotIndex < this.slotManager.occupants.length) {
-      this.slotManager.occupants[keeper.slotIndex] = keeper.id;
-      const slotCenter = this.getSlotCenter(keeper.slotIndex);
-      if (slotCenter) {
-        keeper.position = { ...slotCenter };
-        keeper.prevPosition = { ...slotCenter };
-      }
-      keeper.state = "parked";
-      keeper.cooldown = 0;
-      keeper.parkBounce = 0;
-      keeper.renderRotation = null;
-    }
 
     for (const card of this.cards) {
-      if (card.ammo <= 0) {
-        card.used = true;
+      card.used = true;
+      card.ammo = 0;
+    }
+
+    const cardsSorted = this.cards.slice().sort((a, b) => a.index - b.index);
+    const cardsByLabel = new Map();
+    for (const card of cardsSorted) {
+      const labelKey = String(card.label);
+      if (!cardsByLabel.has(labelKey)) {
+        cardsByLabel.set(labelKey, []);
+      }
+      cardsByLabel.get(labelKey).push(card);
+    }
+    const claimedCardIndexes = new Set();
+    const claimCardByLabel = (label) => {
+      const cardsForLabel = cardsByLabel.get(String(label)) || [];
+      for (const card of cardsForLabel) {
+        if (claimedCardIndexes.has(card.index)) {
+          continue;
+        }
+        return card;
+      }
+      return null;
+    };
+    const claimAnyCard = () => cardsSorted.find((card) => !claimedCardIndexes.has(card.index)) || null;
+
+    for (const entry of continueSnapshot) {
+      const ammo = Math.max(0, Math.round(entry?.ammo));
+      if (!entry || !entry.color || ammo <= 0) {
+        continue;
+      }
+      const targetCard = claimCardByLabel(entry.label) || claimAnyCard();
+      if (!targetCard) {
+        break;
+      }
+      claimedCardIndexes.add(targetCard.index);
+      targetCard.used = false;
+      targetCard.ammo = ammo;
+      targetCard.color = entry.color;
+      if (entry.styleKey) {
+        targetCard.styleKey = entry.styleKey;
       }
     }
     this.normalizeShooterQueues(this.cards);
@@ -6458,6 +6876,18 @@ class Game {
     this.streakTimer = 0;
     this.invalidate(true);
     return true;
+  }
+
+  getCurrentExternalCoinsCount() {
+    return resolveExternalCoinsCount(this);
+  }
+
+  getLoseContinueCoinsCost() {
+    return resolveExternalTimeOutCoinsCost(this);
+  }
+
+  canContinueFromLoseForCoins() {
+    return this.getCurrentExternalCoinsCount() >= this.getLoseContinueCoinsCost();
   }
 
   triggerDebug6() {
@@ -6493,6 +6923,18 @@ class Game {
       this.victoryConfettiSpawnCarry = 0;
       this.spawnConfettiBurst(64);
     }
+    this.invalidate(true);
+    return true;
+  }
+
+  triggerDebugLose() {
+    if (this.gameState === "lose") {
+      return true;
+    }
+    if (this.gameState !== "playing") {
+      return false;
+    }
+    this.startLoseSequence();
     this.invalidate(true);
     return true;
   }
@@ -6551,6 +6993,14 @@ class Game {
       this.victoryFloatTime += dt;
       this.updateConfetti(dt);
       this.cameraZoom += (this.cameraZoomTarget - this.cameraZoom) * Math.min(1, dt * VICTORY_ZOOM_SPEED);
+      if (
+        this.victoryCompleteEventPending &&
+        this.victoryConfettiTime <= 0 &&
+        Math.abs(this.cameraZoomTarget - this.cameraZoom) <= 0.01
+      ) {
+        this.victoryCompleteEventPending = false;
+        dispatchUnityCompleteEvent(this);
+      }
       this.cameraShakeTime = 0;
       this.cameraShakeX = 0;
       this.cameraShakeY = 0;
@@ -6879,20 +7329,60 @@ class Game {
   }
 
   drawDestroyedBlocks(ctx) {
-    if (this.blockWaves.length === 0 && this.blockFieldLayer) {
+    this.ensureBlockFieldLayerFresh();
+    if (this.blockFieldLayer) {
       ctx.drawImage(this.blockFieldLayer, 0, 0);
     } else {
       for (const block of this.blocks) {
         if (!block.alive) {
           continue;
         }
-        const waveOffsetY = this.getBlockWaveOffsetY(block);
         this.drawVolumetricBlock(ctx, block, block.x, block.y, {
           alpha: 0.96,
           shadowOpacity: 0.22,
           bevelStrength: 0.26,
-          offsetY: waveOffsetY,
+          offsetY: 0,
         });
+      }
+    }
+
+    if (this.blockWaves.length > 0) {
+      const movedBlocks = [];
+      for (const block of this.blocks) {
+        if (!block.alive) {
+          continue;
+        }
+        const waveOffsetY = this.getBlockWaveOffsetY(block);
+        if (Math.abs(waveOffsetY) < WAVE_OFFSET_VISUAL_EPSILON) {
+          continue;
+        }
+        movedBlocks.push({ block, waveOffsetY });
+      }
+
+      if (movedBlocks.length > 0) {
+        for (const item of movedBlocks) {
+          const block = item.block;
+          const patchPad = Math.max(2, Math.ceil(block.size * 0.2));
+          const srcX = Math.max(0, Math.floor(block.x - patchPad));
+          const srcY = Math.max(0, Math.floor(block.y - patchPad));
+          const srcW = Math.min(this.width - srcX, Math.ceil(block.size + patchPad * 2));
+          const srcH = Math.min(this.height - srcY, Math.ceil(block.size + patchPad * 2));
+          if (srcW <= 0 || srcH <= 0) {
+            continue;
+          }
+          if (this.staticSceneLayer) {
+            ctx.drawImage(this.staticSceneLayer, srcX, srcY, srcW, srcH, srcX, srcY, srcW, srcH);
+          }
+        }
+
+        for (const item of movedBlocks) {
+          this.drawVolumetricBlock(ctx, item.block, item.block.x, item.block.y, {
+            alpha: 0.96,
+            shadowOpacity: 0.22,
+            bevelStrength: 0.26,
+            offsetY: item.waveOffsetY,
+          });
+        }
       }
     }
 
@@ -7445,33 +7935,42 @@ class Game {
   }
 
   drawParticles(ctx) {
+    if (this.particles.length === 0) {
+      return;
+    }
+    ctx.save();
     for (const particle of this.particles) {
-      ctx.save();
       ctx.globalAlpha = particle.life / particle.maxLife;
       ctx.fillStyle = particle.color;
       ctx.fillRect(particle.x - particle.size / 2, particle.y - particle.size / 2, particle.size, particle.size);
-      ctx.restore();
     }
+    ctx.restore();
   }
 
   drawImpactFx(ctx) {
+    if (this.impactRings.length > 0) {
+      ctx.save();
+    }
     for (const ring of this.impactRings) {
       const t = 1 - ring.life / ring.maxLife;
       const radius = lerp(ring.startR, ring.endR, easeOutCubic(t));
-      ctx.save();
       ctx.globalAlpha = (1 - t) * 0.95;
       ctx.lineWidth = ring.lineWidth;
       ctx.strokeStyle = ring.color;
       ctx.beginPath();
       ctx.arc(ring.x, ring.y, radius, 0, Math.PI * 2);
       ctx.stroke();
+    }
+    if (this.impactRings.length > 0) {
       ctx.restore();
     }
 
+    if (this.slotBursts.length > 0) {
+      ctx.save();
+    }
     for (const burst of this.slotBursts) {
       const t = 1 - burst.life / burst.maxLife;
       const radius = lerp(burst.r, burst.maxR, easeOutCubic(t));
-      ctx.save();
       ctx.globalAlpha = (1 - t) * 0.58;
       const gradient = ctx.createRadialGradient(burst.x, burst.y, 0, burst.x, burst.y, radius);
       gradient.addColorStop(0, burst.color);
@@ -7480,25 +7979,30 @@ class Game {
       ctx.beginPath();
       ctx.arc(burst.x, burst.y, radius, 0, Math.PI * 2);
       ctx.fill();
+    }
+    if (this.slotBursts.length > 0) {
       ctx.restore();
     }
   }
 
   drawFloatingTexts(ctx) {
+    if (this.floatTexts.length === 0) {
+      return;
+    }
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = COLORS.textGlow;
+    ctx.lineWidth = 6;
     for (const item of this.floatTexts) {
       const t = item.maxLife > 0 ? item.life / item.maxLife : 0;
-      ctx.save();
       ctx.globalAlpha = t;
       ctx.font = `900 ${Math.round(46 * item.scale)}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.strokeStyle = COLORS.textGlow;
-      ctx.lineWidth = 6;
       ctx.strokeText(item.text, item.x, item.y);
       ctx.fillStyle = item.color;
       ctx.fillText(item.text, item.x, item.y);
-      ctx.restore();
     }
+    ctx.restore();
   }
 
   drawConfetti(ctx) {
@@ -7600,14 +8104,131 @@ class Game {
     };
   }
 
+  getLoseTopStatsRects() {
+    const sourceHeartW =
+      this.loseTopHeartPanelImage?.naturalWidth > 0 ? this.loseTopHeartPanelImage.naturalWidth : 240;
+    const sourceHeartH =
+      this.loseTopHeartPanelImage?.naturalHeight > 0 ? this.loseTopHeartPanelImage.naturalHeight : 96;
+    const sourceCoinsW =
+      this.loseTopCoinsPanelImage?.naturalWidth > 0 ? this.loseTopCoinsPanelImage.naturalWidth : 244;
+    const sourceCoinsH =
+      this.loseTopCoinsPanelImage?.naturalHeight > 0 ? this.loseTopCoinsPanelImage.naturalHeight : 96;
+    const baseHeight = LOSE_TOP_STATS_UI.targetHeight;
+    const heartScale = baseHeight / sourceHeartH;
+    const coinsScale = baseHeight / sourceCoinsH;
+    let heartW = sourceHeartW * heartScale;
+    let heartH = sourceHeartH * heartScale;
+    let coinsW = sourceCoinsW * coinsScale;
+    let coinsH = sourceCoinsH * coinsScale;
+    let gap = LOSE_TOP_STATS_UI.gap;
+    let totalW = heartW + coinsW + gap;
+    const maxTotalW = Math.max(100, this.width - LOSE_TOP_STATS_UI.sidePadding * 2);
+    const maxScaleFromWidth = maxTotalW / totalW;
+    const scaled = clamp(maxScaleFromWidth, LOSE_TOP_STATS_UI.minScale, LOSE_TOP_STATS_UI.maxScale);
+    heartW *= scaled;
+    heartH *= scaled;
+    coinsW *= scaled;
+    coinsH *= scaled;
+    gap *= scaled;
+    totalW = heartW + coinsW + gap;
+    const x = (this.width - totalW) * 0.5;
+    const y = Math.max(14, TIMER_PANEL_UI.y + LOSE_TOP_STATS_UI.topOffset);
+    return {
+      heart: { x, y, w: heartW, h: heartH },
+      coins: { x: x + heartW + gap, y, w: coinsW, h: coinsH },
+    };
+  }
+
+  drawLoseTopStats(ctx, alpha = 1) {
+    const heartsCountValue = resolveExternalHeartsCount(this);
+    const heartsCount = String(heartsCountValue);
+    const maxLivesCountValue = resolveExternalMaxLivesCount(this);
+    const livesTimerText = resolveExternalLivesTimer(this);
+    const isLivesFull = maxLivesCountValue > 0 && heartsCountValue >= maxLivesCountValue;
+    const heartsTimerDisplayText = isLivesFull ? "full" : livesTimerText || "--:--";
+    const coinsCount = String(this.getCurrentExternalCoinsCount());
+    const { heart, coins } = this.getLoseTopStatsRects();
+
+    const drawPanel = (image, rect, fallbackTop = "#dce8ff", fallbackBottom = "#b8cff5") => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = "rgba(8, 14, 36, 0.26)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
+      if (image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        ctx.imageSmoothingEnabled = true;
+        if ("imageSmoothingQuality" in ctx) {
+          ctx.imageSmoothingQuality = "high";
+        }
+        ctx.drawImage(image, rect.x, rect.y, rect.w, rect.h);
+      } else {
+        const grad = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+        grad.addColorStop(0, fallbackTop);
+        grad.addColorStop(1, fallbackBottom);
+        roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.round(rect.h * 0.28));
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+      ctx.restore();
+    };
+
+    drawPanel(this.loseTopHeartPanelImage, heart, "#ff7b68", "#f04f44");
+    drawPanel(this.loseTopCoinsPanelImage, coins, "#f5f9ff", "#d7e5ff");
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = LOSE_TOP_STATS_UI.heartTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.heartTextStroke;
+    ctx.lineWidth = Math.max(3, heart.h * 0.05);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `900 ${Math.max(20, Math.round(heart.h * 0.44))}px "Open Sans", Arial, sans-serif`;
+    const heartsX = heart.x + heart.w * LOSE_TOP_STATS_UI.heartTextXRatio;
+    const heartsY = heart.y + heart.h * LOSE_TOP_STATS_UI.heartTextYRatio;
+    ctx.strokeText(heartsCount, heartsX, heartsY);
+    ctx.fillText(heartsCount, heartsX, heartsY);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = LOSE_TOP_STATS_UI.coinsTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.coinsTextStroke;
+    ctx.lineWidth = Math.max(2, heart.h * 0.045);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `800 ${Math.max(20, Math.round(heart.h * 0.32 * LOSE_TOP_STATS_UI.coinsTextFontScale))}px "Open Sans", Arial, sans-serif`;
+    const livesTimerX = heart.x + heart.w * LOSE_TOP_STATS_UI.livesTimerTextXRatio + LOSE_TOP_STATS_UI.livesTimerTextOffsetX;
+    const livesTimerY = heart.y + heart.h * LOSE_TOP_STATS_UI.livesTimerTextYRatio + LOSE_TOP_STATS_UI.livesTimerTextOffsetY;
+    ctx.strokeText(heartsTimerDisplayText, livesTimerX, livesTimerY);
+    ctx.fillText(heartsTimerDisplayText, livesTimerX, livesTimerY);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = LOSE_TOP_STATS_UI.coinsTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.coinsTextStroke;
+    ctx.lineWidth = Math.max(2, coins.h * 0.045);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `800 ${Math.max(20, Math.round(coins.h * 0.32 * LOSE_TOP_STATS_UI.coinsTextFontScale))}px "Open Sans", Arial, sans-serif`;
+    const coinsX = coins.x + coins.w * LOSE_TOP_STATS_UI.coinsTextXRatio + LOSE_TOP_STATS_UI.coinsTextOffsetX;
+    const coinsY = coins.y + coins.h * LOSE_TOP_STATS_UI.coinsTextYRatio + LOSE_TOP_STATS_UI.coinsTextOffsetY;
+    ctx.strokeText(coinsCount, coinsX, coinsY);
+    ctx.fillText(coinsCount, coinsX, coinsY);
+    ctx.restore();
+  }
+
   getLosePopupRect() {
-    const targetScale = 1.4;
+    const targetScale = 1.1;
     let w = LOSE_POPUP_UI.w * targetScale;
     let h = LOSE_POPUP_UI.h * targetScale;
     const fitScale = Math.min((this.width * 0.96) / w, (this.height * 0.9) / h, 1);
     w *= fitScale;
     h *= fitScale;
-    const centeredY = (this.height - h) * 0.5;
+    const centeredY = (this.height - h) * 0.5 - 60 + LOSE_POPUP_Y_OFFSET;
     const y = clamp(centeredY, 20, this.height - h - 20);
     return {
       x: (this.width - w) * 0.5,
@@ -7631,20 +8252,66 @@ class Game {
     const popup = popupRect || this.getLosePopupRect();
     const sx = popup.w / 646;
     const sy = popup.h / 663;
-    const buttonY = popup.y + popup.h - 126 * sy;
+    const buttonScale = 0.9;
+    const baseButtonW = 269 * sx;
+    const baseButtonH = 114 * sy;
+    const buttonW = baseButtonW * buttonScale;
+    const buttonH = baseButtonH * buttonScale;
+    const baseButtonY = popup.y + popup.h - 174 * sy;
+    const buttonY = baseButtonY + (baseButtonH - buttonH) * 0.5;
+    const targetGap = 25 * sx;
+    const sideInset = (popup.w - baseButtonW - buttonW - targetGap) * 0.5;
     const left = {
-      x: popup.x + 40 * sx,
+      x: popup.x + sideInset + (baseButtonW - buttonW) * 0.5,
       y: buttonY,
-      w: 184 * sx,
-      h: 68 * sy,
+      w: buttonW,
+      h: buttonH,
     };
     const right = {
-      x: popup.x + popup.w - 40 * sx - 184 * sx,
+      x: popup.x + popup.w - sideInset - baseButtonW + (baseButtonW - buttonW) * 0.5,
       y: buttonY,
-      w: 184 * sx,
-      h: 68 * sy,
+      w: buttonW,
+      h: buttonH,
     };
     return { left, right };
+  }
+
+  getLoseOfferRects(popupRect = null) {
+    const popup = popupRect || this.getLosePopupRect();
+    const sourceOfferW = this.loseOfferImage?.naturalWidth > 0 ? this.loseOfferImage.naturalWidth : LOSE_OFFER_UI.fallbackW;
+    const sourceOfferH = this.loseOfferImage?.naturalHeight > 0 ? this.loseOfferImage.naturalHeight : LOSE_OFFER_UI.fallbackH;
+    const sourceButtonW = this.loseOfferPurchaseButtonImage?.naturalWidth > 0
+      ? this.loseOfferPurchaseButtonImage.naturalWidth
+      : LOSE_OFFER_UI.fallbackButtonW;
+    const sourceButtonH = this.loseOfferPurchaseButtonImage?.naturalHeight > 0
+      ? this.loseOfferPurchaseButtonImage.naturalHeight
+      : LOSE_OFFER_UI.fallbackButtonH;
+    const sidePadding = LOSE_OFFER_UI.sidePadding;
+    const gap = LOSE_OFFER_UI.gapFromPopupBottom;
+    let offerW = Math.min(
+      popup.w * LOSE_OFFER_UI.widthToPopupRatio * LOSE_OFFER_UI.scale,
+      this.width - sidePadding * 2
+    );
+    let offerH = offerW * (sourceOfferH / sourceOfferW);
+    const offerRect = {
+      x: (this.width - offerW) * 0.5,
+      y: popup.y + popup.h + gap,
+      w: offerW,
+      h: offerH,
+    };
+    const buttonW = offerRect.w * LOSE_OFFER_UI.buttonWidthRatio;
+    const buttonH = buttonW * (sourceButtonH / sourceButtonW);
+    const buttonRect = {
+      x: offerRect.x + (offerRect.w - buttonW) * 0.5,
+      y: offerRect.y + offerRect.h - buttonH * LOSE_OFFER_UI.buttonBottomOverlapFactor + LOSE_OFFER_UI.buttonOffsetY,
+      w: buttonW,
+      h: buttonH,
+    };
+    return { offer: offerRect, button: buttonRect };
+  }
+
+  shouldShowLoseOffer() {
+    return !resolveExternalSubscriptionStatus(this);
   }
 
   drawLoseBirdRow(ctx, popupX, popupY, popupW, popupH, alpha = 1) {
@@ -7753,135 +8420,118 @@ class Game {
   }
 
   drawLoseButtons(ctx, popupX, popupY, popupW, popupH) {
-    const buttonY = popupY + popupH - 126;
-    const leftX = popupX + 40;
-    const leftW = 184;
-    const leftH = 68;
-    const rightW = 184;
-    const rightH = 68;
-    const rightX = popupX + popupW - rightW - 40;
-
-    ctx.save();
-    ctx.shadowColor = "rgba(20, 38, 87, 0.24)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-    const leftGrad = ctx.createLinearGradient(0, buttonY, 0, buttonY + leftH);
-    leftGrad.addColorStop(0, "#9ce53f");
-    leftGrad.addColorStop(1, "#53ca1c");
-    roundedRect(ctx, leftX, buttonY, leftW, leftH, 24);
-    ctx.fillStyle = leftGrad;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.34)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
-
-    const coinX = leftX + 22;
-    const coinY = buttonY + 12;
-    const coinR = 22;
-    ctx.save();
-    const coinGrad = ctx.createLinearGradient(coinX, coinY, coinX, coinY + coinR * 2);
-    coinGrad.addColorStop(0, "#ffea55");
-    coinGrad.addColorStop(1, "#f0980f");
-    ctx.fillStyle = coinGrad;
-    ctx.beginPath();
-    ctx.arc(coinX + coinR, coinY + coinR, coinR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#ffbe2b";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = "#ffef65";
-    ctx.beginPath();
-    ctx.arc(coinX + coinR, coinY + coinR, coinR * 0.66, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#f0a300";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    ctx.fillStyle = "#ffc700";
-    ctx.strokeStyle = "#ed8f00";
-    ctx.lineWidth = 1.5;
-    const sx = coinX + coinR;
-    const sy = coinY + coinR;
-    const rOuter = coinR * 0.42;
-    const rInner = coinR * 0.2;
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const angle = -Math.PI / 2 + (Math.PI * 2 * i) / 10;
-      const r = i % 2 === 0 ? rOuter : rInner;
-      const px = sx + Math.cos(angle) * r;
-      const py = sy + Math.sin(angle) * r;
-      if (i === 0) {
-        ctx.moveTo(px, py);
+    const popup = { x: popupX, y: popupY, w: popupW, h: popupH };
+    const { left, right } = this.getLoseButtonRects(popup);
+    const continueCost = this.getLoseContinueCoinsCost();
+    const canContinueForCoins = this.canContinueFromLoseForCoins();
+    const continueButtonAlpha = canContinueForCoins ? 1 : 0.46;
+    const drawButton = (image, rect, alpha = 1, fallbackTop = "#7bcfff", fallbackBottom = "#4a95ef") => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = "rgba(20, 38, 87, 0.24)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
+      if (image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        ctx.imageSmoothingEnabled = true;
+        if ("imageSmoothingQuality" in ctx) {
+          ctx.imageSmoothingQuality = "high";
+        }
+        ctx.drawImage(image, rect.x, rect.y, rect.w, rect.h);
       } else {
-        ctx.lineTo(px, py);
+        const grad = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+        grad.addColorStop(0, fallbackTop);
+        grad.addColorStop(1, fallbackBottom);
+        roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, Math.round(rect.h * 0.36));
+        ctx.fillStyle = grad;
+        ctx.fill();
       }
+      ctx.restore();
+    };
+
+    drawButton(
+      this.loseCoinsButtonImage,
+      left,
+      continueButtonAlpha,
+      canContinueForCoins ? "#9ce53f" : "#9ba7a5",
+      canContinueForCoins ? "#53ca1c" : "#727f7b"
+    );
+    drawButton(this.loseAdsButtonImage, right, 1, "#7bcfff", "#4a95ef");
+
+    ctx.save();
+    const textAreaStartRatio = 0.46;
+    const leftFontSize = Math.max(16, Math.round(left.h * 0.3744));
+    ctx.font = `800 ${leftFontSize}px "Open Sans", Arial, sans-serif`;
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.globalAlpha = continueButtonAlpha;
+    const leftTextX = left.x + left.w * (textAreaStartRatio + (1 - textAreaStartRatio) * 0.5) - 25;
+    const leftTextY = left.y + left.h * 0.5 - 7.5;
+    ctx.fillText(String(continueCost), leftTextX, leftTextY);
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = "#ffffff";
+    const rightFontSize = Math.max(14, Math.round(right.h * 0.36));
+    ctx.font = `800 ${rightFontSize}px "Open Sans", Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const rightTextX = right.x + right.w * (textAreaStartRatio + (1 - textAreaStartRatio) * 0.5) - 25;
+    const rightTextY = right.y + right.h * 0.5 - 7.5;
+    ctx.fillText("FREE", rightTextX, rightTextY);
+    ctx.restore();
+  }
+
+  drawLoseOffer(ctx, popupRect, alpha = 1) {
+    const { offer, button } = this.getLoseOfferRects(popupRect);
+    this.loseOfferPurchaseRect = button;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = "rgba(12, 19, 44, 0.26)";
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 6;
+    if (this.loseOfferImage.complete && this.loseOfferImage.naturalWidth > 0 && this.loseOfferImage.naturalHeight > 0) {
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.drawImage(this.loseOfferImage, offer.x, offer.y, offer.w, offer.h);
+    } else {
+      const fallbackGrad = ctx.createLinearGradient(offer.x, offer.y, offer.x, offer.y + offer.h);
+      fallbackGrad.addColorStop(0, "#f6c451");
+      fallbackGrad.addColorStop(1, "#ef8d32");
+      roundedRect(ctx, offer.x, offer.y, offer.w, offer.h, Math.round(offer.h * 0.14));
+      ctx.fillStyle = fallbackGrad;
+      ctx.fill();
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
     ctx.restore();
 
     ctx.save();
-    ctx.font = "900 56px Arial";
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "rgba(0, 74, 10, 0.42)";
-    ctx.lineWidth = 5;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.strokeText("50", leftX + 92, buttonY + leftH * 0.53);
-    ctx.fillText("50", leftX + 92, buttonY + leftH * 0.53);
-    ctx.restore();
-
-    ctx.save();
-    ctx.shadowColor = "rgba(20, 38, 87, 0.24)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-    const rightGrad = ctx.createLinearGradient(0, buttonY, 0, buttonY + rightH);
-    rightGrad.addColorStop(0, "#7bcfff");
-    rightGrad.addColorStop(1, "#4a95ef");
-    roundedRect(ctx, rightX, buttonY, rightW, rightH, 24);
-    ctx.fillStyle = rightGrad;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.38)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
-
-    const filmX = rightX + 20;
-    const filmY = buttonY + 12;
-    const filmW = 52;
-    const filmH = 44;
-    ctx.save();
-    const filmGrad = ctx.createLinearGradient(filmX, filmY, filmX, filmY + filmH);
-    filmGrad.addColorStop(0, "#d7f0ff");
-    filmGrad.addColorStop(1, "#75b6ff");
-    roundedRect(ctx, filmX, filmY, filmW, filmH, 12);
-    ctx.fillStyle = filmGrad;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(31, 95, 184, 0.8)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = "#4f8fe0";
-    ctx.beginPath();
-    ctx.moveTo(filmX + 21, filmY + 12);
-    ctx.lineTo(filmX + 21, filmY + 32);
-    ctx.lineTo(filmX + 38, filmY + 22);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 54px Arial";
-    ctx.strokeStyle = "rgba(15, 63, 143, 0.72)";
-    ctx.lineWidth = 5;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.strokeText("FREE", rightX + 84, buttonY + rightH * 0.53);
-    ctx.fillText("FREE", rightX + 84, buttonY + rightH * 0.53);
+    ctx.globalAlpha = alpha;
+    if (
+      this.loseOfferPurchaseButtonImage.complete &&
+      this.loseOfferPurchaseButtonImage.naturalWidth > 0 &&
+      this.loseOfferPurchaseButtonImage.naturalHeight > 0
+    ) {
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.drawImage(this.loseOfferPurchaseButtonImage, button.x, button.y, button.w, button.h);
+    } else {
+      const buttonGrad = ctx.createLinearGradient(button.x, button.y, button.x, button.y + button.h);
+      buttonGrad.addColorStop(0, "#98e24f");
+      buttonGrad.addColorStop(1, "#60be2f");
+      roundedRect(ctx, button.x, button.y, button.w, button.h, Math.round(button.h * 0.42));
+      ctx.fillStyle = buttonGrad;
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `800 ${Math.max(18, Math.round(button.h * 0.44))}px "Open Sans", Arial, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Get now!", button.x + button.w * 0.5, button.y + button.h * 0.52);
+    }
     ctx.restore();
   }
 
@@ -7903,12 +8553,19 @@ class Game {
     const loseButtons = this.getLoseButtonRects(drawRect);
     this.loseContinueRect = loseButtons.left;
     this.loseFreeRect = loseButtons.right;
+    if (this.shouldShowLoseOffer()) {
+      const loseOfferRects = this.getLoseOfferRects(drawRect);
+      this.loseOfferPurchaseRect = loseOfferRects.button;
+    } else {
+      this.loseOfferPurchaseRect = { x: 0, y: 0, w: 0, h: 0 };
+    }
 
     ctx.save();
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.fillStyle = `rgba(7, 14, 28, ${0.74 * fade})`;
     ctx.fillRect(0, 0, this.screenWidth, this.screenHeight);
     ctx.restore();
+    this.drawLoseTopStats(ctx, fade);
 
     if (this.losePopupImage.complete && this.losePopupImage.naturalWidth > 0) {
       ctx.save();
@@ -7929,6 +8586,10 @@ class Game {
       }
       ctx.drawImage(this.losePopupImage, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
       this.drawLoseBirdRow(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h, fade);
+      this.drawLoseButtons(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
+      if (this.shouldShowLoseOffer()) {
+        this.drawLoseOffer(ctx, drawRect, fade);
+      }
       ctx.restore();
       return;
     }
@@ -8000,6 +8661,9 @@ class Game {
 
     this.drawLoseSpaceBadge(ctx, drawRect.x + drawRect.w * 0.5, drawRect.y + 314, 430, 250);
     this.drawLoseButtons(ctx, drawRect.x, drawRect.y, drawRect.w, drawRect.h);
+    if (this.shouldShowLoseOffer()) {
+      this.drawLoseOffer(ctx, drawRect, fade);
+    }
   }
 
   render() {
@@ -8090,7 +8754,7 @@ class Game {
     if (animating) {
       this.simAccumulator = Math.min(MAX_SIMULATION_DT, this.simAccumulator + dt);
       let steps = 0;
-      const maxSteps = 12;
+      const maxSteps = MAX_SIM_STEPS_PER_FRAME;
       while (this.simAccumulator >= FIXED_DT && steps < maxSteps) {
         this.update(FIXED_DT);
         this.simAccumulator -= FIXED_DT;
@@ -8151,7 +8815,8 @@ class Game {
     if (animate || this.hasActiveAnimations()) {
       if (!this.isLoopRunning) {
         this.isLoopRunning = true;
-        this.lastTimestamp = performance.now();
+        const now = performance.now();
+        this.lastTimestamp = now;
         this.simAccumulator = 0;
         requestAnimationFrame((t) => this.frame(t));
       }
@@ -8185,14 +8850,25 @@ class Game {
       return;
     }
     if (this.gameState === "playing" && this.tutorial?.active) {
+      const overRestart = isInsideRect(x, y, this.restartButtonRect);
       const target = this.getTutorialTapTarget();
-      this.canvas.style.cursor = target && this.isPointOnTutorialTarget(target, x, y) ? "pointer" : "default";
+      this.canvas.style.cursor = overRestart || (target && this.isPointOnTutorialTarget(target, x, y))
+        ? "pointer"
+        : "default";
       return;
     }
     if (this.gameState === "lose") {
       const overClose = isInsideRect(x, y, this.loseCloseRect);
-      const overContinue = isInsideRect(x, y, this.loseContinueRect);
-      this.canvas.style.cursor = overClose || overContinue ? "pointer" : "default";
+      const overContinue = this.canContinueFromLoseForCoins() && isInsideRect(x, y, this.loseContinueRect);
+      const overFree = isInsideRect(x, y, this.loseFreeRect);
+      const overOfferPurchase = this.shouldShowLoseOffer() && isInsideRect(x, y, this.loseOfferPurchaseRect);
+      this.canvas.style.cursor = overClose || overContinue || overFree || overOfferPurchase ? "pointer" : "default";
+      return;
+    }
+    if (this.gameState === "victory") {
+      const overBack = isInsideRect(x, y, this.backButtonRect);
+      const overRestart = isInsideRect(x, y, this.restartButtonRect);
+      this.canvas.style.cursor = overBack || overRestart ? "pointer" : "default";
       return;
     }
     const overBack = isInsideRect(x, y, this.backButtonRect);
@@ -8207,13 +8883,24 @@ class Game {
       }
       return;
     }
+    if (isInsideRect(x, y, this.restartButtonRect)) {
+      this.restart();
+      return;
+    }
     if (this.gameState === "playing" && this.tutorial?.active) {
       const target = this.getTutorialTapTarget();
       if (!target || !this.isPointOnTutorialTarget(target, x, y)) {
+        const anyCard = this.cardManager.findAnyTapTarget(x, y, {
+          visualLiftY: this.getQueueVisualLiftY(),
+        });
+        if (anyCard) {
+          this.playSound("cant_select");
+        }
         return;
       }
       if (target.type === "card") {
-        this.spawnUnit(target.card.index);
+        const didSpawn = this.spawnUnit(target.card.index);
+        this.playSound(didSpawn ? "tap" : "cant_select");
         return;
       }
       if (target.type === "parkedUnit") {
@@ -8223,17 +8910,24 @@ class Game {
     }
     if (this.gameState === "lose") {
       if (isInsideRect(x, y, this.loseCloseRect)) {
-        this.restart();
+        dispatchUnityCloseEvent(this);
       } else if (isInsideRect(x, y, this.loseContinueRect)) {
+        if (!this.canContinueFromLoseForCoins()) {
+          this.playSound("cant_select");
+          return;
+        }
         this.continueFromLoseWithOneSlot();
+      } else if (isInsideRect(x, y, this.loseFreeRect)) {
+        if (!this.continueFromLoseWithAd()) {
+          this.playSound("cant_select");
+        }
+      } else if (this.shouldShowLoseOffer() && isInsideRect(x, y, this.loseOfferPurchaseRect)) {
+        dispatchUnitySubscriptionRequestEvent();
       }
       return;
     }
     if (isInsideRect(x, y, this.backButtonRect)) {
-      return;
-    }
-    if (isInsideRect(x, y, this.restartButtonRect)) {
-      this.restart();
+      dispatchUnityCloseEvent(this);
       return;
     }
     if (this.gameState !== "playing") {
@@ -8246,7 +8940,15 @@ class Game {
       visualLiftY: this.getQueueVisualLiftY(),
     });
     if (tapCard) {
-      this.spawnUnit(tapCard.index);
+      const didSpawn = this.spawnUnit(tapCard.index);
+      this.playSound(didSpawn ? "tap" : "cant_select");
+      return;
+    }
+    const anyCard = this.cardManager.findAnyTapTarget(x, y, {
+      visualLiftY: this.getQueueVisualLiftY(),
+    });
+    if (anyCard) {
+      this.playSound("cant_select");
     }
   }
 
@@ -8981,6 +9683,7 @@ class Game {
     this.syncDebugContentSelectors();
     this.syncDebugImageGridInputs(CURRENT_LEVEL.layout?.fieldCols || 18, CURRENT_LEVEL.layout?.fieldRows || 18);
     this.syncDebugImageInputsForLevel(this.currentLevelId);
+    this.syncDebugBackgroundButtons();
     this.syncDebugPaintColorOptions();
     this.syncDebugImageFileName();
     this.setDebugImageStatus("Выбери изображение, затем укажи сетку и нажми создать.");
@@ -9060,6 +9763,17 @@ class Game {
       });
       this.queueCardsInput.dispatchEvent(new Event("input"));
     }
+    bindRange(
+      this.maxActiveUnitsInput,
+      this.maxActiveUnitsValue,
+      ACTIVE_UNITS_LIMIT,
+      (value) => Number(value),
+      (value) => String(Math.round(value)),
+      (value) => {
+        ACTIVE_UNITS_LIMIT = clamp(Math.round(value), MIN_ACTIVE_UNITS_LIMIT, MAX_ACTIVE_UNITS_LIMIT);
+        return ACTIVE_UNITS_LIMIT;
+      }
+    );
     bindRange(
       this.chickenSizeScaleInput,
       this.chickenSizeScaleValue,
@@ -9468,6 +10182,15 @@ class Game {
 
   bindEvents() {
     window.addEventListener("resize", () => this.resize());
+    const unlockAudio = () => {
+      if (this.soundManager && typeof this.soundManager.unlock === "function") {
+        this.soundManager.unlock();
+      }
+    };
+    window.addEventListener("pointerdown", unlockAudio, { passive: true, once: true });
+    window.addEventListener("touchstart", unlockAudio, { passive: true, once: true });
+    window.addEventListener("mousedown", unlockAudio, { passive: true, once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
     window.addEventListener("keydown", (event) => {
       if (event.code !== "Space" || event.repeat) {
         return;
@@ -9488,6 +10211,7 @@ class Game {
       this.handlePointerMove(point.x, point.y);
     });
     this.canvas.addEventListener("pointerdown", (event) => {
+      unlockAudio();
       const point = this.getPointerPosition(event);
       if (!point) {
         return;
@@ -9509,6 +10233,12 @@ class Game {
     if (this.debugButton) {
       this.debugButton.addEventListener("click", (event) => {
         this.triggerDebug6();
+        event.preventDefault();
+      });
+    }
+    if (this.debugLoseButton) {
+      this.debugLoseButton.addEventListener("click", (event) => {
+        this.triggerDebugLose();
         event.preventDefault();
       });
     }
@@ -9552,6 +10282,16 @@ class Game {
       this.debugImageLevelToggleButton.addEventListener("click", (event) => {
         const hidden = !!this.debugImageLevelSection?.classList.contains("is-collapsed");
         this.setDebugImageGeneratorVisible(hidden);
+        event.preventDefault();
+      });
+    }
+    for (const backgroundId of BACKGROUND_VARIANT_IDS) {
+      const button = this.debugBackgroundButtons?.[backgroundId];
+      if (!button) {
+        continue;
+      }
+      button.addEventListener("click", (event) => {
+        this.applyBackgroundConfig(backgroundId);
         event.preventDefault();
       });
     }
@@ -9647,10 +10387,411 @@ class Game {
   }
 }
 
+let pendingExternalLevelSelection = null;
+let pendingExternalCoinsCount = null;
+let pendingExternalHeartsCount = null;
+let pendingExternalMaxLivesCount = null;
+let pendingExternalLivesTimer = null;
+let pendingExternalSubscriptionStatus = null;
+let pendingExternalTimeOutCoinsCost = null;
+const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
+const EXTERNAL_HEARTS_STORAGE_KEY = "pixelflow.external.hearts.v1";
+const EXTERNAL_MAX_LIVES_STORAGE_KEY = "pixelflow.external.max_lives.v1";
+const EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY = "pixelflow.external.subscription_status.v1";
+const EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY = "pixelflow.external.timeout_coins_cost.v1";
+const DEFAULT_TIMEOUT_COINS_COST = 50;
+
+function normalizeExternalCoinsCount(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function persistExternalCoinsCount(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_COINS_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeExternalHeartsCount(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function persistExternalHeartsCount(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_HEARTS_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeExternalMaxLivesCount(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  if (normalizedRaw.length === 0) {
+    return null;
+  }
+  const numeric = Number(normalizedRaw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function normalizeExternalLivesTimer(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  if (normalizedRaw.length === 0) {
+    return null;
+  }
+  return normalizedRaw;
+}
+
+function persistExternalMaxLivesCount(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_MAX_LIVES_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeExternalSubscriptionStatus(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  const lowered = normalizedRaw.toLowerCase();
+  if (lowered === "true" || lowered === "1" || lowered === "yes") {
+    return true;
+  }
+  if (lowered === "false" || lowered === "0" || lowered === "no") {
+    return false;
+  }
+  return null;
+}
+
+function persistExternalSubscriptionStatus(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY, value ? "1" : "0");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeExternalTimeOutCoinsCost(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  if (normalizedRaw.length === 0) {
+    return null;
+  }
+  const numeric = Number(normalizedRaw);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function persistExternalTimeOutCoinsCost(value) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    window.localStorage.setItem(EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY, String(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadExternalCountFromStorage(storageKey) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (raw === null || raw === undefined) {
+      return null;
+    }
+    const numeric = Number(raw);
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+    return Math.max(0, Math.trunc(numeric));
+  } catch {
+    return null;
+  }
+}
+
+function resolveExternalCoinsCount(gameInstance) {
+  const fromGame = normalizeExternalCoinsCount(gameInstance?.externalCoinsCount);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalCoinsCount(pendingExternalCoinsCount);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_COINS_STORAGE_KEY);
+  return fromStorage ?? 0;
+}
+
+function resolveExternalHeartsCount(gameInstance) {
+  const fromGame = normalizeExternalHeartsCount(gameInstance?.externalHeartsCount);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalHeartsCount(pendingExternalHeartsCount);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_HEARTS_STORAGE_KEY);
+  return fromStorage ?? 0;
+}
+
+function resolveExternalMaxLivesCount(gameInstance) {
+  const fromGame = normalizeExternalMaxLivesCount(gameInstance?.externalMaxLivesCount);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalMaxLivesCount(pendingExternalMaxLivesCount);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_MAX_LIVES_STORAGE_KEY);
+  return fromStorage ?? 0;
+}
+
+function resolveExternalLivesTimer(gameInstance) {
+  const fromGame = normalizeExternalLivesTimer(gameInstance?.externalLivesTimer);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalLivesTimer(pendingExternalLivesTimer);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  return null;
+}
+
+function resolveExternalSubscriptionStatus(gameInstance) {
+  const fromGame = normalizeExternalSubscriptionStatus(gameInstance?.externalSubscriptionStatus);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalSubscriptionStatus(pendingExternalSubscriptionStatus);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+  try {
+    const fromStorage = normalizeExternalSubscriptionStatus(
+      window.localStorage.getItem(EXTERNAL_SUBSCRIPTION_STATUS_STORAGE_KEY)
+    );
+    return fromStorage ?? false;
+  } catch {
+    return false;
+  }
+}
+
+function resolveExternalTimeOutCoinsCost(gameInstance) {
+  const fromGame = normalizeExternalTimeOutCoinsCost(gameInstance?.externalTimeOutCoinsCost);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalTimeOutCoinsCost(pendingExternalTimeOutCoinsCost);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  const fromStorage = loadExternalCountFromStorage(EXTERNAL_TIMEOUT_COINS_COST_STORAGE_KEY);
+  if (fromStorage !== null) {
+    return fromStorage;
+  }
+  return DEFAULT_TIMEOUT_COINS_COST;
+}
+
+function dispatchUnityCloseEvent(gameInstance) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const coinsCount = resolveExternalCoinsCount(gameInstance);
+  const heartsCount = resolveExternalHeartsCount(gameInstance);
+  const closeUrl = `uniwebview://close?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
+  try {
+    window.location.href = closeUrl;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnityCompleteEvent(gameInstance) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const coinsCount = resolveExternalCoinsCount(gameInstance);
+  const heartsCount = resolveExternalHeartsCount(gameInstance);
+  const completeUrl = `uniwebview://complete?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
+  try {
+    window.location.href = completeUrl;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnityRewardEvent() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    window.location.href = "uniwebview://reward";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnitySubscriptionRequestEvent() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    window.location.href = "uniwebview://subscription_request";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (typeof window !== "undefined") {
+  const applyExternalTimeOutCoinsCost = (timeOutCoinsCost) => {
+    pendingExternalTimeOutCoinsCost = timeOutCoinsCost;
+    const normalized = normalizeExternalTimeOutCoinsCost(timeOutCoinsCost);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalTimeOutCoinsCost(normalized);
+  };
+  window.setLevel = (indexOrId) => {
+    pendingExternalLevelSelection = indexOrId;
+    return false;
+  };
+  window.setCoins = (coinsCount) => {
+    pendingExternalCoinsCount = coinsCount;
+    const normalized = normalizeExternalCoinsCount(coinsCount);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalCoinsCount(normalized);
+  };
+  window.setHearts = (heartsCount) => {
+    pendingExternalHeartsCount = heartsCount;
+    const normalized = normalizeExternalHeartsCount(heartsCount);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalHeartsCount(normalized);
+  };
+  window.setMaxLives = (maxLivesCount) => {
+    pendingExternalMaxLivesCount = maxLivesCount;
+    const normalized = normalizeExternalMaxLivesCount(maxLivesCount);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalMaxLivesCount(normalized);
+  };
+  window.setLivesTimer = (livesTimer) => {
+    pendingExternalLivesTimer = livesTimer;
+    return normalizeExternalLivesTimer(livesTimer) !== null;
+  };
+  window.setSubscriptionStatus = (subscriptionStatus) => {
+    pendingExternalSubscriptionStatus = subscriptionStatus;
+    const normalized = normalizeExternalSubscriptionStatus(subscriptionStatus);
+    if (normalized === null) {
+      return false;
+    }
+    return persistExternalSubscriptionStatus(normalized);
+  };
+  window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.rewardResult = () => false;
+}
+
 async function bootstrapGame() {
-  const loadedLevels = await loadLevelDefinitions();
   const fallbackLevels = LEVEL_DEFINITIONS_FALLBACK.length ? LEVEL_DEFINITIONS_FALLBACK : [BUILTIN_FALLBACK_LEVEL];
-  rebuildLevelRegistry(loadedLevels.length ? loadedLevels : fallbackLevels);
+  rebuildLevelRegistry(fallbackLevels);
   loadLevelOverridesFromStorage();
   applyLoadedLevelOverrides();
 
@@ -9659,11 +10800,178 @@ async function bootstrapGame() {
 
   const canvas = document.getElementById("gameCanvas");
   const game = new Game(canvas);
+  game.externalMaxLivesCount = resolveExternalMaxLivesCount(game);
+  game.externalLivesTimer = resolveExternalLivesTimer(game);
+  game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
+
+  const resolveExternalLevelSelection = (value) => {
+    const levels = Array.isArray(game.availableLevels) ? game.availableLevels : [];
+    if (levels.length === 0) {
+      return null;
+    }
+
+    const raw = String(value ?? "").trim();
+    if (raw.length === 0) {
+      return null;
+    }
+
+    if (levels.some((level) => level.id === raw)) {
+      const displayLevelNumber = isPositiveIntegerString(raw) ? Number(raw) : null;
+      return {
+        targetLevelId: raw,
+        displayLevelNumber,
+      };
+    }
+
+    const numeric = Number(raw);
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+    const index = Math.trunc(numeric);
+    if (index < 0) {
+      return null;
+    }
+
+    // Preferred path for Unity: index in available levels (0-based).
+    // For indexes outside the range, loop cyclically through the available levels.
+    const normalizedIndex = index % levels.length;
+    return {
+      targetLevelId: levels[normalizedIndex].id,
+      displayLevelNumber: index > 0 ? index : 1,
+    };
+  };
 
   window.game = game;
+  window.setLevel = (indexOrId) => {
+    pendingExternalLevelSelection = indexOrId;
+    const selection = resolveExternalLevelSelection(indexOrId);
+    if (!selection) {
+      return false;
+    }
+    game.applyLevelConfig(selection.targetLevelId, {
+      restart: true,
+      displayLevelNumber: selection.displayLevelNumber,
+    });
+    game.syncDebugContentSelectors();
+    game.saveDebugSettings();
+    return true;
+  };
+  window.setCoins = (coinsCount) => {
+    pendingExternalCoinsCount = coinsCount;
+    const normalized = normalizeExternalCoinsCount(coinsCount);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalCoinsCount = normalized;
+    game.invalidate(false);
+    return persistExternalCoinsCount(normalized);
+  };
+  window.setHearts = (heartsCount) => {
+    pendingExternalHeartsCount = heartsCount;
+    const normalized = normalizeExternalHeartsCount(heartsCount);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalHeartsCount = normalized;
+    return persistExternalHeartsCount(normalized);
+  };
+  window.setMaxLives = (maxLivesCount) => {
+    pendingExternalMaxLivesCount = maxLivesCount;
+    const normalized = normalizeExternalMaxLivesCount(maxLivesCount);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalMaxLivesCount = normalized;
+    game.invalidate(false);
+    return persistExternalMaxLivesCount(normalized);
+  };
+  window.setLivesTimer = (livesTimer) => {
+    pendingExternalLivesTimer = livesTimer;
+    const normalized = normalizeExternalLivesTimer(livesTimer);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalLivesTimer = normalized;
+    game.invalidate(false);
+    return true;
+  };
+  window.setSubscriptionStatus = (subscriptionStatus) => {
+    pendingExternalSubscriptionStatus = subscriptionStatus;
+    const normalized = normalizeExternalSubscriptionStatus(subscriptionStatus);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalSubscriptionStatus = normalized;
+    game.invalidate(false);
+    return persistExternalSubscriptionStatus(normalized);
+  };
+  const applyExternalTimeOutCoinsCost = (timeOutCoinsCost) => {
+    pendingExternalTimeOutCoinsCost = timeOutCoinsCost;
+    const normalized = normalizeExternalTimeOutCoinsCost(timeOutCoinsCost);
+    if (normalized === null) {
+      return false;
+    }
+    game.externalTimeOutCoinsCost = normalized;
+    game.invalidate(false);
+    return persistExternalTimeOutCoinsCost(normalized);
+  };
+  window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.rewardResult = (result) => {
+    const normalized = String(result ?? "").trim().toLowerCase();
+    if (normalized !== "true") {
+      return false;
+    }
+    return game.continueFromLoseWithOneSlotCore({ spendCoins: false });
+  };
   window.advanceTime = (ms) => game.advanceTime(ms);
   window.render_game_to_text = () => game.renderGameToText();
   window.debug6 = () => game.triggerDebug6();
+  window.debugLose = () => game.triggerDebugLose();
+
+  if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined) {
+    window.setLevel(pendingExternalLevelSelection);
+  }
+  if (pendingExternalCoinsCount !== null && pendingExternalCoinsCount !== undefined) {
+    window.setCoins(pendingExternalCoinsCount);
+  }
+  if (pendingExternalHeartsCount !== null && pendingExternalHeartsCount !== undefined) {
+    window.setHearts(pendingExternalHeartsCount);
+  }
+  if (pendingExternalMaxLivesCount !== null && pendingExternalMaxLivesCount !== undefined) {
+    window.setMaxLives(pendingExternalMaxLivesCount);
+  }
+  if (pendingExternalLivesTimer !== null && pendingExternalLivesTimer !== undefined) {
+    window.setLivesTimer(pendingExternalLivesTimer);
+  }
+  if (pendingExternalSubscriptionStatus !== null && pendingExternalSubscriptionStatus !== undefined) {
+    window.setSubscriptionStatus(pendingExternalSubscriptionStatus);
+  }
+  if (pendingExternalTimeOutCoinsCost !== null && pendingExternalTimeOutCoinsCost !== undefined) {
+    window.setTimeOutCoinsCost(pendingExternalTimeOutCoinsCost);
+  }
+
+  void hydrateLevelDefinitionsInBackground(game);
+}
+
+async function hydrateLevelDefinitionsInBackground(game) {
+  const loadedLevels = await loadLevelDefinitions();
+  if (!loadedLevels.length) {
+    return;
+  }
+
+  rebuildLevelRegistry(loadedLevels);
+  loadLevelOverridesFromStorage();
+  applyLoadedLevelOverrides();
+
+  if (game && typeof game.fillDebugContentSelectors === "function") {
+    game.fillDebugContentSelectors();
+    game.syncDebugContentSelectors();
+  }
+
+  if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined && typeof window.setLevel === "function") {
+    window.setLevel(pendingExternalLevelSelection);
+  }
 }
 
 void bootstrapGame();

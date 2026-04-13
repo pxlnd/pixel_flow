@@ -35,7 +35,7 @@
       "id": "level-2-art",
       "name": "Frame 32.png",
       "sourceFileName": "Frame 32.png",
-      "artScale": 0.9,
+      "artScale": 0.85,
       "offsetY": -34,
       "grid": {
         "cols": 25,
