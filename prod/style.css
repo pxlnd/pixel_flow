@@ -12,10 +12,10 @@ body {
 body {
   display: grid;
   place-items: center;
-  background-color: #a3db14;
-  background-image: url("ui/bg.jpg");
+  background-color: #7fbf54;
+  background-image: url("ui/background/default/background.png");
   background-repeat: repeat;
-  background-size: 500px 500px;
+  background-size: 402px 874px;
   overflow: hidden;
   padding:
     env(safe-area-inset-top, 0)
@@ -291,6 +291,7 @@ body {
 }
 
 #debug6,
+#debugLose,
 #debugReset,
 #debugExport,
 #debugExportLevel,
@@ -312,6 +313,7 @@ body {
 }
 
 #debug6:active,
+#debugLose:active,
 #debugReset:active,
 #debugExport:active,
 #debugExportLevel:active,
@@ -412,6 +414,31 @@ body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 6px;
+}
+
+.debug-bg-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.debug-bg-button {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font: 700 12px/1 Arial, sans-serif;
+  padding: 7px 8px;
+  cursor: pointer;
+}
+
+.debug-bg-button:active {
+  transform: translateY(1px);
+}
+
+.debug-bg-button.is-active {
+  border-color: rgba(197, 255, 165, 0.95);
+  background: rgba(116, 198, 66, 0.42);
 }
 
 .debug-status {
