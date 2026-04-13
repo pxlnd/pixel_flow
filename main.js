@@ -398,6 +398,14 @@ const LAND_DURATION = 0.2;
 const STREAK_DECAY_TIME = 1.45;
 const LOSE_POPUP_ANIM_DURATION = 0.34;
 const LEVEL_START_FADE_DURATION = 0.22;
+const LEVEL_PREVIEW_HOLD_DURATION = 1.0;
+const LEVEL_PREVIEW_DISAPPEAR_DURATION = 1.0;
+const LEVEL_PREVIEW_TOTAL_DURATION =
+  LEVEL_PREVIEW_HOLD_DURATION + LEVEL_PREVIEW_DISAPPEAR_DURATION;
+const LEVEL_PREVIEW_CELL_FADE_SPAN = 0.24;
+const LEVEL_PREVIEW_MAX_ALPHA = 0.3;
+const LEVEL_PREVIEW_CELL_APPEAR_START_SCALE = 0.2;
+const LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE = 0.2;
 const CARD_QUEUE_SPRING_STIFFNESS = 42;
 const CARD_QUEUE_SPRING_DAMPING = 10.5;
 const CARD_QUEUE_SETTLE_EPSILON = 2;
@@ -1442,6 +1450,14 @@ function hslToRgb(h, s, l) {
 function easeOutCubic(t) {
   const u = 1 - clamp(t, 0, 1);
   return 1 - u * u * u;
+}
+
+function easeInOutCubic(t) {
+  const u = clamp(t, 0, 1);
+  if (u < 0.5) {
+    return 4 * u * u * u;
+  }
+  return 1 - ((-2 * u + 2) ** 3) / 2;
 }
 
 function easeOutBack(t) {
@@ -2559,6 +2575,7 @@ class Game {
     this.victoryConfettiSpawnCarry = 0;
     this.victoryCompleteEventPending = false;
     this.levelStartFade = 0;
+    this.levelPreviewTime = 0;
     this.losePopupAppear = 1;
     this.debugPanel = document.getElementById("debugPanel");
     this.debugButton = document.getElementById("debug6");
@@ -4088,10 +4105,11 @@ class Game {
     this.victoryFloatTime = 0;
     this.victoryConfettiSpawnCarry = 0;
     this.victoryCompleteEventPending = false;
-    this.levelStartFade = 1;
+    this.levelStartFade = 0;
+    this.levelPreviewTime = 0;
     this.losePopupAppear = 1;
 
-    this.gameState = "playing";
+    this.gameState = "preview";
     this.remainingBlocks = this.blocks.length;
     this.loseCloseRect = this.getLoseCloseRect();
     this.rebuildBlockFieldLayer();
@@ -6981,6 +6999,14 @@ class Game {
       this.levelStartFade = Math.max(0, this.levelStartFade - dt / LEVEL_START_FADE_DURATION);
     }
 
+    if (this.gameState === "preview") {
+      this.levelPreviewTime = Math.min(LEVEL_PREVIEW_TOTAL_DURATION, this.levelPreviewTime + dt);
+      if (this.levelPreviewTime >= LEVEL_PREVIEW_TOTAL_DURATION) {
+        this.gameState = "playing";
+      }
+      return;
+    }
+
     if (this.gameState === "victory") {
       this.victoryConfettiTime = Math.max(0, this.victoryConfettiTime - dt);
       this.victoryConfettiSpawnCarry += dt * VICTORY_CONFETTI_RATE;
@@ -7237,6 +7263,98 @@ class Game {
         bevelStrength: 0.34,
       });
     }
+  }
+
+  drawLevelPreviewImageOnField(ctx, options = {}) {
+    const clampedAlpha = clamp(Number.isFinite(options.alpha) ? options.alpha : 1, 0, 1);
+    if (clampedAlpha <= 0.001) {
+      return;
+    }
+    const appearProgress = clamp(Number(options.appearProgress) || 0, 0, 1);
+    const disappearProgress = clamp(Number(options.disappearProgress) || 0, 0, 1);
+    const rows = Math.max(1, LAYOUT.fieldRows);
+    const cols = Math.max(1, LAYOUT.fieldCols);
+    const cellFadeSpan = clamp(
+      Number.isFinite(options.cellFadeSpan) ? options.cellFadeSpan : LEVEL_PREVIEW_CELL_FADE_SPAN,
+      0.05,
+      0.95
+    );
+    const startRange = Math.max(0, 1 - cellFadeSpan);
+    const centerCol = (cols - 1) * 0.5;
+    const centerRow = (rows - 1) * 0.5;
+    const maxRadius = Math.max(0.0001, Math.hypot(centerCol, centerRow));
+    const getCellStart = (block) => {
+      const dx = block.col - centerCol;
+      const dy = block.row - centerRow;
+      const radiusNorm = clamp(Math.hypot(dx, dy) / maxRadius, 0, 1);
+      // Radial edge-to-center order: edges start fading first, center last.
+      const order = 1 - radiusNorm;
+      return order * startRange;
+    };
+
+    // Preview must show the full target image, not only already-opened cells.
+    // `blockFieldLayer` stores only alive blocks, which are empty at level start.
+    for (const block of this.blocks) {
+      const start = getCellStart(block);
+      const appearLocal = clamp((appearProgress - start) / cellFadeSpan, 0, 1);
+      const disappearLocal = clamp((disappearProgress - start) / cellFadeSpan, 0, 1);
+      const revealAlpha = easeInOutCubic(appearLocal);
+      const hideAlpha = 1 - easeInOutCubic(disappearLocal);
+      const blockAlpha = clampedAlpha * revealAlpha * hideAlpha;
+      if (blockAlpha <= 0.001) {
+        continue;
+      }
+      const appearScale = lerp(
+        LEVEL_PREVIEW_CELL_APPEAR_START_SCALE,
+        1,
+        easeOutBack(appearLocal)
+      );
+      const disappearScale = lerp(
+        1,
+        LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE,
+        easeOutBack(disappearLocal)
+      );
+      const blockScale = clamp(appearScale * disappearScale, 0.7, 1.14);
+      const centerX = block.x + block.size * 0.5;
+      const centerY = block.y + block.size * 0.5;
+
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.scale(blockScale, blockScale);
+      ctx.translate(-centerX, -centerY);
+      this.drawVolumetricBlock(ctx, block, block.x, block.y, {
+        alpha: LEVEL_PREVIEW_MAX_ALPHA * blockAlpha,
+        shadowOpacity: 0.22,
+        bevelStrength: 0.26,
+        offsetY: 0,
+      });
+      ctx.restore();
+    }
+  }
+
+  drawLevelPreview(ctx) {
+    const appearProgress = 1;
+    const disappearStart = LEVEL_PREVIEW_HOLD_DURATION;
+    const disappearProgress = clamp(
+      (this.levelPreviewTime - disappearStart) / LEVEL_PREVIEW_DISAPPEAR_DURATION,
+      0,
+      1
+    );
+
+    if (this.staticSceneLayer) {
+      ctx.drawImage(this.staticSceneLayer, 0, 0);
+    } else {
+      this.drawBackground(ctx);
+      this.drawWagonLayer(ctx);
+    }
+    this.drawBottomCleanup(ctx);
+    this.drawSlotState(ctx);
+    this.drawLevelPreviewImageOnField(ctx, {
+      alpha: 1,
+      appearProgress,
+      disappearProgress,
+      cellFadeSpan: LEVEL_PREVIEW_CELL_FADE_SPAN,
+    });
   }
 
   drawVolumetricBlock(ctx, block, x, y, options = {}) {
@@ -8684,6 +8802,16 @@ class Game {
       return;
     }
 
+    if (this.gameState === "preview") {
+      this.drawLevelPreview(ctx);
+      this.drawTopTimerPanel(ctx);
+      this.drawTopCoinsPanel(ctx);
+      this.drawBackButton(ctx);
+      ctx.restore();
+      this.needsRender = false;
+      return;
+    }
+
     if (this.gameState === "victory") {
       this.drawVictoryBackground(ctx);
       const fieldCenter = this.getFieldCenter();
@@ -8779,6 +8907,9 @@ class Game {
   }
 
   hasActiveAnimations() {
+    if (this.gameState === "preview") {
+      return true;
+    }
     if (this.gameState === "lose") {
       return this.losePopupAppear < 0.999 || this.levelStartFade > 0.001 || this.hasAnimatingCards();
     }
