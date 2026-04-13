@@ -143,6 +143,78 @@ function escapeForInlineScript(jsCode) {
   return jsCode.replace(/<\/script>/gi, "<\\/script>");
 }
 
+function parseDataUri(value) {
+  if (!/^data:/i.test(value)) {
+    return null;
+  }
+  const commaIndex = value.indexOf(",");
+  if (commaIndex < 0) {
+    return null;
+  }
+  const meta = value.slice("data:".length, commaIndex);
+  const payload = value.slice(commaIndex + 1);
+  return { meta, payload };
+}
+
+function toBase64DataUri(meta, payload) {
+  if (/;base64(?:;|$)/i.test(meta)) {
+    return `data:${meta},${payload}`;
+  }
+  let decodedPayload = payload;
+  try {
+    decodedPayload = decodeURIComponent(payload);
+  } catch {}
+  const base64Payload = Buffer.from(String(decodedPayload), "utf8").toString("base64");
+  return `data:${meta};base64,${base64Payload}`;
+}
+
+function normalizeCssDataUrisToBase64(cssText) {
+  return String(cssText || "").replace(/url\(([^)]+)\)/gi, (full, rawValue) => {
+    const unquoted = String(rawValue || "").trim().replace(/^['"]|['"]$/g, "");
+    if (!/^data:/i.test(unquoted)) {
+      return full;
+    }
+    const parsed = parseDataUri(unquoted);
+    if (!parsed) {
+      return full;
+    }
+    const normalized = toBase64DataUri(parsed.meta, parsed.payload);
+    return `url("${normalized}")`;
+  });
+}
+
+function normalizeQuotedDataUrisToBase64(inputText) {
+  let output = String(inputText || "");
+  const patterns = [
+    { quote: '"', pattern: /"data:([^,"]+),([^"]*)"/gi },
+    { quote: "'", pattern: /'data:([^,']+),([^']*)'/gi },
+  ];
+  for (const { quote, pattern } of patterns) {
+    output = output.replace(pattern, (fullMatch, meta, payload) => (
+      `${quote}${toBase64DataUri(meta, payload)}${quote}`
+    ));
+  }
+  return output;
+}
+
+function countNonBase64QuotedDataUris(inputText) {
+  const source = String(inputText || "");
+  const patterns = [
+    /"data:([^,"]+),([^"]*)"/gi,
+    /'data:([^,']+),([^']*)'/gi,
+  ];
+  let count = 0;
+  for (const pattern of patterns) {
+    source.replace(pattern, (fullMatch, meta) => {
+      if (!/;base64(?:;|$)/i.test(meta)) {
+        count += 1;
+      }
+      return fullMatch;
+    });
+  }
+  return count;
+}
+
 function inlineCssAssetUrls(cssText, assetMap) {
   return String(cssText || "").replace(/url\(([^)]+)\)/gi, (full, rawValue) => {
     const unquoted = String(rawValue || "").trim().replace(/^['"]|['"]$/g, "");
@@ -939,16 +1011,24 @@ async function buildAssetMap(options = {}) {
 
 function createSingleHtml(indexHtml, styleCss, transpiledBundleJs, networkKey, assetMap, soundRuntimeCode = "") {
   let output = injectHeadTags(indexHtml, networkKey);
+  const normalizedStyleCss = normalizeCssDataUrisToBase64(styleCss);
+  const normalizedBundleJs = normalizeQuotedDataUrisToBase64(transpiledBundleJs);
+  const normalizedSoundRuntimeCode = normalizeQuotedDataUrisToBase64(soundRuntimeCode);
   const embeddedFontsCss = buildEmbeddedFontCss(assetMap);
   output = output.replace(/<link rel="stylesheet" href="\/?style\.css">/, () => (
-    `<style>\n${embeddedFontsCss}${embeddedFontsCss ? "\n\n" : ""}${styleCss}\n\n/* standalone-build override: remove all debug UI */\n#debugPanel,\n#debugToggleFab,\n.debug-level-nav {\n  display: none !important;\n  visibility: hidden !important;\n  pointer-events: none !important;\n}\n</style>`
+    `<style>\n${embeddedFontsCss}${embeddedFontsCss ? "\n\n" : ""}${normalizedStyleCss}\n\n/* standalone-build override: remove all debug UI */\n#debugPanel,\n#debugToggleFab,\n.debug-level-nav {\n  display: none !important;\n  visibility: hidden !important;\n  pointer-events: none !important;\n}\n</style>`
   ));
   output = output.replace(/<script\b[^>]*src="[^"]+"[^>]*><\/script>\s*/g, "");
-  const mergedCode = [soundRuntimeCode, buildNetworkAdapter(networkKey), transpiledBundleJs]
+  const mergedCode = [normalizedSoundRuntimeCode, buildNetworkAdapter(networkKey), normalizedBundleJs]
     .filter((value) => String(value || "").trim().length > 0)
     .join("\n;\n");
   const scriptsBundle = `<script>\n${escapeForInlineScript(mergedCode)}\n</script>`;
   output = output.replace("</body>", () => `${scriptsBundle}\n</body>`);
+  output = normalizeQuotedDataUrisToBase64(output);
+  const nonBase64DataUriCount = countNonBase64QuotedDataUris(output);
+  if (nonBase64DataUriCount > 0) {
+    throw new Error(`Found ${nonBase64DataUriCount} non-base64 quoted data URI assets after single-html build.`);
+  }
   return output;
 }
 
