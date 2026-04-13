@@ -2561,7 +2561,6 @@ class Game {
     this.levelStartFade = 0;
     this.losePopupAppear = 1;
     this.debugPanel = document.getElementById("debugPanel");
-    this.debugToggleFab = document.getElementById("debugToggleFab");
     this.debugButton = document.getElementById("debug6");
     this.debugLoseButton = document.getElementById("debugLose");
     this.debugResetButton = document.getElementById("debugReset");
@@ -10171,9 +10170,6 @@ class Game {
     if (this.debugPanel) {
       this.debugPanel.classList.toggle("is-visible", visible);
     }
-    if (this.debugToggleFab) {
-      this.debugToggleFab.textContent = visible ? "CLOSE" : "DBG";
-    }
   }
 
   toggleDebugPanel() {
@@ -10292,12 +10288,6 @@ class Game {
       }
       button.addEventListener("click", (event) => {
         this.applyBackgroundConfig(backgroundId);
-        event.preventDefault();
-      });
-    }
-    if (this.debugToggleFab) {
-      this.debugToggleFab.addEventListener("click", (event) => {
-        this.toggleDebugPanel();
         event.preventDefault();
       });
     }

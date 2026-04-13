@@ -106,23 +106,6 @@ body {
   letter-spacing: 0.02em;
 }
 
-.debug-fab {
-  position: absolute;
-  right: calc(env(safe-area-inset-right, 0) + 10px);
-  top: calc(env(safe-area-inset-top, 0) + 10px);
-  z-index: 3;
-  display: none;
-  min-width: 56px;
-  height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  border-radius: 999px;
-  background: rgba(10, 23, 38, 0.82);
-  color: #ffffff;
-  font: 800 12px/1 Arial, sans-serif;
-  letter-spacing: 0.06em;
-  backdrop-filter: blur(4px);
-}
-
 .debug-panel {
   position: absolute;
   top: 16px;
@@ -457,12 +440,6 @@ body {
 }
 
 @media (max-width: 920px) {
-  .debug-fab {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
   .debug-panel {
     position: fixed;
     top: auto;
@@ -483,15 +460,5 @@ body {
   .debug-panel.is-visible {
     bottom: 10px;
     transform: none;
-  }
-}
-
-@media (max-width: 920px) and (orientation: portrait) {
-  .debug-fab {
-    border-color: transparent;
-    background: transparent;
-    color: transparent;
-    backdrop-filter: none;
-    box-shadow: none;
   }
 }
