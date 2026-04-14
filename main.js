@@ -2614,6 +2614,9 @@ class Game {
     this.victoryCompleteEventPending = false;
     this.levelStartFade = 0;
     this.levelPreviewTime = 0;
+    this.previewEnabledBySetLevel = false;
+    this.previewEnableFallbackTimer = null;
+    this.previewEnableFallbackToken = 0;
     this.losePopupAppear = 1;
     this.debugPanel = document.getElementById("debugPanel");
     this.debugButton = document.getElementById("debug6");
@@ -4147,7 +4150,7 @@ class Game {
     this.levelPreviewTime = 0;
     this.losePopupAppear = 1;
 
-    this.gameState = "preview";
+    this.gameState = this.previewEnabledBySetLevel ? "preview" : "loading";
     this.remainingBlocks = this.blocks.length;
     this.loseCloseRect = this.getLoseCloseRect();
     this.rebuildBlockFieldLayer();
@@ -4642,6 +4645,32 @@ class Game {
     const { restart = true } = options;
     this.applyThemeConfig(themeId, { restart: false });
     this.applyLevelConfig(levelId, { restart });
+    this.schedulePreviewEnableFallbackAfterApplyConfig();
+  }
+
+  schedulePreviewEnableFallbackAfterApplyConfig() {
+    this.previewEnableFallbackToken += 1;
+    const token = this.previewEnableFallbackToken;
+    if (this.previewEnableFallbackTimer !== null) {
+      clearTimeout(this.previewEnableFallbackTimer);
+      this.previewEnableFallbackTimer = null;
+    }
+    if (this.previewEnabledBySetLevel) {
+      return;
+    }
+    this.previewEnableFallbackTimer = setTimeout(() => {
+      if (this.previewEnableFallbackToken !== token) {
+        return;
+      }
+      this.previewEnableFallbackTimer = null;
+      if (this.previewEnabledBySetLevel) {
+        return;
+      }
+      this.previewEnabledBySetLevel = true;
+      if (this.gameState === "loading") {
+        this.restart();
+      }
+    }, 500);
   }
 
   getDebugSettingsState() {
@@ -7152,7 +7181,7 @@ class Game {
   }
 
   drawLoading(ctx) {
-    ctx.fillStyle = "#214113";
+    ctx.fillStyle = "#cde9fd";
     ctx.fillRect(0, 0, this.width, this.height);
     ctx.fillStyle = COLORS.white;
     ctx.font = "700 42px Arial";
@@ -11021,6 +11050,12 @@ async function bootstrapGame() {
     if (!selection) {
       return false;
     }
+    game.previewEnableFallbackToken += 1;
+    if (game.previewEnableFallbackTimer !== null) {
+      clearTimeout(game.previewEnableFallbackTimer);
+      game.previewEnableFallbackTimer = null;
+    }
+    game.previewEnabledBySetLevel = true;
     game.applyLevelConfig(selection.targetLevelId, {
       restart: true,
       displayLevelNumber: selection.displayLevelNumber,
