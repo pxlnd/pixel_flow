@@ -5394,6 +5394,31 @@ class Game {
     return null;
   }
 
+  getTutorialBirdStepNumber() {
+    if (!this.tutorial?.active) {
+      return null;
+    }
+    const step = this.tutorial.step;
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard) {
+      return 1;
+    }
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
+      return 2;
+    }
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked) {
+      return 3;
+    }
+    return null;
+  }
+
+  trackTutorialBirdTap() {
+    const stepNumber = this.getTutorialBirdStepNumber();
+    if (!Number.isFinite(stepNumber)) {
+      return false;
+    }
+    return dispatchUnityTutorialBirdTrackEvent(stepNumber);
+  }
+
   isPointOnTutorialTarget(target, x, y) {
     if (!target) {
       return false;
@@ -9079,6 +9104,7 @@ class Game {
         }
         return;
       }
+      this.trackTutorialBirdTap();
       if (target.type === "card") {
         const didSpawn = this.spawnUnit(target.card.index);
         this.playSound(didSpawn ? "tap" : "cant_select");
@@ -9097,8 +9123,10 @@ class Game {
           this.playSound("cant_select");
           return;
         }
+        dispatchUnityLosePopupTrackEvent("coins_button_pressed");
         this.continueFromLoseWithOneSlot();
       } else if (isInsideRect(x, y, this.loseFreeRect)) {
+        dispatchUnityLosePopupTrackEvent("reward_button_pressed");
         if (!this.continueFromLoseWithAd()) {
           this.playSound("cant_select");
         }
@@ -10906,6 +10934,38 @@ function dispatchUnityTapTrackEvent() {
   }
   try {
     window.location.href = "uniwebview://track?event=tap&event_action=screen";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnityTutorialBirdTrackEvent(stepNumber) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const normalizedStep = Math.max(1, Math.trunc(Number(stepNumber) || 0));
+  if (!Number.isFinite(normalizedStep)) {
+    return false;
+  }
+  try {
+    window.location.href = `uniwebview://track?event=tutorial_bird&event_action=${encodeURIComponent(String(normalizedStep))}`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnityLosePopupTrackEvent(eventAction) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const normalizedAction = String(eventAction || "").trim();
+  if (!normalizedAction) {
+    return false;
+  }
+  try {
+    window.location.href = `uniwebview://track?event=lose_popup&event_action=${encodeURIComponent(normalizedAction)}`;
     return true;
   } catch {
     return false;
