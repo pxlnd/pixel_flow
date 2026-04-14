@@ -1585,6 +1585,7 @@ class Block {
       LAYOUT.fieldRows - 1 - row
     );
     this.alive = false;
+    this.spawned = false;
     this.spiralIndex = Number.MAX_SAFE_INTEGER;
     this.spiralOrder = Number.MAX_SAFE_INTEGER;
     this.hitFlash = 0;
@@ -1700,8 +1701,6 @@ class Unit {
     this.parkBounce = 0;
     this.shotBounceTime = SHOT_BOUNCE_DURATION;
     this.renderRotation = null;
-    this.currentTrackRegion = null;
-    this.regionFrontierLock = null;
     this.alive = true;
   }
 
@@ -1737,8 +1736,6 @@ class Unit {
         this.state = "moving";
         this.position = this.conveyor.pointAtDistance(this.distanceOnTrack);
         this.prevPosition = { ...this.position };
-        this.currentTrackRegion = null;
-        this.regionFrontierLock = null;
         this.renderRotation = game.getTrackSideFacingAngle(this.position);
         game.normalizeShooterQueues(game.cards);
       }
@@ -1848,14 +1845,7 @@ class Unit {
         if (!shootDirection) {
           continue;
         }
-        const sampleRegion = game.getTrackRegionForPoint(samplePoint);
-        if (sampleRegion !== this.currentTrackRegion) {
-          this.currentTrackRegion = sampleRegion;
-          this.regionFrontierLock = game.getTrackRegionFrontierLock(sampleRegion);
-        }
-        const target = game.findTargetOnLine(samplePoint, this.color, shootDirection, {
-          frontierLock: this.regionFrontierLock,
-        });
+        const target = game.findTargetOnLine(samplePoint, this.color, shootDirection);
         if (!target) {
           continue;
         }
@@ -4118,6 +4108,7 @@ class Game {
       .slice()
       .sort((a, b) => (a.spiralIndex - b.spiralIndex) || (a.spiralOrder - b.spiralOrder));
     this.blockByCell = new Map(this.blocks.map((block) => [`${block.col},${block.row}`, block]));
+    this.seedInitialGhostTargets();
     this.invalidateTargetingCaches();
     this.units = [];
     this.projectiles = [];
@@ -5945,7 +5936,7 @@ class Game {
 
   isPathBlockedByPlacedBlocks(sourcePoint, direction, targetForwardDistance, lineHalfWidth, ignoreBlockId = null) {
     for (const block of this.blocks) {
-      if (!block.alive) {
+      if (!block.alive && !block.spawned) {
         continue;
       }
       if (ignoreBlockId !== null && block.id === ignoreBlockId) {
@@ -5963,19 +5954,15 @@ class Game {
   }
 
   getNextSpiralTarget() {
-    const targets = this.getNextSpiralTargets();
+    const targets = this.getSpawnedGhostTargets();
     if (targets.length > 0) {
       return targets[0];
     }
     return null;
   }
 
-  getNextSpiralTargets() {
-    if (this.nextSpiralTargetsCacheVersion === this.targetingCacheVersion) {
-      return this.nextSpiralTargetsCache;
-    }
+  getInitialSpawnSeedTargets() {
     let minPendingSpiralIndex = Number.POSITIVE_INFINITY;
-
     for (const block of this.blocksBySpiral) {
       if (block.alive) {
         continue;
@@ -5983,24 +5970,21 @@ class Game {
       minPendingSpiralIndex = Math.min(minPendingSpiralIndex, block.spiralIndex);
     }
     if (!Number.isFinite(minPendingSpiralIndex)) {
-      this.nextSpiralTargetsCache = [];
-      this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
-      return this.nextSpiralTargetsCache;
+      return [];
     }
 
     const targets = [];
+    const neighbors = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ];
     for (const block of this.blocksBySpiral) {
       if (block.alive || block.spiralIndex !== minPendingSpiralIndex) {
         continue;
       }
-      // Never allow building an outer-side block while a direct inner neighbor is still pending.
       let hasPendingInnerNeighbor = false;
-      const neighbors = [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-      ];
       for (const [dx, dy] of neighbors) {
         const neighbor = this.blockByCell.get(`${block.col + dx},${block.row + dy}`);
         if (!neighbor) {
@@ -6011,81 +5995,182 @@ class Game {
           break;
         }
       }
-      if (hasPendingInnerNeighbor) {
+      if (!hasPendingInnerNeighbor) {
+        targets.push(block);
+      }
+    }
+
+    if (targets.length === 0) {
+      for (const block of this.blocksBySpiral) {
+        if (!block.alive && block.spiralIndex === minPendingSpiralIndex) {
+          targets.push(block);
+        }
+      }
+    }
+    targets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
+    return targets;
+  }
+
+  seedInitialGhostTargets() {
+    for (const block of this.blocksBySpiral) {
+      block.spawned = false;
+    }
+    const targets = this.getInitialSpawnSeedTargets();
+    for (const block of targets) {
+      block.spawned = true;
+    }
+  }
+
+  getSpawnedGhostTargets() {
+    if (this.nextSpiralTargetsCacheVersion === this.targetingCacheVersion) {
+      return this.nextSpiralTargetsCache;
+    }
+    const targets = [];
+    for (const block of this.blocksBySpiral) {
+      if (block.alive || !block.spawned) {
         continue;
       }
       targets.push(block);
     }
-
-    if (targets.length > 0) {
-      targets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-      this.nextSpiralTargetsCache = targets;
-      this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
-      return this.nextSpiralTargetsCache;
-    }
-
-    // Safety fallback: if strict filter removed everything, keep inner ring available.
-    const fallbackTargets = [];
-    for (const block of this.blocksBySpiral) {
-      if (!block.alive && block.spiralIndex === minPendingSpiralIndex) {
-        fallbackTargets.push(block);
-      }
-    }
-    fallbackTargets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-    this.nextSpiralTargetsCache = fallbackTargets;
+    this.nextSpiralTargetsCache = targets;
     this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
     return this.nextSpiralTargetsCache;
   }
 
+  getNextSpiralTargets() {
+    return this.getSpawnedGhostTargets();
+  }
+
   getContourGhostTargets() {
-    if (this.contourGhostTargetsCacheVersion === this.targetingCacheVersion) {
-      return this.contourGhostTargetsCache;
-    }
-    if (this.remainingBlocks <= 0) {
-      this.contourGhostTargetsCache = [];
-      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
-      return this.contourGhostTargetsCache;
-    }
-    const hasFilledBlocks = this.remainingBlocks < this.blocks.length;
-    if (!hasFilledBlocks) {
-      const targets = this.getNextSpiralTargets();
-      this.contourGhostTargetsCache = targets;
-      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
-      return this.contourGhostTargetsCache;
-    }
+    return this.getSpawnedGhostTargets();
+  }
 
-    const contourTargets = [];
-    const neighbors = [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ];
+  isCellOccupiedForLOS(col, row, simulatedBlockedCell = null, ignoreBlockId = null) {
+    if (simulatedBlockedCell && simulatedBlockedCell.col === col && simulatedBlockedCell.row === row) {
+      return true;
+    }
+    const block = this.blockByCell.get(`${col},${row}`);
+    if (!block) {
+      return false;
+    }
+    if (ignoreBlockId !== null && block.id === ignoreBlockId) {
+      return false;
+    }
+    return block.alive || block.spawned;
+  }
 
+  hasClearPathToPerimeterSide(block, side, simulatedBlockedCell = null, ignoreBlockId = null) {
+    if (!block || block.alive) {
+      return false;
+    }
+    if (side === "left") {
+      for (let col = block.col - 1; col >= 0; col -= 1) {
+        if (this.isCellOccupiedForLOS(col, block.row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (side === "right") {
+      for (let col = block.col + 1; col < LAYOUT.fieldCols; col += 1) {
+        if (this.isCellOccupiedForLOS(col, block.row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (side === "top") {
+      for (let row = block.row - 1; row >= 0; row -= 1) {
+        if (this.isCellOccupiedForLOS(block.col, row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (side === "bottom") {
+      for (let row = block.row + 1; row < LAYOUT.fieldRows; row += 1) {
+        if (this.isCellOccupiedForLOS(block.col, row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  hasAnyClearPathToPerimeter(block, simulatedBlockedCell = null, ignoreBlockId = null) {
+    if (!block || block.alive) {
+      return false;
+    }
+    return (
+      this.hasClearPathToPerimeterSide(block, "left", simulatedBlockedCell, ignoreBlockId)
+      || this.hasClearPathToPerimeterSide(block, "right", simulatedBlockedCell, ignoreBlockId)
+      || this.hasClearPathToPerimeterSide(block, "top", simulatedBlockedCell, ignoreBlockId)
+      || this.hasClearPathToPerimeterSide(block, "bottom", simulatedBlockedCell, ignoreBlockId)
+    );
+  }
+
+  canSpawnGhostCandidate(candidate) {
+    if (!candidate || candidate.alive || candidate.spawned) {
+      return false;
+    }
+    const simulatedBlockedCell = { col: candidate.col, row: candidate.row };
     for (const block of this.blocksBySpiral) {
-      if (block.alive) {
+      if (block.alive || !block.spawned || block.id === candidate.id) {
         continue;
       }
-      for (const [dx, dy] of neighbors) {
-        const neighbor = this.blockByCell.get(`${block.col + dx},${block.row + dy}`);
-        if (!neighbor || !neighbor.alive) {
-          continue;
-        }
-        contourTargets.push(block);
-        break;
+      const wasClear = this.hasAnyClearPathToPerimeter(block);
+      if (!wasClear) {
+        continue;
+      }
+      const isClear = this.hasAnyClearPathToPerimeter(block, simulatedBlockedCell);
+      if (!isClear) {
+        return false;
       }
     }
+    return true;
+  }
 
-    if (contourTargets.length === 0) {
-      const targets = this.getNextSpiralTargets();
-      this.contourGhostTargetsCache = targets;
-      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
-      return this.contourGhostTargetsCache;
+  getAdjacentSpawnCandidateForSide(sourceBlock, side) {
+    if (!sourceBlock) {
+      return null;
     }
-    contourTargets.sort((a, b) => (a.spiralIndex - b.spiralIndex) || (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-    this.contourGhostTargetsCache = contourTargets;
-    this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
-    return this.contourGhostTargetsCache;
+    const sideOffsets = {
+      right: [1, 0],
+      left: [-1, 0],
+      bottom: [0, 1],
+      top: [0, -1],
+    };
+    const offset = sideOffsets[side];
+    if (!offset) {
+      return null;
+    }
+    const [dx, dy] = offset;
+    const candidate = this.blockByCell.get(`${sourceBlock.col + dx},${sourceBlock.row + dy}`);
+    if (!candidate || candidate.alive || candidate.spawned) {
+      return null;
+    }
+    if (!this.hasClearPathToPerimeterSide(candidate, side)) {
+      return null;
+    }
+    return candidate;
+  }
+
+  spawnGhostsAfterFill(sourceBlock) {
+    if (!sourceBlock) {
+      return;
+    }
+    const sideOrder = ["right", "left", "bottom", "top"];
+    for (const side of sideOrder) {
+      const candidate = this.getAdjacentSpawnCandidateForSide(sourceBlock, side);
+      if (!candidate) {
+        continue;
+      }
+      if (!this.canSpawnGhostCandidate(candidate)) {
+        continue;
+      }
+      candidate.spawned = true;
+    }
   }
 
   getSpiralBuildPriority(target, forwardDistance) {
@@ -6558,9 +6643,6 @@ class Game {
     if (colorTargets.length === 0) {
       return false;
     }
-    if (!colorTargets.some((target) => this.getAllowedReachableProbesForTarget(target).length > 0)) {
-      return false;
-    }
     return this.canColorShootNextSpiralTargetFromTrack(color);
   }
 
@@ -6594,11 +6676,9 @@ class Game {
     return false;
   }
 
-  findTargetOnLine(sourcePoint, color, direction, options = {}) {
+  findTargetOnLine(sourcePoint, color, direction) {
     const lineHalfWidth = this.getShotLineHalfWidth();
-    const sourceRegion = this.getTrackRegionForPoint(sourcePoint);
-    const activeTargets = this.getNextSpiralTargets();
-    const frontierLock = options?.frontierLock || null;
+    const activeTargets = this.getSpawnedGhostTargets();
     let bestTarget = null;
     let bestPriority = null;
 
@@ -6606,21 +6686,6 @@ class Game {
       if (target.color !== color) {
         continue;
       }
-      const targetRegionTags = this.getTargetRegionTags(target, activeTargets);
-      if (!this.doesTrackRegionMatchTarget(sourceRegion, targetRegionTags)) {
-        continue;
-      }
-      if (!this.doesTargetMatchTrackRegionFrontierLock(target, frontierLock)) {
-        continue;
-      }
-      if (!frontierLock && !this.isTargetOnTrackRegionFrontier(target, sourceRegion, activeTargets)) {
-        continue;
-      }
-      const allowedProbes = this.getAllowedReachableProbesForTarget(target);
-      if (!allowedProbes.some((probe) => probe.direction.side === direction.side)) {
-        continue;
-      }
-
       const hit = this.getLineHitForBlock(sourcePoint, direction, target, lineHalfWidth);
       if (!hit) {
         continue;
@@ -6673,14 +6738,19 @@ class Game {
       return;
     }
 
-    const activeTargets = this.getNextSpiralTargets();
+    const activeTargets = this.getSpawnedGhostTargets();
     if (!activeTargets.some((target) => target.id === block.id)) {
+      return;
+    }
+    if (block.color !== color) {
       return;
     }
 
     block.alive = true;
+    block.spawned = false;
     block.hitFlash = 1;
     this.remainingBlocks -= 1;
+    this.spawnGhostsAfterFill(block);
     this.invalidateTargetingCaches();
     this.markBlockFieldLayerDirty();
 
@@ -6992,6 +7062,7 @@ class Game {
 
     for (const block of this.blocks) {
       block.alive = true;
+      block.spawned = false;
       block.hitFlash = 0;
     }
     this.invalidateTargetingCaches();
