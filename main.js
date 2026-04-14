@@ -6150,7 +6150,8 @@ class Game {
     if (!candidate || candidate.alive || candidate.spawned) {
       return null;
     }
-    if (!this.hasClearPathToPerimeterSide(candidate, side)) {
+    const hasPreferredSidePath = this.hasClearPathToPerimeterSide(candidate, side);
+    if (!hasPreferredSidePath && !this.hasAnyClearPathToPerimeter(candidate)) {
       return null;
     }
     return candidate;
