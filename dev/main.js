@@ -412,6 +412,8 @@ const CARD_QUEUE_SETTLE_EPSILON = 2;
 const CARD_QUEUE_BOUNCE_SCALE = 0.09;
 const CARD_QUEUE_SCALE_STIFFNESS = 30;
 const CARD_QUEUE_SCALE_DAMPING = 9;
+const CARD_BLOCKED_NUDGE_DURATION = 0.28;
+const CARD_BLOCKED_NUDGE_OFFSET_Y = 64;
 const MIN_QUEUE_CARDS = 2;
 const MAX_QUEUE_CARDS = 24;
 const BACK_BUTTON_UI = {
@@ -2168,6 +2170,7 @@ class CardManager {
       queueVy: 0,
       queueScale: 1,
       queueScaleV: 0,
+      blockedNudgeStartTime: -Infinity,
     }));
     const colorCounts = this.distributeColors(cards, blocks);
     const styleIndexByColor = {};
@@ -2263,6 +2266,7 @@ class CardManager {
       card.queueVy = Number.isFinite(card.queueVy) ? card.queueVy : 0;
       card.queueScale = Number.isFinite(card.queueScale) ? card.queueScale : 1;
       card.queueScaleV = Number.isFinite(card.queueScaleV) ? card.queueScaleV : 0;
+      card.blockedNudgeStartTime = Number.isFinite(card.blockedNudgeStartTime) ? card.blockedNudgeStartTime : -Infinity;
 
       const dx = card.targetX - card.x;
       const dy = card.targetY - card.y;
@@ -2308,13 +2312,15 @@ class CardManager {
   }
 
   hasAnimatingCards() {
+    const now = performance.now();
     return this.cards.some((card) => (
       Math.abs((card.targetX ?? card.x ?? 0) - (card.x ?? 0)) > CARD_QUEUE_SETTLE_EPSILON ||
       Math.abs((card.targetY ?? card.y ?? 0) - (card.y ?? 0)) > CARD_QUEUE_SETTLE_EPSILON ||
       Math.abs(card.queueVx || 0) > CARD_QUEUE_SETTLE_EPSILON * 4 ||
       Math.abs(card.queueVy || 0) > CARD_QUEUE_SETTLE_EPSILON * 4 ||
       Math.abs((card.queueScale ?? 1) - 1) > 0.01 ||
-      Math.abs(card.queueScaleV || 0) > 0.05
+      Math.abs(card.queueScaleV || 0) > 0.05 ||
+      Math.abs(this.getBlockedTapNudgeOffsetY(card, now)) > 0.01
     ));
   }
 
@@ -2331,15 +2337,17 @@ class CardManager {
   }
 
   getCardPigCenter(card) {
+    const blockedNudgeOffsetY = this.getBlockedTapNudgeOffsetY(card);
     return {
       x: card.x + card.w / 2,
-      y: card.y + card.h / 2,
+      y: card.y + card.h / 2 + blockedNudgeOffsetY,
     };
   }
 
   getCardBadgeRect(card) {
     const center = this.getCardPigCenter(card);
-    const badgeY = card.y + card.h - 16;
+    const blockedNudgeOffsetY = this.getBlockedTapNudgeOffsetY(card);
+    const badgeY = card.y + blockedNudgeOffsetY + card.h - 16;
     return {
       x: center.x - 38,
       y: badgeY - 13,
@@ -2350,18 +2358,48 @@ class CardManager {
 
   isPointOnCard(card, x, y, options = {}) {
     const visualLiftY = Number.isFinite(options.visualLiftY) ? options.visualLiftY : 0;
+    const blockedNudgeOffsetY = this.getBlockedTapNudgeOffsetY(card);
     const center = this.getCardPigCenter(card);
     const visualCenterY = center.y - visualLiftY;
     const onPig = Math.hypot(x - center.x, y - visualCenterY) <= SHOOTER_HIT_RADIUS;
     const onCardRect =
       x >= card.x - CARD_HITBOX_PADDING_X &&
       x <= card.x + card.w + CARD_HITBOX_PADDING_X &&
-      y >= card.y - visualLiftY - CARD_HITBOX_PADDING_TOP &&
-      y <= card.y - visualLiftY + card.h + CARD_HITBOX_PADDING_BOTTOM;
+      y >= card.y + blockedNudgeOffsetY - visualLiftY - CARD_HITBOX_PADDING_TOP &&
+      y <= card.y + blockedNudgeOffsetY - visualLiftY + card.h + CARD_HITBOX_PADDING_BOTTOM;
     if (card.row === 0) {
       return onCardRect;
     }
     return onPig || onCardRect;
+  }
+
+  isCardBlockedByFront(card) {
+    if (!card || card.used || !Number.isFinite(card.row) || card.row <= 0) {
+      return false;
+    }
+    const front = this.getActiveFrontCardInLane(card.lane);
+    return !!front && front.index !== card.index;
+  }
+
+  triggerBlockedTapNudge(card) {
+    if (!this.isCardBlockedByFront(card)) {
+      return false;
+    }
+    card.blockedNudgeStartTime = performance.now();
+    return true;
+  }
+
+  getBlockedTapNudgeOffsetY(card, now = performance.now()) {
+    if (!card || !Number.isFinite(card.blockedNudgeStartTime)) {
+      return 0;
+    }
+    const elapsed = (now - card.blockedNudgeStartTime) / 1000;
+    if (elapsed <= 0 || elapsed >= CARD_BLOCKED_NUDGE_DURATION) {
+      return 0;
+    }
+    const t = clamp(elapsed / CARD_BLOCKED_NUDGE_DURATION, 0, 1);
+    const pulse = easeOutCubic(Math.sin(Math.PI * t));
+    return -CARD_BLOCKED_NUDGE_OFFSET_Y * pulse;
   }
 
   findTapTarget(x, y, options = {}) {
@@ -5186,6 +5224,17 @@ class Game {
     return this.cardManager.getCardPigCenter(card);
   }
 
+  triggerBlockedQueueTapFeedback(card) {
+    if (!this.cardManager || !card) {
+      return false;
+    }
+    const triggered = this.cardManager.triggerBlockedTapNudge(card);
+    if (triggered) {
+      this.invalidate(true);
+    }
+    return triggered;
+  }
+
   createTutorialState() {
     return {
       active: false,
@@ -7819,8 +7868,9 @@ class Game {
   }
 
   drawFrontQueueCard(ctx, card, queueScale = 1) {
-    const centerX = card.x + card.w * 0.5;
-    const centerY = card.y + card.h * 0.5 - this.getQueueVisualLiftY();
+    const center = this.getCardPigCenter(card);
+    const centerX = center.x;
+    const centerY = center.y - this.getQueueVisualLiftY();
     const scale = Math.max(0.1, queueScale);
     const bodyW = card.w * 0.72 * scale;
     const bodyH = card.h * 0.52 * scale;
@@ -9024,6 +9074,7 @@ class Game {
           visualLiftY: this.getQueueVisualLiftY(),
         });
         if (anyCard) {
+          this.triggerBlockedQueueTapFeedback(anyCard);
           this.playSound("cant_select");
         }
         return;
@@ -9078,6 +9129,7 @@ class Game {
       visualLiftY: this.getQueueVisualLiftY(),
     });
     if (anyCard) {
+      this.triggerBlockedQueueTapFeedback(anyCard);
       this.playSound("cant_select");
     }
   }
