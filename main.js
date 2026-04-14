@@ -10366,6 +10366,10 @@ class Game {
         this.soundManager.unlock();
       }
     };
+    const trackScreenTap = () => {
+      dispatchUnityTapTrackEvent();
+    };
+    window.addEventListener("pointerdown", trackScreenTap, { passive: true, capture: true });
     window.addEventListener("pointerdown", unlockAudio, { passive: true, once: true });
     window.addEventListener("touchstart", unlockAudio, { passive: true, once: true });
     window.addEventListener("mousedown", unlockAudio, { passive: true, once: true });
@@ -10890,6 +10894,18 @@ function dispatchUnityRewardEvent() {
   }
   try {
     window.location.href = "uniwebview://reward";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnityTapTrackEvent() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    window.location.href = "uniwebview://track?event=tap&event_action=screen";
     return true;
   } catch {
     return false;
