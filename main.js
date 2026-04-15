@@ -11428,6 +11428,8 @@ async function bootstrapGame() {
 
   const canvas = document.getElementById("gameCanvas");
   const game = new Game(canvas);
+  game.levelDefinitionsHydrationPending = true;
+  game.externalLevelSelectionDeferred = false;
   game.externalMaxLivesCount = resolveExternalMaxLivesCount(game);
   game.externalLivesTimer = resolveExternalLivesTimer(game);
   game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
@@ -11443,6 +11445,19 @@ async function bootstrapGame() {
       return null;
     }
 
+    const numeric = Number(raw);
+    const index = Number.isFinite(numeric) ? Math.trunc(numeric) : null;
+    const shouldDeferUntilHydrated =
+      game.levelDefinitionsHydrationPending === true &&
+      levels.length <= 1 &&
+      (
+        !Number.isFinite(numeric)
+        || (Number.isFinite(index) && index >= 1)
+      );
+    if (shouldDeferUntilHydrated) {
+      return { deferUntilHydration: true };
+    }
+
     if (levels.some((level) => level.id === raw)) {
       const displayLevelNumber = isPositiveIntegerString(raw) ? Number(raw) : null;
       return {
@@ -11451,11 +11466,9 @@ async function bootstrapGame() {
       };
     }
 
-    const numeric = Number(raw);
     if (!Number.isFinite(numeric)) {
       return null;
     }
-    const index = Math.trunc(numeric);
     if (index < 0) {
       return null;
     }
@@ -11474,8 +11487,13 @@ async function bootstrapGame() {
     pendingExternalLevelSelection = indexOrId;
     const selection = resolveExternalLevelSelection(indexOrId);
     if (!selection) {
+      game.externalLevelSelectionDeferred = false;
       dispatchUnityLevelLoadedTrackEvent("failure");
       return false;
+    }
+    if (selection.deferUntilHydration) {
+      game.externalLevelSelectionDeferred = true;
+      return true;
     }
     try {
       game.previewEnableFallbackToken += 1;
@@ -11488,11 +11506,13 @@ async function bootstrapGame() {
         restart: true,
         displayLevelNumber: selection.displayLevelNumber,
       });
+      game.externalLevelSelectionDeferred = false;
       game.syncDebugContentSelectors();
       game.saveDebugSettings();
       dispatchUnityLevelLoadedTrackEvent("success");
       return true;
     } catch {
+      game.externalLevelSelectionDeferred = false;
       dispatchUnityLevelLoadedTrackEvent("failure");
       return false;
     }
@@ -11596,21 +11616,30 @@ async function bootstrapGame() {
 }
 
 async function hydrateLevelDefinitionsInBackground(game) {
-  const loadedLevels = await loadLevelDefinitions();
-  if (!loadedLevels.length) {
-    return;
+  let loadedLevels = [];
+  try {
+    loadedLevels = await loadLevelDefinitions();
+    if (!loadedLevels.length) {
+      return;
+    }
+
+    rebuildLevelRegistry(loadedLevels);
+    loadLevelOverridesFromStorage();
+    applyLoadedLevelOverrides();
+
+    if (game && typeof game.fillDebugContentSelectors === "function") {
+      game.fillDebugContentSelectors();
+      game.syncDebugContentSelectors();
+    }
+  } finally {
+    if (game) {
+      game.levelDefinitionsHydrationPending = false;
+    }
   }
 
-  rebuildLevelRegistry(loadedLevels);
-  loadLevelOverridesFromStorage();
-  applyLoadedLevelOverrides();
-
-  if (game && typeof game.fillDebugContentSelectors === "function") {
-    game.fillDebugContentSelectors();
-    game.syncDebugContentSelectors();
-  }
-
-  if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined && typeof window.setLevel === "function") {
+  const hasPendingExternalLevelSelection = pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined;
+  const shouldReplayDeferredSelection = !!(game && game.externalLevelSelectionDeferred);
+  if (hasPendingExternalLevelSelection && typeof window.setLevel === "function" && (loadedLevels.length > 0 || shouldReplayDeferredSelection)) {
     window.setLevel(pendingExternalLevelSelection);
   }
 }
