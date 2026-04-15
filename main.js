@@ -11303,6 +11303,22 @@ function dispatchUnityTapTrackEvent() {
   }
 }
 
+function dispatchUnityLevelLoadedTrackEvent(eventAction) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const normalizedAction = String(eventAction || "").trim().toLowerCase();
+  if (normalizedAction !== "success" && normalizedAction !== "failure") {
+    return false;
+  }
+  try {
+    window.location.href = `uniwebview://track?event=level_loaded&event_action=${encodeURIComponent(normalizedAction)}`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function dispatchUnityTutorialBirdTrackEvent(stepNumber) {
   if (typeof window === "undefined") {
     return false;
@@ -11458,21 +11474,28 @@ async function bootstrapGame() {
     pendingExternalLevelSelection = indexOrId;
     const selection = resolveExternalLevelSelection(indexOrId);
     if (!selection) {
+      dispatchUnityLevelLoadedTrackEvent("failure");
       return false;
     }
-    game.previewEnableFallbackToken += 1;
-    if (game.previewEnableFallbackTimer !== null) {
-      clearTimeout(game.previewEnableFallbackTimer);
-      game.previewEnableFallbackTimer = null;
+    try {
+      game.previewEnableFallbackToken += 1;
+      if (game.previewEnableFallbackTimer !== null) {
+        clearTimeout(game.previewEnableFallbackTimer);
+        game.previewEnableFallbackTimer = null;
+      }
+      game.previewEnabledBySetLevel = true;
+      game.applyLevelConfig(selection.targetLevelId, {
+        restart: true,
+        displayLevelNumber: selection.displayLevelNumber,
+      });
+      game.syncDebugContentSelectors();
+      game.saveDebugSettings();
+      dispatchUnityLevelLoadedTrackEvent("success");
+      return true;
+    } catch {
+      dispatchUnityLevelLoadedTrackEvent("failure");
+      return false;
     }
-    game.previewEnabledBySetLevel = true;
-    game.applyLevelConfig(selection.targetLevelId, {
-      restart: true,
-      displayLevelNumber: selection.displayLevelNumber,
-    });
-    game.syncDebugContentSelectors();
-    game.saveDebugSettings();
-    return true;
   };
   window.setCoins = (coinsCount) => {
     pendingExternalCoinsCount = coinsCount;

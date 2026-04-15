@@ -1,5 +1,13 @@
 (function initPixelFlowLevels(global) {
-  const LEVEL_DEFINITIONS = [global.PIXELFLOW_LEVEL_1, global.PIXELFLOW_LEVEL_2].filter(Boolean);
+  const LEVEL_DEFINITIONS = Object.keys(global)
+    .filter((key) => /^PIXELFLOW_LEVEL_\d+$/.test(key))
+    .sort((a, b) => {
+      const aNumber = Number(a.slice("PIXELFLOW_LEVEL_".length));
+      const bNumber = Number(b.slice("PIXELFLOW_LEVEL_".length));
+      return aNumber - bNumber;
+    })
+    .map((key) => global[key])
+    .filter(Boolean);
   const DEFAULT_LEVEL_ID = LEVEL_DEFINITIONS[0]?.id || "1";
   const LEVEL_MAP = new Map(LEVEL_DEFINITIONS.map((level) => [level.id, level]));
 
