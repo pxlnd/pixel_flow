@@ -342,10 +342,10 @@ const PARKED_UNIT_TAP_RADIUS = 86;
 const LEVEL_ONE_TUTORIAL_ID = "1";
 const LEVEL_ONE_TUTORIAL_STEPS = {
   tapBlackCard: "tap-black-card",
-  waitBlackParked: "wait-black-parked",
-  tapGreenCard: "tap-green-card",
-  waitGreenParked: "wait-green-parked",
-  tapBlackParked: "tap-black-parked",
+  waitBlackResolved: "wait-black-resolved",
+  tapGreenLeftCard: "tap-green-left-card",
+  waitGreenLeftResolved: "wait-green-left-resolved",
+  tapGreenRightCard: "tap-green-right-card",
   done: "done",
 };
 const QUEUE_CARDS_RAISE_RATIO = 0.3;
@@ -1585,6 +1585,7 @@ class Block {
       LAYOUT.fieldRows - 1 - row
     );
     this.alive = false;
+    this.spawned = false;
     this.spiralIndex = Number.MAX_SAFE_INTEGER;
     this.spiralOrder = Number.MAX_SAFE_INTEGER;
     this.hitFlash = 0;
@@ -1700,9 +1701,41 @@ class Unit {
     this.parkBounce = 0;
     this.shotBounceTime = SHOT_BOUNCE_DURATION;
     this.renderRotation = null;
-    this.currentTrackRegion = null;
-    this.regionFrontierLock = null;
+    this.shotLinesFiredThisPass = new Set();
     this.alive = true;
+  }
+
+  resetShotLineLocks() {
+    this.shotLinesFiredThisPass.clear();
+  }
+
+  getShotLineKey(game, target, shootDirection, sourcePoint = null) {
+    if (!game || !target || !shootDirection) {
+      return null;
+    }
+    const shootSide = game.resolveShootSideFromDirection(shootDirection, sourcePoint);
+    let axis = null;
+    if (shootSide === "left" || shootSide === "right") {
+      axis = "row";
+    } else if (shootSide === "top" || shootSide === "bottom") {
+      axis = "col";
+    } else if (Math.abs(shootDirection.x) >= Math.abs(shootDirection.y)) {
+      axis = "row";
+    } else {
+      axis = "col";
+    }
+    const lineIndex = axis === "row" ? target.row : target.col;
+    if (!Number.isFinite(lineIndex)) {
+      return null;
+    }
+    let sideKey = shootSide || "any";
+    if (axis === "row" && (sideKey === "any" || (sideKey !== "left" && sideKey !== "right"))) {
+      sideKey = (Number(shootDirection.x) || 0) >= 0 ? "left" : "right";
+    }
+    if (axis === "col" && (sideKey === "any" || (sideKey !== "top" && sideKey !== "bottom"))) {
+      sideKey = (Number(shootDirection.y) || 0) >= 0 ? "top" : "bottom";
+    }
+    return `${axis}:${lineIndex}:side:${sideKey}`;
   }
 
   triggerShotBounce() {
@@ -1737,8 +1770,6 @@ class Unit {
         this.state = "moving";
         this.position = this.conveyor.pointAtDistance(this.distanceOnTrack);
         this.prevPosition = { ...this.position };
-        this.currentTrackRegion = null;
-        this.regionFrontierLock = null;
         this.renderRotation = game.getTrackSideFacingAngle(this.position);
         game.normalizeShooterQueues(game.cards);
       }
@@ -1791,6 +1822,7 @@ class Unit {
         if (this.loopDistance >= game.conveyor.totalLength) {
           if (this.ammo > 0 && game.hasTargetForColor(this.color)) {
             this.loopDistance -= game.conveyor.totalLength;
+            this.resetShotLineLocks();
             return;
           }
           const freeSlotIndex = game.claimFreeSlot(this.id);
@@ -1831,6 +1863,10 @@ class Unit {
       let shotsFired = 0;
       const sweepStart = this.prevPosition ? { ...this.prevPosition } : { ...this.position };
       const sweepEnd = this.position ? { ...this.position } : { ...sweepStart };
+      const movementVector = {
+        x: sweepEnd.x - sweepStart.x,
+        y: sweepEnd.y - sweepStart.y,
+      };
       const sweepDistance = Math.hypot(sweepEnd.x - sweepStart.x, sweepEnd.y - sweepStart.y);
       const sampleStep = Math.max(1, LAYOUT.cellSize * 0.12);
       const sampleCount = Math.max(1, Math.ceil(sweepDistance / sampleStep));
@@ -1844,23 +1880,23 @@ class Unit {
           x: sweepStart.x + (sweepEnd.x - sweepStart.x) * t,
           y: sweepStart.y + (sweepEnd.y - sweepStart.y) * t,
         };
-        const shootDirection = game.getInwardShootDirection(samplePoint);
+        const shootDirection = game.getInwardShootDirection(samplePoint, movementVector);
         if (!shootDirection) {
           continue;
         }
-        const sampleRegion = game.getTrackRegionForPoint(samplePoint);
-        if (sampleRegion !== this.currentTrackRegion) {
-          this.currentTrackRegion = sampleRegion;
-          this.regionFrontierLock = game.getTrackRegionFrontierLock(sampleRegion);
-        }
-        const target = game.findTargetOnLine(samplePoint, this.color, shootDirection, {
-          frontierLock: this.regionFrontierLock,
-        });
+        const target = game.findTargetOnLine(samplePoint, this.color, shootDirection);
         if (!target) {
+          continue;
+        }
+        const shotLineKey = this.getShotLineKey(game, target, shootDirection, samplePoint);
+        if (shotLineKey && this.shotLinesFiredThisPass.has(shotLineKey)) {
           continue;
         }
         this.ammo -= 1;
         game.fireProjectile(this, target);
+        if (shotLineKey) {
+          this.shotLinesFiredThisPass.add(shotLineKey);
+        }
         shotsFired += 1;
         break;
       }
@@ -4118,6 +4154,7 @@ class Game {
       .slice()
       .sort((a, b) => (a.spiralIndex - b.spiralIndex) || (a.spiralOrder - b.spiralOrder));
     this.blockByCell = new Map(this.blocks.map((block) => [`${block.col},${block.row}`, block]));
+    this.seedInitialGhostTargets();
     this.invalidateTargetingCaches();
     this.units = [];
     this.projectiles = [];
@@ -4129,9 +4166,9 @@ class Game {
     this.confetti = [];
     this.loseContinueSnapshot = [];
     this.cards = this.cardManager.resetFromBlocks(this.blocks);
-    this.enforceLevelOneTutorialQueue();
     this.slotManager.reset();
     this.setupLevelOneTutorial();
+    this.enforceLevelOneTutorialQueue();
     this.setWagonIdle();
     this.cameraZoom = 1;
     this.cameraZoomTarget = 1;
@@ -5270,7 +5307,7 @@ class Game {
       step: LEVEL_ONE_TUTORIAL_STEPS.done,
       handTime: 0,
       firstBlackUnitId: null,
-      greenUnitId: null,
+      firstGreenLeftUnitId: null,
     };
   }
 
@@ -5298,24 +5335,39 @@ class Game {
   }
 
   enforceLevelOneTutorialQueue() {
-    if (!this.isLevelOneTutorialEnabled()) {
+    if (!this.isLevelOneTutorialEnabled() || !this.tutorial?.active) {
       return;
     }
-    const rightFront = this.getActiveFrontCardInLane(1);
-    const leftFront = this.getActiveFrontCardInLane(0);
-    if (rightFront && rightFront.color !== "black") {
-      const donor = this.cards.find((card) => !card.used && card.color === "black" && card.index !== rightFront.index);
-      if (donor) {
-        this.swapCardPayload(rightFront, donor);
+    const step = this.tutorial.step;
+    let didSwap = false;
+    const enforceLaneColor = (lane, color) => {
+      const front = this.getActiveFrontCardInLane(lane);
+      if (!front || front.color === color) {
+        return;
       }
-    }
-    if (leftFront && leftFront.color !== "green") {
-      const donor = this.cards.find((card) => !card.used && card.color === "green" && card.index !== leftFront.index);
-      if (donor) {
-        this.swapCardPayload(leftFront, donor);
+      const donor = this.cards.find(
+        (card) => !card.used && card.ammo > 0 && card.color === color && card.index !== front.index
+      );
+      if (!donor) {
+        return;
       }
+      this.swapCardPayload(front, donor);
+      didSwap = true;
+    };
+
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard || step === LEVEL_ONE_TUTORIAL_STEPS.waitBlackResolved) {
+      enforceLaneColor(1, "black");
+      enforceLaneColor(0, "green");
+    } else if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard || step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenLeftResolved) {
+      enforceLaneColor(0, "green");
+      enforceLaneColor(1, "green");
+    } else if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard) {
+      enforceLaneColor(1, "green");
     }
-    this.cards = this.normalizeShooterQueues(this.cards);
+
+    if (didSwap) {
+      this.cards = this.normalizeShooterQueues(this.cards);
+    }
   }
 
   ensurePlayableFrontQueueColor() {
@@ -5368,21 +5420,16 @@ class Game {
     this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.done;
   }
 
-  getTutorialTargetCard(color) {
+  getTutorialTargetCard(color, lane = null) {
     if (!this.tutorial?.active) {
       return null;
     }
-    if (color === "black") {
-      const rightFront = this.getActiveFrontCardInLane(1);
-      if (rightFront && rightFront.color === "black") {
-        return rightFront;
+    if (Number.isFinite(lane)) {
+      const front = this.getActiveFrontCardInLane(lane);
+      if (front && front.color === color) {
+        return front;
       }
-    }
-    if (color === "green") {
-      const leftFront = this.getActiveFrontCardInLane(0);
-      if (leftFront && leftFront.color === "green") {
-        return leftFront;
-      }
+      return null;
     }
     return this.cards.find((card) => this.isFrontRowCard(card) && card.color === color) || null;
   }
@@ -5409,16 +5456,16 @@ class Game {
     }
     const step = this.tutorial.step;
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard) {
-      const card = this.getTutorialTargetCard("black");
+      const card = this.getTutorialTargetCard("black", 1);
       return card ? { type: "card", card } : null;
     }
-    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
-      const card = this.getTutorialTargetCard("green");
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard) {
+      const card = this.getTutorialTargetCard("green", 0);
       return card ? { type: "card", card } : null;
     }
-    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked) {
-      const unit = this.getTutorialTargetBlackParkedUnit();
-      return unit ? { type: "parkedUnit", unit } : null;
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard) {
+      const card = this.getTutorialTargetCard("green", 1);
+      return card ? { type: "card", card } : null;
     }
     return null;
   }
@@ -5467,17 +5514,28 @@ class Game {
     if (!this.tutorial?.active || !unit) {
       return;
     }
-    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitBlackParked && unit.color === "black") {
-      this.tutorial.firstBlackUnitId = unit.id;
-      this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard;
-      this.invalidate(true);
+    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitBlackResolved && unit.color === "black") {
+      if (!Number.isFinite(this.tutorial.firstBlackUnitId) || unit.id === this.tutorial.firstBlackUnitId) {
+        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard;
+        this.enforceLevelOneTutorialQueue();
+        this.invalidate(true);
+      }
       return;
     }
-    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenParked && unit.color === "green") {
-      this.tutorial.greenUnitId = unit.id;
-      this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked;
-      this.invalidate(true);
+    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenLeftResolved && unit.color === "green") {
+      if (!Number.isFinite(this.tutorial.firstGreenLeftUnitId) || unit.id === this.tutorial.firstGreenLeftUnitId) {
+        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard;
+        this.enforceLevelOneTutorialQueue();
+        this.invalidate(true);
+      }
     }
+  }
+
+  getTutorialActiveUnitById(unitId, color) {
+    if (!Number.isFinite(unitId)) {
+      return null;
+    }
+    return this.units.find((unit) => unit.id === unitId && unit.alive && unit.color === color) || null;
   }
 
   updateTutorialState(dt) {
@@ -5485,9 +5543,23 @@ class Game {
       return;
     }
     this.tutorial.handTime += dt;
-    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked && !this.getTutorialTargetBlackParkedUnit()) {
-      this.finishTutorial();
-      this.invalidate(true);
+    this.enforceLevelOneTutorialQueue();
+    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitBlackResolved) {
+      const firstBlackUnit = this.getTutorialActiveUnitById(this.tutorial.firstBlackUnitId, "black");
+      if (!firstBlackUnit) {
+        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard;
+        this.enforceLevelOneTutorialQueue();
+        this.invalidate(true);
+      }
+      return;
+    }
+    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenLeftResolved) {
+      const firstGreenUnit = this.getTutorialActiveUnitById(this.tutorial.firstGreenLeftUnitId, "green");
+      if (!firstGreenUnit) {
+        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard;
+        this.enforceLevelOneTutorialQueue();
+        this.invalidate(true);
+      }
     }
   }
 
@@ -5605,13 +5677,24 @@ class Game {
     this.units.push(unit);
     card.used = true;
     if (this.tutorial?.active) {
-      if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard && card.color === "black") {
-        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitBlackParked;
+      if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard && card.color === "black" && card.lane === 1) {
+        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitBlackResolved;
         this.tutorial.firstBlackUnitId = unit.id;
-      } else if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard && card.color === "green") {
-        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitGreenParked;
-        this.tutorial.greenUnitId = unit.id;
+      } else if (
+        this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard
+        && card.color === "green"
+        && card.lane === 0
+      ) {
+        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitGreenLeftResolved;
+        this.tutorial.firstGreenLeftUnitId = unit.id;
+      } else if (
+        this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard
+        && card.color === "green"
+        && card.lane === 1
+      ) {
+        this.finishTutorial();
       }
+      this.enforceLevelOneTutorialQueue();
     }
     this.invalidate(true);
     return true;
@@ -5662,8 +5745,8 @@ class Game {
     unit.parkBounce = 0;
     unit.renderRotation = null;
     unit.prevPosition = { ...unit.position };
-    if (this.tutorial?.active && this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked && unit.color === "black") {
-      this.finishTutorial();
+    if (typeof unit.resetShotLineLocks === "function") {
+      unit.resetShotLineLocks();
     }
     this.invalidate(true);
     return true;
@@ -5904,7 +5987,31 @@ class Game {
     return distances[0]?.side || null;
   }
 
-  getInwardShootDirection(sourcePoint) {
+  getInwardShootDirection(sourcePoint, movementVector = null) {
+    const movementX = Number(movementVector?.x) || 0;
+    const movementY = Number(movementVector?.y) || 0;
+    const movementLength = Math.hypot(movementX, movementY);
+    if (movementLength > 0.0001) {
+      const tangentX = movementX / movementLength;
+      const tangentY = movementY / movementLength;
+      const normalA = { x: -tangentY, y: tangentX };
+      const normalB = { x: tangentY, y: -tangentX };
+      const fieldCenter = this.getFieldCenter();
+      const toCenterX = fieldCenter.x - sourcePoint.x;
+      const toCenterY = fieldCenter.y - sourcePoint.y;
+      const dotA = normalA.x * toCenterX + normalA.y * toCenterY;
+      const dotB = normalB.x * toCenterX + normalB.y * toCenterY;
+      const inward = dotA >= dotB ? normalA : normalB;
+      const inwardLength = Math.hypot(inward.x, inward.y);
+      if (inwardLength > 0.0001) {
+        return {
+          x: inward.x / inwardLength,
+          y: inward.y / inwardLength,
+          side: null,
+        };
+      }
+    }
+
     const trackRect = this.conveyor?.trackRect;
     if (trackRect) {
       const closestTrackSide = [
@@ -5949,6 +6056,114 @@ class Game {
     return distances[0]?.direction || null;
   }
 
+  getRayHitForBlock(sourcePoint, direction, block) {
+    const minX = block.x;
+    const maxX = block.x + block.size;
+    const minY = block.y;
+    const maxY = block.y + block.size;
+    const rayEpsilon = 0.000001;
+    let enterDistance = 0;
+    let exitDistance = Number.POSITIVE_INFINITY;
+
+    if (Math.abs(direction.x) <= rayEpsilon) {
+      if (sourcePoint.x < minX || sourcePoint.x > maxX) {
+        return null;
+      }
+    } else {
+      const t1 = (minX - sourcePoint.x) / direction.x;
+      const t2 = (maxX - sourcePoint.x) / direction.x;
+      const axisEnter = Math.min(t1, t2);
+      const axisExit = Math.max(t1, t2);
+      enterDistance = Math.max(enterDistance, axisEnter);
+      exitDistance = Math.min(exitDistance, axisExit);
+      if (exitDistance < enterDistance) {
+        return null;
+      }
+    }
+
+    if (Math.abs(direction.y) <= rayEpsilon) {
+      if (sourcePoint.y < minY || sourcePoint.y > maxY) {
+        return null;
+      }
+    } else {
+      const t1 = (minY - sourcePoint.y) / direction.y;
+      const t2 = (maxY - sourcePoint.y) / direction.y;
+      const axisEnter = Math.min(t1, t2);
+      const axisExit = Math.max(t1, t2);
+      enterDistance = Math.max(enterDistance, axisEnter);
+      exitDistance = Math.min(exitDistance, axisExit);
+      if (exitDistance < enterDistance) {
+        return null;
+      }
+    }
+
+    if (exitDistance <= 0) {
+      return null;
+    }
+
+    return {
+      forwardDistance: Math.max(0, enterDistance),
+      exitDistance,
+    };
+  }
+
+  getFirstRayHitBlocks(sourcePoint, direction) {
+    const hitEpsilon = 0.001;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    const nearestHits = [];
+
+    for (const block of this.blocks) {
+      if (!block.alive && !block.spawned) {
+        continue;
+      }
+      const hit = this.getRayHitForBlock(sourcePoint, direction, block);
+      if (!hit) {
+        continue;
+      }
+      if (hit.forwardDistance + hitEpsilon < nearestDistance) {
+        nearestDistance = hit.forwardDistance;
+        nearestHits.length = 0;
+        nearestHits.push({ block, hit });
+        continue;
+      }
+      if (Math.abs(hit.forwardDistance - nearestDistance) <= hitEpsilon) {
+        nearestHits.push({ block, hit });
+      }
+    }
+
+    return nearestHits;
+  }
+
+  hasSupportBlockBehindGhost(block, shootSide) {
+    // First successful build shot has no painted neighbors yet, so skip support guard once.
+    if (this.remainingBlocks === this.blocks.length) {
+      return true;
+    }
+    if (!block || !shootSide) {
+      return false;
+    }
+    const supportSideByShot = {
+      left: "right",
+      right: "left",
+      top: "bottom",
+      bottom: "top",
+    };
+    const sideOffsets = {
+      left: [-1, 0],
+      right: [1, 0],
+      top: [0, -1],
+      bottom: [0, 1],
+    };
+    const supportSide = supportSideByShot[shootSide];
+    const offset = sideOffsets[supportSide];
+    if (!offset) {
+      return false;
+    }
+    const [dx, dy] = offset;
+    const supportBlock = this.blockByCell.get(`${block.col + dx},${block.row + dy}`);
+    return Boolean(supportBlock?.alive);
+  }
+
   getLineHitForBlock(sourcePoint, direction, block, lineHalfWidth) {
     const center = this.blockCenter(block);
     const dx = center.x - sourcePoint.x;
@@ -5970,7 +6185,7 @@ class Game {
 
   isPathBlockedByPlacedBlocks(sourcePoint, direction, targetForwardDistance, lineHalfWidth, ignoreBlockId = null) {
     for (const block of this.blocks) {
-      if (!block.alive) {
+      if (!block.alive && !block.spawned) {
         continue;
       }
       if (ignoreBlockId !== null && block.id === ignoreBlockId) {
@@ -5988,19 +6203,15 @@ class Game {
   }
 
   getNextSpiralTarget() {
-    const targets = this.getNextSpiralTargets();
+    const targets = this.getSpawnedGhostTargets();
     if (targets.length > 0) {
       return targets[0];
     }
     return null;
   }
 
-  getNextSpiralTargets() {
-    if (this.nextSpiralTargetsCacheVersion === this.targetingCacheVersion) {
-      return this.nextSpiralTargetsCache;
-    }
+  getInitialSpawnSeedTargets() {
     let minPendingSpiralIndex = Number.POSITIVE_INFINITY;
-
     for (const block of this.blocksBySpiral) {
       if (block.alive) {
         continue;
@@ -6008,24 +6219,21 @@ class Game {
       minPendingSpiralIndex = Math.min(minPendingSpiralIndex, block.spiralIndex);
     }
     if (!Number.isFinite(minPendingSpiralIndex)) {
-      this.nextSpiralTargetsCache = [];
-      this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
-      return this.nextSpiralTargetsCache;
+      return [];
     }
 
     const targets = [];
+    const neighbors = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ];
     for (const block of this.blocksBySpiral) {
       if (block.alive || block.spiralIndex !== minPendingSpiralIndex) {
         continue;
       }
-      // Never allow building an outer-side block while a direct inner neighbor is still pending.
       let hasPendingInnerNeighbor = false;
-      const neighbors = [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-      ];
       for (const [dx, dy] of neighbors) {
         const neighbor = this.blockByCell.get(`${block.col + dx},${block.row + dy}`);
         if (!neighbor) {
@@ -6036,81 +6244,183 @@ class Game {
           break;
         }
       }
-      if (hasPendingInnerNeighbor) {
+      if (!hasPendingInnerNeighbor) {
+        targets.push(block);
+      }
+    }
+
+    if (targets.length === 0) {
+      for (const block of this.blocksBySpiral) {
+        if (!block.alive && block.spiralIndex === minPendingSpiralIndex) {
+          targets.push(block);
+        }
+      }
+    }
+    targets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
+    return targets;
+  }
+
+  seedInitialGhostTargets() {
+    for (const block of this.blocksBySpiral) {
+      block.spawned = false;
+    }
+    const targets = this.getInitialSpawnSeedTargets();
+    for (const block of targets) {
+      block.spawned = true;
+    }
+  }
+
+  getSpawnedGhostTargets() {
+    if (this.nextSpiralTargetsCacheVersion === this.targetingCacheVersion) {
+      return this.nextSpiralTargetsCache;
+    }
+    const targets = [];
+    for (const block of this.blocksBySpiral) {
+      if (block.alive || !block.spawned) {
         continue;
       }
       targets.push(block);
     }
-
-    if (targets.length > 0) {
-      targets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-      this.nextSpiralTargetsCache = targets;
-      this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
-      return this.nextSpiralTargetsCache;
-    }
-
-    // Safety fallback: if strict filter removed everything, keep inner ring available.
-    const fallbackTargets = [];
-    for (const block of this.blocksBySpiral) {
-      if (!block.alive && block.spiralIndex === minPendingSpiralIndex) {
-        fallbackTargets.push(block);
-      }
-    }
-    fallbackTargets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-    this.nextSpiralTargetsCache = fallbackTargets;
+    this.nextSpiralTargetsCache = targets;
     this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
     return this.nextSpiralTargetsCache;
   }
 
+  getNextSpiralTargets() {
+    return this.getSpawnedGhostTargets();
+  }
+
   getContourGhostTargets() {
-    if (this.contourGhostTargetsCacheVersion === this.targetingCacheVersion) {
-      return this.contourGhostTargetsCache;
-    }
-    if (this.remainingBlocks <= 0) {
-      this.contourGhostTargetsCache = [];
-      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
-      return this.contourGhostTargetsCache;
-    }
-    const hasFilledBlocks = this.remainingBlocks < this.blocks.length;
-    if (!hasFilledBlocks) {
-      const targets = this.getNextSpiralTargets();
-      this.contourGhostTargetsCache = targets;
-      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
-      return this.contourGhostTargetsCache;
-    }
+    return this.getSpawnedGhostTargets();
+  }
 
-    const contourTargets = [];
-    const neighbors = [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ];
+  isCellOccupiedForLOS(col, row, simulatedBlockedCell = null, ignoreBlockId = null) {
+    if (simulatedBlockedCell && simulatedBlockedCell.col === col && simulatedBlockedCell.row === row) {
+      return true;
+    }
+    const block = this.blockByCell.get(`${col},${row}`);
+    if (!block) {
+      return false;
+    }
+    if (ignoreBlockId !== null && block.id === ignoreBlockId) {
+      return false;
+    }
+    return block.alive || block.spawned;
+  }
 
+  hasClearPathToPerimeterSide(block, side, simulatedBlockedCell = null, ignoreBlockId = null) {
+    if (!block || block.alive) {
+      return false;
+    }
+    if (side === "left") {
+      for (let col = block.col - 1; col >= 0; col -= 1) {
+        if (this.isCellOccupiedForLOS(col, block.row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (side === "right") {
+      for (let col = block.col + 1; col < LAYOUT.fieldCols; col += 1) {
+        if (this.isCellOccupiedForLOS(col, block.row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (side === "top") {
+      for (let row = block.row - 1; row >= 0; row -= 1) {
+        if (this.isCellOccupiedForLOS(block.col, row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (side === "bottom") {
+      for (let row = block.row + 1; row < LAYOUT.fieldRows; row += 1) {
+        if (this.isCellOccupiedForLOS(block.col, row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  hasAnyClearPathToPerimeter(block, simulatedBlockedCell = null, ignoreBlockId = null) {
+    if (!block || block.alive) {
+      return false;
+    }
+    return (
+      this.hasClearPathToPerimeterSide(block, "left", simulatedBlockedCell, ignoreBlockId)
+      || this.hasClearPathToPerimeterSide(block, "right", simulatedBlockedCell, ignoreBlockId)
+      || this.hasClearPathToPerimeterSide(block, "top", simulatedBlockedCell, ignoreBlockId)
+      || this.hasClearPathToPerimeterSide(block, "bottom", simulatedBlockedCell, ignoreBlockId)
+    );
+  }
+
+  canSpawnGhostCandidate(candidate) {
+    if (!candidate || candidate.alive || candidate.spawned) {
+      return false;
+    }
+    const simulatedBlockedCell = { col: candidate.col, row: candidate.row };
     for (const block of this.blocksBySpiral) {
-      if (block.alive) {
+      if (block.alive || !block.spawned || block.id === candidate.id) {
         continue;
       }
-      for (const [dx, dy] of neighbors) {
-        const neighbor = this.blockByCell.get(`${block.col + dx},${block.row + dy}`);
-        if (!neighbor || !neighbor.alive) {
-          continue;
-        }
-        contourTargets.push(block);
-        break;
+      const wasClear = this.hasAnyClearPathToPerimeter(block);
+      if (!wasClear) {
+        continue;
+      }
+      const isClear = this.hasAnyClearPathToPerimeter(block, simulatedBlockedCell);
+      if (!isClear) {
+        return false;
       }
     }
+    return true;
+  }
 
-    if (contourTargets.length === 0) {
-      const targets = this.getNextSpiralTargets();
-      this.contourGhostTargetsCache = targets;
-      this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
-      return this.contourGhostTargetsCache;
+  getAdjacentSpawnCandidateForSide(sourceBlock, side) {
+    if (!sourceBlock) {
+      return null;
     }
-    contourTargets.sort((a, b) => (a.spiralIndex - b.spiralIndex) || (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
-    this.contourGhostTargetsCache = contourTargets;
-    this.contourGhostTargetsCacheVersion = this.targetingCacheVersion;
-    return this.contourGhostTargetsCache;
+    const sideOffsets = {
+      right: [1, 0],
+      left: [-1, 0],
+      bottom: [0, 1],
+      top: [0, -1],
+    };
+    const offset = sideOffsets[side];
+    if (!offset) {
+      return null;
+    }
+    const [dx, dy] = offset;
+    const candidate = this.blockByCell.get(`${sourceBlock.col + dx},${sourceBlock.row + dy}`);
+    if (!candidate || candidate.alive || candidate.spawned) {
+      return null;
+    }
+    const hasPreferredSidePath = this.hasClearPathToPerimeterSide(candidate, side);
+    if (!hasPreferredSidePath && !this.hasAnyClearPathToPerimeter(candidate)) {
+      return null;
+    }
+    return candidate;
+  }
+
+  spawnGhostsAfterFill(sourceBlock) {
+    if (!sourceBlock) {
+      return;
+    }
+    const sideOrder = ["right", "left", "bottom", "top"];
+    for (const side of sideOrder) {
+      const candidate = this.getAdjacentSpawnCandidateForSide(sourceBlock, side);
+      if (!candidate) {
+        continue;
+      }
+      if (!this.canSpawnGhostCandidate(candidate)) {
+        continue;
+      }
+      candidate.spawned = true;
+    }
   }
 
   getSpiralBuildPriority(target, forwardDistance) {
@@ -6241,6 +6551,31 @@ class Game {
     return samples;
   }
 
+  resolveShootSideFromDirection(direction, sourcePoint = null) {
+    if (!direction) {
+      return null;
+    }
+    const explicitSide = direction.side;
+    if (explicitSide === "top" || explicitSide === "bottom" || explicitSide === "left" || explicitSide === "right") {
+      return explicitSide;
+    }
+    if (sourcePoint) {
+      const inwardDirection = this.getInwardShootDirection(sourcePoint);
+      if (inwardDirection?.side) {
+        return inwardDirection.side;
+      }
+    }
+    const dx = Number(direction.x) || 0;
+    const dy = Number(direction.y) || 0;
+    if (Math.abs(dx) <= 0.0001 && Math.abs(dy) <= 0.0001) {
+      return null;
+    }
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return dx >= 0 ? "left" : "right";
+    }
+    return dy >= 0 ? "top" : "bottom";
+  }
+
   hasTrackShotWindowForProbe(target, probe, lineHalfWidth) {
     if (!target || !probe?.side || !probe.direction) {
       return false;
@@ -6248,6 +6583,11 @@ class Game {
     const cacheKey = `${this.targetingCacheVersion}:${target.id}:${probe.side}`;
     if (this.trackProbeWindowCache.has(cacheKey)) {
       return this.trackProbeWindowCache.get(cacheKey);
+    }
+    const probeShootSide = this.resolveShootSideFromDirection(probe.direction);
+    if (!this.hasSupportBlockBehindGhost(target, probeShootSide)) {
+      this.trackProbeWindowCache.set(cacheKey, false);
+      return false;
     }
 
     const sideSamples = this.getTrackSideSamples()[probe.side] || [];
@@ -6583,9 +6923,6 @@ class Game {
     if (colorTargets.length === 0) {
       return false;
     }
-    if (!colorTargets.some((target) => this.getAllowedReachableProbesForTarget(target).length > 0)) {
-      return false;
-    }
     return this.canColorShootNextSpiralTargetFromTrack(color);
   }
 
@@ -6619,52 +6956,43 @@ class Game {
     return false;
   }
 
-  findTargetOnLine(sourcePoint, color, direction, options = {}) {
-    const lineHalfWidth = this.getShotLineHalfWidth();
-    const sourceRegion = this.getTrackRegionForPoint(sourcePoint);
-    const activeTargets = this.getNextSpiralTargets();
-    const frontierLock = options?.frontierLock || null;
+  findTargetOnLine(sourcePoint, color, direction) {
+    if (!sourcePoint || !direction) {
+      return null;
+    }
+    const directionLength = Math.hypot(direction.x, direction.y);
+    if (directionLength <= 0.0001) {
+      return null;
+    }
+    const normalizedDirection = {
+      x: direction.x / directionLength,
+      y: direction.y / directionLength,
+      side: direction.side || null,
+    };
+    const firstHits = this.getFirstRayHitBlocks(sourcePoint, normalizedDirection);
+    if (firstHits.length === 0) {
+      return null;
+    }
+
     let bestTarget = null;
     let bestPriority = null;
-
-    for (const target of activeTargets) {
-      if (target.color !== color) {
+    const shootSide = this.resolveShootSideFromDirection(normalizedDirection, sourcePoint);
+    for (const { block, hit } of firstHits) {
+      if (block.alive) {
+        return null;
+      }
+      if (!block.spawned || block.color !== color) {
+        return null;
+      }
+      if (!this.hasSupportBlockBehindGhost(block, shootSide)) {
         continue;
       }
-      const targetRegionTags = this.getTargetRegionTags(target, activeTargets);
-      if (!this.doesTrackRegionMatchTarget(sourceRegion, targetRegionTags)) {
-        continue;
-      }
-      if (!this.doesTargetMatchTrackRegionFrontierLock(target, frontierLock)) {
-        continue;
-      }
-      if (!frontierLock && !this.isTargetOnTrackRegionFrontier(target, sourceRegion, activeTargets)) {
-        continue;
-      }
-      const allowedProbes = this.getAllowedReachableProbesForTarget(target);
-      if (!allowedProbes.some((probe) => probe.direction.side === direction.side)) {
-        continue;
-      }
-
-      const hit = this.getLineHitForBlock(sourcePoint, direction, target, lineHalfWidth);
-      if (!hit) {
-        continue;
-      }
-      if (this.isPathBlockedByPlacedBlocks(
-        sourcePoint,
-        direction,
-        hit.forwardDistance,
-        lineHalfWidth * 0.9,
-        target.id
-      )) {
-        continue;
-      }
-      const priority = this.getSpiralBuildPriority(target, hit.forwardDistance);
+      const priority = this.getSpiralBuildPriority(block, hit.forwardDistance);
       if (!this.isSpiralBuildPriorityBetter(priority, bestPriority)) {
         continue;
       }
       bestPriority = priority;
-      bestTarget = target;
+      bestTarget = block;
     }
 
     return bestTarget;
@@ -6698,14 +7026,19 @@ class Game {
       return;
     }
 
-    const activeTargets = this.getNextSpiralTargets();
+    const activeTargets = this.getSpawnedGhostTargets();
     if (!activeTargets.some((target) => target.id === block.id)) {
+      return;
+    }
+    if (block.color !== color) {
       return;
     }
 
     block.alive = true;
+    block.spawned = false;
     block.hitFlash = 1;
     this.remainingBlocks -= 1;
+    this.spawnGhostsAfterFill(block);
     this.invalidateTargetingCaches();
     this.markBlockFieldLayerDirty();
 
@@ -7017,6 +7350,7 @@ class Game {
 
     for (const block of this.blocks) {
       block.alive = true;
+      block.spawned = false;
       block.hitFlash = 0;
     }
     this.invalidateTargetingCaches();
