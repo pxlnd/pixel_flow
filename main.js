@@ -6064,6 +6064,36 @@ class Game {
     return nearestHits;
   }
 
+  hasSupportBlockBehindGhost(block, shootSide) {
+    // First successful build shot has no painted neighbors yet, so skip support guard once.
+    if (this.remainingBlocks === this.blocks.length) {
+      return true;
+    }
+    if (!block || !shootSide) {
+      return false;
+    }
+    const supportSideByShot = {
+      left: "right",
+      right: "left",
+      top: "bottom",
+      bottom: "top",
+    };
+    const sideOffsets = {
+      left: [-1, 0],
+      right: [1, 0],
+      top: [0, -1],
+      bottom: [0, 1],
+    };
+    const supportSide = supportSideByShot[shootSide];
+    const offset = sideOffsets[supportSide];
+    if (!offset) {
+      return false;
+    }
+    const [dx, dy] = offset;
+    const supportBlock = this.blockByCell.get(`${block.col + dx},${block.row + dy}`);
+    return Boolean(supportBlock?.alive);
+  }
+
   getLineHitForBlock(sourcePoint, direction, block, lineHalfWidth) {
     const center = this.blockCenter(block);
     const dx = center.x - sourcePoint.x;
@@ -6451,6 +6481,31 @@ class Game {
     return samples;
   }
 
+  resolveShootSideFromDirection(direction, sourcePoint = null) {
+    if (!direction) {
+      return null;
+    }
+    const explicitSide = direction.side;
+    if (explicitSide === "top" || explicitSide === "bottom" || explicitSide === "left" || explicitSide === "right") {
+      return explicitSide;
+    }
+    if (sourcePoint) {
+      const inwardDirection = this.getInwardShootDirection(sourcePoint);
+      if (inwardDirection?.side) {
+        return inwardDirection.side;
+      }
+    }
+    const dx = Number(direction.x) || 0;
+    const dy = Number(direction.y) || 0;
+    if (Math.abs(dx) <= 0.0001 && Math.abs(dy) <= 0.0001) {
+      return null;
+    }
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return dx >= 0 ? "left" : "right";
+    }
+    return dy >= 0 ? "top" : "bottom";
+  }
+
   hasTrackShotWindowForProbe(target, probe, lineHalfWidth) {
     if (!target || !probe?.side || !probe.direction) {
       return false;
@@ -6458,6 +6513,11 @@ class Game {
     const cacheKey = `${this.targetingCacheVersion}:${target.id}:${probe.side}`;
     if (this.trackProbeWindowCache.has(cacheKey)) {
       return this.trackProbeWindowCache.get(cacheKey);
+    }
+    const probeShootSide = this.resolveShootSideFromDirection(probe.direction);
+    if (!this.hasSupportBlockBehindGhost(target, probeShootSide)) {
+      this.trackProbeWindowCache.set(cacheKey, false);
+      return false;
     }
 
     const sideSamples = this.getTrackSideSamples()[probe.side] || [];
@@ -6846,12 +6906,16 @@ class Game {
 
     let bestTarget = null;
     let bestPriority = null;
+    const shootSide = this.resolveShootSideFromDirection(normalizedDirection, sourcePoint);
     for (const { block, hit } of firstHits) {
       if (block.alive) {
         return null;
       }
       if (!block.spawned || block.color !== color) {
         return null;
+      }
+      if (!this.hasSupportBlockBehindGhost(block, shootSide)) {
+        continue;
       }
       const priority = this.getSpiralBuildPriority(block, hit.forwardDistance);
       if (!this.isSpiralBuildPriorityBetter(priority, bestPriority)) {
