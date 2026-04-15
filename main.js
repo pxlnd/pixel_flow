@@ -1828,6 +1828,10 @@ class Unit {
       let shotsFired = 0;
       const sweepStart = this.prevPosition ? { ...this.prevPosition } : { ...this.position };
       const sweepEnd = this.position ? { ...this.position } : { ...sweepStart };
+      const movementVector = {
+        x: sweepEnd.x - sweepStart.x,
+        y: sweepEnd.y - sweepStart.y,
+      };
       const sweepDistance = Math.hypot(sweepEnd.x - sweepStart.x, sweepEnd.y - sweepStart.y);
       const sampleStep = Math.max(1, LAYOUT.cellSize * 0.12);
       const sampleCount = Math.max(1, Math.ceil(sweepDistance / sampleStep));
@@ -1841,7 +1845,7 @@ class Unit {
           x: sweepStart.x + (sweepEnd.x - sweepStart.x) * t,
           y: sweepStart.y + (sweepEnd.y - sweepStart.y) * t,
         };
-        const shootDirection = game.getInwardShootDirection(samplePoint);
+        const shootDirection = game.getInwardShootDirection(samplePoint, movementVector);
         if (!shootDirection) {
           continue;
         }
@@ -5870,7 +5874,31 @@ class Game {
     return distances[0]?.side || null;
   }
 
-  getInwardShootDirection(sourcePoint) {
+  getInwardShootDirection(sourcePoint, movementVector = null) {
+    const movementX = Number(movementVector?.x) || 0;
+    const movementY = Number(movementVector?.y) || 0;
+    const movementLength = Math.hypot(movementX, movementY);
+    if (movementLength > 0.0001) {
+      const tangentX = movementX / movementLength;
+      const tangentY = movementY / movementLength;
+      const normalA = { x: -tangentY, y: tangentX };
+      const normalB = { x: tangentY, y: -tangentX };
+      const fieldCenter = this.getFieldCenter();
+      const toCenterX = fieldCenter.x - sourcePoint.x;
+      const toCenterY = fieldCenter.y - sourcePoint.y;
+      const dotA = normalA.x * toCenterX + normalA.y * toCenterY;
+      const dotB = normalB.x * toCenterX + normalB.y * toCenterY;
+      const inward = dotA >= dotB ? normalA : normalB;
+      const inwardLength = Math.hypot(inward.x, inward.y);
+      if (inwardLength > 0.0001) {
+        return {
+          x: inward.x / inwardLength,
+          y: inward.y / inwardLength,
+          side: null,
+        };
+      }
+    }
+
     const trackRect = this.conveyor?.trackRect;
     if (trackRect) {
       const closestTrackSide = [
@@ -5913,6 +5941,84 @@ class Game {
       }
     }
     return distances[0]?.direction || null;
+  }
+
+  getRayHitForBlock(sourcePoint, direction, block) {
+    const minX = block.x;
+    const maxX = block.x + block.size;
+    const minY = block.y;
+    const maxY = block.y + block.size;
+    const rayEpsilon = 0.000001;
+    let enterDistance = 0;
+    let exitDistance = Number.POSITIVE_INFINITY;
+
+    if (Math.abs(direction.x) <= rayEpsilon) {
+      if (sourcePoint.x < minX || sourcePoint.x > maxX) {
+        return null;
+      }
+    } else {
+      const t1 = (minX - sourcePoint.x) / direction.x;
+      const t2 = (maxX - sourcePoint.x) / direction.x;
+      const axisEnter = Math.min(t1, t2);
+      const axisExit = Math.max(t1, t2);
+      enterDistance = Math.max(enterDistance, axisEnter);
+      exitDistance = Math.min(exitDistance, axisExit);
+      if (exitDistance < enterDistance) {
+        return null;
+      }
+    }
+
+    if (Math.abs(direction.y) <= rayEpsilon) {
+      if (sourcePoint.y < minY || sourcePoint.y > maxY) {
+        return null;
+      }
+    } else {
+      const t1 = (minY - sourcePoint.y) / direction.y;
+      const t2 = (maxY - sourcePoint.y) / direction.y;
+      const axisEnter = Math.min(t1, t2);
+      const axisExit = Math.max(t1, t2);
+      enterDistance = Math.max(enterDistance, axisEnter);
+      exitDistance = Math.min(exitDistance, axisExit);
+      if (exitDistance < enterDistance) {
+        return null;
+      }
+    }
+
+    if (exitDistance <= 0) {
+      return null;
+    }
+
+    return {
+      forwardDistance: Math.max(0, enterDistance),
+      exitDistance,
+    };
+  }
+
+  getFirstRayHitBlocks(sourcePoint, direction) {
+    const hitEpsilon = 0.001;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    const nearestHits = [];
+
+    for (const block of this.blocks) {
+      if (!block.alive && !block.spawned) {
+        continue;
+      }
+      const hit = this.getRayHitForBlock(sourcePoint, direction, block);
+      if (!hit) {
+        continue;
+      }
+      if (hit.forwardDistance + hitEpsilon < nearestDistance) {
+        nearestDistance = hit.forwardDistance;
+        nearestHits.length = 0;
+        nearestHits.push({ block, hit });
+        continue;
+      }
+      if (Math.abs(hit.forwardDistance - nearestDistance) <= hitEpsilon) {
+        nearestHits.push({ block, hit });
+      }
+    }
+
+    return nearestHits;
   }
 
   getLineHitForBlock(sourcePoint, direction, block, lineHalfWidth) {
@@ -6678,34 +6784,38 @@ class Game {
   }
 
   findTargetOnLine(sourcePoint, color, direction) {
-    const lineHalfWidth = this.getShotLineHalfWidth();
-    const activeTargets = this.getSpawnedGhostTargets();
+    if (!sourcePoint || !direction) {
+      return null;
+    }
+    const directionLength = Math.hypot(direction.x, direction.y);
+    if (directionLength <= 0.0001) {
+      return null;
+    }
+    const normalizedDirection = {
+      x: direction.x / directionLength,
+      y: direction.y / directionLength,
+      side: direction.side || null,
+    };
+    const firstHits = this.getFirstRayHitBlocks(sourcePoint, normalizedDirection);
+    if (firstHits.length === 0) {
+      return null;
+    }
+
     let bestTarget = null;
     let bestPriority = null;
-
-    for (const target of activeTargets) {
-      if (target.color !== color) {
-        continue;
+    for (const { block, hit } of firstHits) {
+      if (block.alive) {
+        return null;
       }
-      const hit = this.getLineHitForBlock(sourcePoint, direction, target, lineHalfWidth);
-      if (!hit) {
-        continue;
+      if (!block.spawned || block.color !== color) {
+        return null;
       }
-      if (this.isPathBlockedByPlacedBlocks(
-        sourcePoint,
-        direction,
-        hit.forwardDistance,
-        lineHalfWidth * 0.9,
-        target.id
-      )) {
-        continue;
-      }
-      const priority = this.getSpiralBuildPriority(target, hit.forwardDistance);
+      const priority = this.getSpiralBuildPriority(block, hit.forwardDistance);
       if (!this.isSpiralBuildPriorityBetter(priority, bestPriority)) {
         continue;
       }
       bestPriority = priority;
-      bestTarget = target;
+      bestTarget = block;
     }
 
     return bestTarget;
