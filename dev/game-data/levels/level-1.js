@@ -22,16 +22,16 @@ window.PIXELFLOW_LEVEL_1 = {
     "GGGGGGGGGGGGGGGGGG"
   ],
   "referenceGrid": {
-    "x": 220,
-    "y": 216,
-    "step": 32,
+    "x": 242,
+    "y": 379,
+    "step": 30,
     "cellSize": 30
   },
   "layout": {
-    "fieldX": 220,
-    "fieldY": 329,
-    "fieldStep": 32,
-    "cellSize": 32,
+    "fieldX": 242,
+    "fieldY": 379,
+    "fieldStep": 30,
+    "cellSize": 30,
     "fieldCols": 18,
     "fieldRows": 18,
     "track": {
@@ -144,5 +144,6 @@ window.PIXELFLOW_LEVEL_1 = {
       "h": 1600,
       "r": 0
     }
-  }
+  },
+  "queueCardCount": 7
 };
