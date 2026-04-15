@@ -1701,7 +1701,41 @@ class Unit {
     this.parkBounce = 0;
     this.shotBounceTime = SHOT_BOUNCE_DURATION;
     this.renderRotation = null;
+    this.shotLinesFiredThisPass = new Set();
     this.alive = true;
+  }
+
+  resetShotLineLocks() {
+    this.shotLinesFiredThisPass.clear();
+  }
+
+  getShotLineKey(game, target, shootDirection, sourcePoint = null) {
+    if (!game || !target || !shootDirection) {
+      return null;
+    }
+    const shootSide = game.resolveShootSideFromDirection(shootDirection, sourcePoint);
+    let axis = null;
+    if (shootSide === "left" || shootSide === "right") {
+      axis = "row";
+    } else if (shootSide === "top" || shootSide === "bottom") {
+      axis = "col";
+    } else if (Math.abs(shootDirection.x) >= Math.abs(shootDirection.y)) {
+      axis = "row";
+    } else {
+      axis = "col";
+    }
+    const lineIndex = axis === "row" ? target.row : target.col;
+    if (!Number.isFinite(lineIndex)) {
+      return null;
+    }
+    let sideKey = shootSide || "any";
+    if (axis === "row" && (sideKey === "any" || (sideKey !== "left" && sideKey !== "right"))) {
+      sideKey = (Number(shootDirection.x) || 0) >= 0 ? "left" : "right";
+    }
+    if (axis === "col" && (sideKey === "any" || (sideKey !== "top" && sideKey !== "bottom"))) {
+      sideKey = (Number(shootDirection.y) || 0) >= 0 ? "top" : "bottom";
+    }
+    return `${axis}:${lineIndex}:side:${sideKey}`;
   }
 
   triggerShotBounce() {
@@ -1788,6 +1822,7 @@ class Unit {
         if (this.loopDistance >= game.conveyor.totalLength) {
           if (this.ammo > 0 && game.hasTargetForColor(this.color)) {
             this.loopDistance -= game.conveyor.totalLength;
+            this.resetShotLineLocks();
             return;
           }
           const freeSlotIndex = game.claimFreeSlot(this.id);
@@ -1853,8 +1888,15 @@ class Unit {
         if (!target) {
           continue;
         }
+        const shotLineKey = this.getShotLineKey(game, target, shootDirection, samplePoint);
+        if (shotLineKey && this.shotLinesFiredThisPass.has(shotLineKey)) {
+          continue;
+        }
         this.ammo -= 1;
         game.fireProjectile(this, target);
+        if (shotLineKey) {
+          this.shotLinesFiredThisPass.add(shotLineKey);
+        }
         shotsFired += 1;
         break;
       }
@@ -5678,6 +5720,9 @@ class Game {
     unit.parkBounce = 0;
     unit.renderRotation = null;
     unit.prevPosition = { ...unit.position };
+    if (typeof unit.resetShotLineLocks === "function") {
+      unit.resetShotLineLocks();
+    }
     this.invalidate(true);
     return true;
   }
