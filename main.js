@@ -5478,10 +5478,10 @@ class Game {
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard) {
       return 1;
     }
-    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard) {
       return 2;
     }
-    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackParked) {
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard) {
       return 3;
     }
     return null;
