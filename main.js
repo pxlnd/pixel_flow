@@ -4707,7 +4707,7 @@ class Game {
       if (this.gameState === "loading") {
         this.restart();
       }
-    }, 500);
+    }, 2000);
   }
 
   getDebugSettingsState() {
