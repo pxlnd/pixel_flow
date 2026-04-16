@@ -560,6 +560,10 @@ const LEVEL_MANIFEST_PATH = `${LEVELS_PATH}/manifest.json`;
 const MAX_AUTOLOAD_LEVELS = 50;
 const MAX_AUTOLOAD_MISSES_IN_A_ROW = 5;
 const LEVEL_LOAD_BATCH_SIZE = 6;
+const IS_FILE_PROTOCOL =
+  typeof window !== "undefined"
+  && window.location
+  && window.location.protocol === "file:";
 
 function normalizeBackgroundId(backgroundId) {
   const normalized = String(backgroundId || "")
@@ -578,6 +582,9 @@ function getBackgroundAssetPath(backgroundId, assetKey) {
 }
 
 async function loadLevelJSONByNumber(levelNumber) {
+  if (IS_FILE_PROTOCOL) {
+    return null;
+  }
   try {
     const response = await fetch(`${LEVELS_PATH}/${levelNumber}.json`, { cache: "default" });
     if (!response.ok) {
@@ -620,6 +627,9 @@ function normalizeLevelNumber(value) {
 }
 
 async function loadLevelManifestNumbers() {
+  if (IS_FILE_PROTOCOL) {
+    return [];
+  }
   try {
     const response = await fetch(LEVEL_MANIFEST_PATH, { cache: "default" });
     if (!response.ok) {
@@ -669,6 +679,9 @@ async function loadLevelDefinitionsByNumbers(levelNumbers) {
 }
 
 async function loadLevelDefinitions() {
+  if (IS_FILE_PROTOCOL) {
+    return [];
+  }
   const manifestNumbers = await loadLevelManifestNumbers();
   if (manifestNumbers.length > 0) {
     return loadLevelDefinitionsByNumbers(manifestNumbers);
@@ -2915,8 +2928,7 @@ class Game {
       this.registerChickenSpriteImageSource(color, src);
     }
     // For file:// sessions directory listing is often unavailable; probe by predictable color filenames.
-    const isFileProtocol = typeof window !== "undefined" && window.location?.protocol === "file:";
-    if (isFileProtocol) {
+    if (IS_FILE_PROTOCOL) {
       for (const color of Object.keys(BLOCK_TILE_SOURCE_BY_COLOR)) {
         this.registerChickenSpriteImageSource(color, `ui/birds/${color}.png`);
       }
@@ -2974,6 +2986,9 @@ class Game {
   }
 
   async discoverChickenSpriteSourcesFromUiDirectory() {
+    if (IS_FILE_PROTOCOL) {
+      return;
+    }
     if (typeof fetch !== "function") {
       return;
     }
@@ -3070,6 +3085,9 @@ class Game {
   }
 
   async discoverBlockTileSourcesFromUiDirectory() {
+    if (IS_FILE_PROTOCOL) {
+      return;
+    }
     if (typeof fetch !== "function") {
       return;
     }
@@ -3473,10 +3491,17 @@ class Game {
         return key;
       }
     }
+    const fallbackChickenSamplesByColor = {};
+    for (const key of loadedKeys) {
+      const sample = this.chickenSpriteColorSampleByColor[key] || this.getColorSampleForColorKey(key);
+      if (sample) {
+        fallbackChickenSamplesByColor[key] = sample;
+      }
+    }
     const nearest = this.getNearestColorKeyFromSample(
       this.getColorSampleForColorKey(requestedColor),
       loadedKeys,
-      this.chickenSpriteColorSampleByColor
+      fallbackChickenSamplesByColor
     );
     if (nearest) {
       return nearest;
