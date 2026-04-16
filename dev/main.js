@@ -4707,7 +4707,7 @@ class Game {
       if (this.gameState === "loading") {
         this.restart();
       }
-    }, 1000);
+    }, 500);
   }
 
   getDebugSettingsState() {
@@ -11501,6 +11501,7 @@ async function bootstrapGame() {
         clearTimeout(game.previewEnableFallbackTimer);
         game.previewEnableFallbackTimer = null;
       }
+      game.previewEnabledBySetLevel = true;
       game.applyLevelConfig(selection.targetLevelId, {
         restart: true,
         displayLevelNumber: selection.displayLevelNumber,
@@ -11508,7 +11509,6 @@ async function bootstrapGame() {
       game.externalLevelSelectionDeferred = false;
       game.syncDebugContentSelectors();
       game.saveDebugSettings();
-      game.previewEnabledBySetLevel = true;
       dispatchUnityLevelLoadedTrackEvent("success");
       return true;
     } catch {
