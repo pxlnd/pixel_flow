@@ -3,7 +3,11 @@ class SoundManager {
     this.definitionByName = new Map();
     this.bufferByName = new Map();
     this.loadingByName = new Map();
+    this.webAudioFailureByName = new Set();
     this.poolByName = new Map();
+    this.lastPlayAtByName = new Map();
+    this.webAudioGainByName = new Map();
+    this.webAudioMasterGain = null;
     this.audioContext = null;
     this.webAudioEnabled = false;
     this.unlocked = false;
@@ -17,9 +21,13 @@ class SoundManager {
       try {
         this.audioContext = new AudioContextClass({ latencyHint: "interactive" });
         this.webAudioEnabled = true;
+        this.webAudioMasterGain = this.audioContext.createGain();
+        this.webAudioMasterGain.gain.value = 1;
+        this.webAudioMasterGain.connect(this.audioContext.destination);
       } catch {
         this.audioContext = null;
         this.webAudioEnabled = false;
+        this.webAudioMasterGain = null;
       }
     }
 
@@ -30,12 +38,21 @@ class SoundManager {
       }
       const channelsCount = Math.max(1, Math.min(8, Math.round(Number(config.channels) || 1)));
       const volume = Number.isFinite(config.volume) ? Math.max(0, Math.min(1, config.volume)) : 1;
+      const minIntervalMs = Math.max(0, Math.round(Number(config?.minIntervalMs) || 0));
       this.definitionByName.set(name, {
         src,
         channelsCount,
         volume,
+        minIntervalMs,
       });
     }
+  }
+
+  getNowMs() {
+    if (typeof performance !== "undefined" && typeof performance.now === "function") {
+      return performance.now();
+    }
+    return Date.now();
   }
 
   ensureFallbackPool(name) {
@@ -59,6 +76,11 @@ class SoundManager {
       }
       audio.preload = "auto";
       audio.volume = definition.volume;
+      try {
+        audio.load();
+      } catch {
+        // Ignore eager-loading failures.
+      }
       channels.push(audio);
     }
     if (channels.length === 0) {
@@ -131,6 +153,9 @@ class SoundManager {
     if (!this.webAudioEnabled || !this.audioContext) {
       return Promise.resolve(null);
     }
+    if (this.webAudioFailureByName.has(name)) {
+      return Promise.resolve(null);
+    }
     if (this.bufferByName.has(name)) {
       return Promise.resolve(this.bufferByName.get(name));
     }
@@ -145,14 +170,17 @@ class SoundManager {
     const loadingPromise = (async () => {
       try {
         const response = await fetch(definition.src, { cache: "force-cache" });
-        if (!response.ok) {
+        const raw = await response.arrayBuffer();
+        if (!raw || raw.byteLength === 0) {
+          this.webAudioFailureByName.add(name);
           return null;
         }
-        const raw = await response.arrayBuffer();
         const decoded = await this.decodeAudioData(this.audioContext, raw.slice(0));
         this.bufferByName.set(name, decoded);
+        this.webAudioFailureByName.delete(name);
         return decoded;
       } catch {
+        this.webAudioFailureByName.add(name);
         return null;
       } finally {
         this.loadingByName.delete(name);
@@ -225,10 +253,14 @@ class SoundManager {
       }
       const source = this.audioContext.createBufferSource();
       source.buffer = buffer;
-      const gain = this.audioContext.createGain();
-      gain.gain.value = definition.volume;
+      let gain = this.webAudioGainByName.get(name) || null;
+      if (!gain) {
+        gain = this.audioContext.createGain();
+        gain.gain.value = definition.volume;
+        gain.connect(this.webAudioMasterGain || this.audioContext.destination);
+        this.webAudioGainByName.set(name, gain);
+      }
       source.connect(gain);
-      gain.connect(this.audioContext.destination);
       source.start(0);
       return true;
     } catch {
@@ -276,6 +308,9 @@ class SoundManager {
       return;
     }
     this.unlocked = true;
+    for (const name of this.definitionByName.keys()) {
+      this.ensureFallbackPool(name);
+    }
     if (this.webAudioEnabled && this.audioContext) {
       void this.audioContext.resume();
       this.queueWarmupBuffers();
@@ -284,14 +319,25 @@ class SoundManager {
   }
 
   play(name) {
+    const definition = this.definitionByName.get(name);
+    if (!definition) {
+      return;
+    }
+    const now = this.getNowMs();
+    if (definition.minIntervalMs > 0) {
+      const lastPlayAt = this.lastPlayAtByName.get(name) ?? -Infinity;
+      if (now - lastPlayAt < definition.minIntervalMs) {
+        return;
+      }
+      this.lastPlayAtByName.set(name, now);
+    }
     if (this.webAudioEnabled) {
       this.queueWarmupBuffers();
       if (this.playFromWebAudio(name)) {
         return;
       }
-      void this.ensureBufferLoaded(name);
-      if (name === "buble") {
-        return;
+      if (!this.webAudioFailureByName.has(name)) {
+        void this.ensureBufferLoaded(name);
       }
     }
     this.playFromFallbackPool(name);
