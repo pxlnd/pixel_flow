@@ -8,18 +8,12 @@ class SoundManager {
     this.webAudioEnabled = false;
     this.unlocked = false;
     this.warmupStarted = false;
-    this.isFileProtocol =
-      typeof window !== "undefined"
-      && window.location
-      && window.location.protocol === "file:";
 
     const AudioContextClass =
       typeof window !== "undefined"
         ? (window.AudioContext || window.webkitAudioContext || null)
         : null;
-    // In file:// mode many browsers block fetch/decode for local audio files.
-    // Prefer HTMLAudio fallback there to keep SFX reliable in direct index.html runs.
-    if (!this.isFileProtocol && AudioContextClass && typeof fetch === "function") {
+    if (AudioContextClass && typeof fetch === "function") {
       try {
         this.audioContext = new AudioContextClass({ latencyHint: "interactive" });
         this.webAudioEnabled = true;
@@ -73,12 +67,6 @@ class SoundManager {
     const pool = { channels, cursor: 0 };
     this.poolByName.set(name, pool);
     return pool;
-  }
-
-  ensureAllFallbackPools() {
-    for (const name of this.definitionByName.keys()) {
-      this.ensureFallbackPool(name);
-    }
   }
 
   queueWarmupBuffers() {
@@ -292,7 +280,6 @@ class SoundManager {
       void this.audioContext.resume();
       this.queueWarmupBuffers();
     }
-    this.ensureAllFallbackPools();
     this.unlockFallbackPools();
   }
 
@@ -303,6 +290,9 @@ class SoundManager {
         return;
       }
       void this.ensureBufferLoaded(name);
+      if (name === "buble") {
+        return;
+      }
     }
     this.playFromFallbackPool(name);
   }
