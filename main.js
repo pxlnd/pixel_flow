@@ -3473,10 +3473,17 @@ class Game {
         return key;
       }
     }
+    const fallbackChickenSamplesByColor = {};
+    for (const key of loadedKeys) {
+      const sample = this.chickenSpriteColorSampleByColor[key] || this.getColorSampleForColorKey(key);
+      if (sample) {
+        fallbackChickenSamplesByColor[key] = sample;
+      }
+    }
     const nearest = this.getNearestColorKeyFromSample(
       this.getColorSampleForColorKey(requestedColor),
       loadedKeys,
-      this.chickenSpriteColorSampleByColor
+      fallbackChickenSamplesByColor
     );
     if (nearest) {
       return nearest;
