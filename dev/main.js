@@ -111,7 +111,7 @@ const SOUND_DEFINITIONS = {
   fail: { src: "sounds/Fail.mp3", channels: 1, volume: 0.9 },
   no_moves: { src: "sounds/no_moves.mp3", channels: 1, volume: 0.9 },
   win: { src: "sounds/Win.mp3", channels: 1, volume: 0.9 },
-  buble: { src: "sounds/Bubble.mp3", channels: 5, volume: 0.75 },
+  buble: { src: "sounds/Bubble.mp3", channels: 6, volume: 0.75, minIntervalMs: 38 },
   tap: { src: "sounds/tap.mp3", channels: 3, volume: 0.85 },
 };
 
