@@ -837,6 +837,7 @@ const CHICKEN_SPRITE_SOURCE_BY_COLOR = {
   white: "ui/birds/white.png",
   yellow: "ui/birds/yellow.png",
   red: "ui/birds/red.png",
+  red_alt: "ui/birds/малиновый.png",
   orange: "ui/birds/orange.png",
   brown: "ui/birds/brown.png",
   light_purple: "ui/birds/light_purple.png",
@@ -851,7 +852,7 @@ const CHICKEN_SPRITE_SOURCE_BY_COLOR = {
   very_dark_blue: "ui/birds/very_dark_blue.png",
   blue_alt: "ui/birds/blue_alt.png",
   levender: "ui/birds/levender.png",
-  малиновый: "ui/birds/малиновый.png",
+  малиновый: "ui/birds/малиновый.png",
 };
 
 const BLOCK_TILE_SOURCE_BY_COLOR = {
@@ -889,6 +890,7 @@ const BLOCK_TILE_COLOR_ALIASES = {
   sky: "blue",
   lime: "light_green",
   crimson: "red_alt",
+  малиновый: "red_alt",
   grey: "gray",
   lilac: "orchid",
 };
