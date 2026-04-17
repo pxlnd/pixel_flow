@@ -8573,6 +8573,10 @@ class Game {
     }
   }
 
+  shouldShowTopActionButtons() {
+    return this.gameState !== "loading" && this.gameState !== "preview" && this.gameState !== "victory";
+  }
+
   drawBackButton(ctx) {
     if (!this.backButtonImage.complete || this.backButtonImage.naturalWidth === 0) {
       return;
@@ -9233,8 +9237,10 @@ class Game {
     if (this.gameState === "loading") {
       this.drawLoading(ctx);
       this.drawTopTimerPanel(ctx);
-      this.drawTopCoinsPanel(ctx);
-      this.drawBackButton(ctx);
+      if (this.shouldShowTopActionButtons()) {
+        this.drawTopCoinsPanel(ctx);
+        this.drawBackButton(ctx);
+      }
       ctx.restore();
       this.needsRender = false;
       return;
@@ -9243,8 +9249,10 @@ class Game {
     if (this.gameState === "preview") {
       this.drawLevelPreview(ctx);
       this.drawTopTimerPanel(ctx);
-      this.drawTopCoinsPanel(ctx);
-      this.drawBackButton(ctx);
+      if (this.shouldShowTopActionButtons()) {
+        this.drawTopCoinsPanel(ctx);
+        this.drawBackButton(ctx);
+      }
       ctx.restore();
       this.needsRender = false;
       return;
@@ -9262,8 +9270,10 @@ class Game {
       ctx.restore();
       this.drawConfetti(ctx);
       this.drawTopTimerPanel(ctx);
-      this.drawTopCoinsPanel(ctx);
-      this.drawBackButton(ctx);
+      if (this.shouldShowTopActionButtons()) {
+        this.drawTopCoinsPanel(ctx);
+        this.drawBackButton(ctx);
+      }
       this.drawLevelStartFade(ctx);
       ctx.restore();
       this.needsRender = false;
@@ -9296,8 +9306,10 @@ class Game {
     ctx.restore();
     this.drawConfetti(ctx);
     this.drawTopTimerPanel(ctx);
-    this.drawTopCoinsPanel(ctx);
-    this.drawBackButton(ctx);
+    if (this.shouldShowTopActionButtons()) {
+      this.drawTopCoinsPanel(ctx);
+      this.drawBackButton(ctx);
+    }
     this.drawTutorialHand(ctx);
     this.drawLevelStartFade(ctx);
     if (this.gameState === "lose") {
@@ -9433,10 +9445,8 @@ class Game {
       this.canvas.style.cursor = overClose || overContinue || overFree || overOfferPurchase ? "pointer" : "default";
       return;
     }
-    if (this.gameState === "victory") {
-      const overBack = isInsideRect(x, y, this.backButtonRect);
-      const overRestart = isInsideRect(x, y, this.restartButtonRect);
-      this.canvas.style.cursor = overBack || overRestart ? "pointer" : "default";
+    if (!this.shouldShowTopActionButtons()) {
+      this.canvas.style.cursor = "default";
       return;
     }
     const overBack = isInsideRect(x, y, this.backButtonRect);
@@ -9451,7 +9461,8 @@ class Game {
       }
       return;
     }
-    if (isInsideRect(x, y, this.restartButtonRect)) {
+    const sideButtonsVisible = this.shouldShowTopActionButtons();
+    if (sideButtonsVisible && isInsideRect(x, y, this.restartButtonRect)) {
       this.restart();
       return;
     }
@@ -9498,7 +9509,7 @@ class Game {
       }
       return;
     }
-    if (isInsideRect(x, y, this.backButtonRect)) {
+    if (sideButtonsVisible && isInsideRect(x, y, this.backButtonRect)) {
       dispatchUnityCloseEvent(this);
       return;
     }
