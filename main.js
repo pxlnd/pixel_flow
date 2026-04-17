@@ -8579,6 +8579,10 @@ class Game {
     return this.gameState !== "loading" && this.gameState !== "preview" && this.gameState !== "victory";
   }
 
+  shouldShowTopLevelPanel() {
+    return this.gameState !== "loading";
+  }
+
   drawBackButton(ctx) {
     if (!this.backButtonImage.complete || this.backButtonImage.naturalWidth === 0) {
       return;
@@ -9238,7 +9242,9 @@ class Game {
 
     if (this.gameState === "loading") {
       this.drawLoading(ctx);
-      this.drawTopTimerPanel(ctx);
+      if (this.shouldShowTopLevelPanel()) {
+        this.drawTopTimerPanel(ctx);
+      }
       if (this.shouldShowTopActionButtons()) {
         this.drawTopCoinsPanel(ctx);
         this.drawBackButton(ctx);
@@ -9250,7 +9256,9 @@ class Game {
 
     if (this.gameState === "preview") {
       this.drawLevelPreview(ctx);
-      this.drawTopTimerPanel(ctx);
+      if (this.shouldShowTopLevelPanel()) {
+        this.drawTopTimerPanel(ctx);
+      }
       if (this.shouldShowTopActionButtons()) {
         this.drawTopCoinsPanel(ctx);
         this.drawBackButton(ctx);
@@ -9271,7 +9279,9 @@ class Game {
       this.drawDebugPaintOverlay(ctx);
       ctx.restore();
       this.drawConfetti(ctx);
-      this.drawTopTimerPanel(ctx);
+      if (this.shouldShowTopLevelPanel()) {
+        this.drawTopTimerPanel(ctx);
+      }
       if (this.shouldShowTopActionButtons()) {
         this.drawTopCoinsPanel(ctx);
         this.drawBackButton(ctx);
@@ -9307,7 +9317,9 @@ class Game {
     this.drawDebugPaintOverlay(ctx);
     ctx.restore();
     this.drawConfetti(ctx);
-    this.drawTopTimerPanel(ctx);
+    if (this.shouldShowTopLevelPanel()) {
+      this.drawTopTimerPanel(ctx);
+    }
     if (this.shouldShowTopActionButtons()) {
       this.drawTopCoinsPanel(ctx);
       this.drawBackButton(ctx);
