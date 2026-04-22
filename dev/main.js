@@ -342,10 +342,8 @@ const PARKED_UNIT_TAP_RADIUS = 86;
 const LEVEL_ONE_TUTORIAL_ID = "1";
 const LEVEL_ONE_TUTORIAL_STEPS = {
   tapBlackCard: "tap-black-card",
-  waitBlackResolved: "wait-black-resolved",
-  tapGreenLeftCard: "tap-green-left-card",
-  waitGreenLeftResolved: "wait-green-left-resolved",
-  tapGreenRightCard: "tap-green-right-card",
+  waitBlackLapComplete: "wait-black-lap-complete",
+  tapGreenCard: "tap-green-card",
   done: "done",
 };
 const QUEUE_CARDS_RAISE_RATIO = 0.3;
@@ -1822,6 +1820,9 @@ class Unit {
         this.position = this.conveyor.pointAtDistance(this.distanceOnTrack);
 
         if (this.loopDistance >= game.conveyor.totalLength) {
+          if (game.onTutorialUnitCompletedFullLoop(this)) {
+            return;
+          }
           if (this.ammo > 0 && game.hasTargetForColor(this.color)) {
             this.loopDistance -= game.conveyor.totalLength;
             this.resetShotLineLocks();
@@ -5333,7 +5334,7 @@ class Game {
       step: LEVEL_ONE_TUTORIAL_STEPS.done,
       handTime: 0,
       firstBlackUnitId: null,
-      firstGreenLeftUnitId: null,
+      gameplayPaused: false,
       lastShownPointerStepTracked: null,
     };
   }
@@ -5382,14 +5383,11 @@ class Game {
       didSwap = true;
     };
 
-    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard || step === LEVEL_ONE_TUTORIAL_STEPS.waitBlackResolved) {
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard || step === LEVEL_ONE_TUTORIAL_STEPS.waitBlackLapComplete) {
       enforceLaneColor(1, "black");
       enforceLaneColor(0, "green");
-    } else if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard || step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenLeftResolved) {
+    } else if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
       enforceLaneColor(0, "green");
-      enforceLaneColor(1, "green");
-    } else if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard) {
-      enforceLaneColor(1, "green");
     }
 
     if (didSwap) {
@@ -5440,9 +5438,36 @@ class Game {
     }
     this.tutorial.active = true;
     this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard;
+    this.tutorial.gameplayPaused = false;
+  }
+
+  isTutorialGameplayPaused() {
+    return this.isLevelOneTutorialEnabled() && this.tutorial?.active && this.tutorial.gameplayPaused === true;
+  }
+
+  pauseTutorialAfterFirstBlackLap(unit) {
+    if (!this.tutorial?.active || !unit || unit.color !== "black") {
+      return false;
+    }
+    if (this.tutorial.step !== LEVEL_ONE_TUTORIAL_STEPS.waitBlackLapComplete) {
+      return false;
+    }
+    if (Number.isFinite(this.tutorial.firstBlackUnitId) && unit.id !== this.tutorial.firstBlackUnitId) {
+      return false;
+    }
+    if (!Number.isFinite(this.tutorial.firstBlackUnitId)) {
+      this.tutorial.firstBlackUnitId = unit.id;
+    }
+    this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard;
+    this.tutorial.gameplayPaused = true;
+    this.tutorial.handTime = 0;
+    this.enforceLevelOneTutorialQueue();
+    this.invalidate(true);
+    return true;
   }
 
   finishTutorial() {
+    this.tutorial.gameplayPaused = false;
     this.tutorial.active = false;
     this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.done;
   }
@@ -5486,12 +5511,8 @@ class Game {
       const card = this.getTutorialTargetCard("black", 1);
       return card ? { type: "card", card } : null;
     }
-    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard) {
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
       const card = this.getTutorialTargetCard("green", 0);
-      return card ? { type: "card", card } : null;
-    }
-    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard) {
-      const card = this.getTutorialTargetCard("green", 1);
       return card ? { type: "card", card } : null;
     }
     return null;
@@ -5505,11 +5526,8 @@ class Game {
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard) {
       return 1;
     }
-    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard) {
+    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
       return 2;
-    }
-    if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard) {
-      return 3;
     }
     return null;
   }
@@ -5611,21 +5629,11 @@ class Game {
     if (!this.tutorial?.active || !unit) {
       return;
     }
-    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitBlackResolved && unit.color === "black") {
-      if (!Number.isFinite(this.tutorial.firstBlackUnitId) || unit.id === this.tutorial.firstBlackUnitId) {
-        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard;
-        this.enforceLevelOneTutorialQueue();
-        this.invalidate(true);
-      }
-      return;
-    }
-    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenLeftResolved && unit.color === "green") {
-      if (!Number.isFinite(this.tutorial.firstGreenLeftUnitId) || unit.id === this.tutorial.firstGreenLeftUnitId) {
-        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard;
-        this.enforceLevelOneTutorialQueue();
-        this.invalidate(true);
-      }
-    }
+    this.pauseTutorialAfterFirstBlackLap(unit);
+  }
+
+  onTutorialUnitCompletedFullLoop(unit) {
+    return this.pauseTutorialAfterFirstBlackLap(unit);
   }
 
   getTutorialActiveUnitById(unitId, color) {
@@ -5641,22 +5649,15 @@ class Game {
     }
     this.tutorial.handTime += dt;
     this.enforceLevelOneTutorialQueue();
-    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitBlackResolved) {
+    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitBlackLapComplete) {
       const firstBlackUnit = this.getTutorialActiveUnitById(this.tutorial.firstBlackUnitId, "black");
       if (!firstBlackUnit) {
-        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard;
-        this.enforceLevelOneTutorialQueue();
-        this.invalidate(true);
+        this.pauseTutorialAfterFirstBlackLap({
+          id: this.tutorial.firstBlackUnitId,
+          color: "black",
+        });
       }
       return;
-    }
-    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenLeftResolved) {
-      const firstGreenUnit = this.getTutorialActiveUnitById(this.tutorial.firstGreenLeftUnitId, "green");
-      if (!firstGreenUnit) {
-        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard;
-        this.enforceLevelOneTutorialQueue();
-        this.invalidate(true);
-      }
     }
   }
 
@@ -5735,15 +5736,23 @@ class Game {
       return false;
     }
 
+    const tutorialSecondTapForcedSpawn =
+      this.isTutorialGameplayPaused()
+      && this.tutorial?.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard;
     const activeUnitCount = this.units.reduce((count, unit) => count + (unit.alive ? 1 : 0), 0);
-    if (activeUnitCount >= ACTIVE_UNITS_LIMIT) {
+    if (!tutorialSecondTapForcedSpawn && activeUnitCount >= ACTIVE_UNITS_LIMIT) {
       return false;
     }
     const card = this.cards[cardIndex];
     if (!card) {
       return false;
     }
-    if (!this.isSpawnAreaClear()) {
+    const tutorialSecondTapBypassesSpawnBlock =
+      this.isTutorialGameplayPaused()
+      && this.tutorial?.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard
+      && card.color === "green"
+      && card.lane === 0;
+    if (!tutorialSecondTapBypassesSpawnBlock && !this.isSpawnAreaClear()) {
       return false;
     }
     if (!this.isFrontRowCard(card)) {
@@ -5776,19 +5785,12 @@ class Game {
     card.used = true;
     if (this.tutorial?.active) {
       if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard && card.color === "black" && card.lane === 1) {
-        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitBlackResolved;
+        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitBlackLapComplete;
         this.tutorial.firstBlackUnitId = unit.id;
       } else if (
-        this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenLeftCard
+        this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard
         && card.color === "green"
         && card.lane === 0
-      ) {
-        this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitGreenLeftResolved;
-        this.tutorial.firstGreenLeftUnitId = unit.id;
-      } else if (
-        this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenRightCard
-        && card.color === "green"
-        && card.lane === 1
       ) {
         this.finishTutorial();
       }
@@ -7570,6 +7572,11 @@ class Game {
     }
     if (this.gameState === "lose") {
       this.losePopupAppear = Math.min(1, this.losePopupAppear + dt / LOSE_POPUP_ANIM_DURATION);
+      return;
+    }
+
+    if (this.isTutorialGameplayPaused()) {
+      this.updateTutorialState(dt);
       return;
     }
 
