@@ -4150,6 +4150,26 @@ class Game {
     }
   }
 
+  setGameState(nextState, options = {}) {
+    const normalizedNextState = String(nextState || "").trim();
+    if (!normalizedNextState) {
+      return this.gameState;
+    }
+    const previousState = this.gameState;
+    const forcePreviewShow = options.forcePreviewShow === true;
+    if (previousState === "preview" && normalizedNextState !== "preview") {
+      dispatchUnityPreviewTrackEvent("hide");
+    }
+    if (
+      normalizedNextState === "preview"
+      && (previousState !== "preview" || forcePreviewShow)
+    ) {
+      dispatchUnityPreviewTrackEvent("show");
+    }
+    this.gameState = normalizedNextState;
+    return this.gameState;
+  }
+
   restart() {
     this.blocks = this.createBlocksFromReference();
     this.blocksBySpiral = this.blocks
@@ -4189,7 +4209,9 @@ class Game {
     this.levelPreviewTime = 0;
     this.losePopupAppear = 1;
 
-    this.gameState = this.previewEnabledBySetLevel ? "preview" : "loading";
+    this.setGameState(this.previewEnabledBySetLevel ? "preview" : "loading", {
+      forcePreviewShow: true,
+    });
     this.remainingBlocks = this.blocks.length;
     this.loseCloseRect = this.getLoseCloseRect();
     this.rebuildBlockFieldLayer();
@@ -7166,7 +7188,7 @@ class Game {
     if (this.gameState === "victory") {
       return;
     }
-    this.gameState = "victory";
+    this.setGameState("victory");
     this.playSound("win");
     this.cameraZoomTarget = VICTORY_ZOOM_TARGET;
     this.victoryConfettiTime = VICTORY_CONFETTI_DURATION;
@@ -7229,7 +7251,7 @@ class Game {
       return;
     }
     this.loseContinueSnapshot = this.buildLoseContinueSnapshotFromCurrentState();
-    this.gameState = "lose";
+    this.setGameState("lose");
     this.playSound("fail");
     const parkedUnits = this.units.filter(
       (unit) => unit.alive && unit.state === "parked" && unit.slotIndex !== null && unit.ammo > 0
@@ -7345,7 +7367,7 @@ class Game {
       }
     }
     this.normalizeShooterQueues(this.cards);
-    this.gameState = "playing";
+    this.setGameState("playing");
     this.losePopupAppear = 1;
     this.successStreak = 0;
     this.streakTimer = 0;
@@ -7461,7 +7483,7 @@ class Game {
     if (this.gameState === "preview") {
       this.levelPreviewTime = Math.min(LEVEL_PREVIEW_TOTAL_DURATION, this.levelPreviewTime + dt);
       if (this.levelPreviewTime >= LEVEL_PREVIEW_TOTAL_DURATION) {
-        this.gameState = "playing";
+        this.setGameState("playing");
       }
       return;
     }
@@ -11336,80 +11358,105 @@ function dispatchUnityRewardEvent() {
   }
 }
 
-function dispatchUnityTapTrackEvent() {
+const UNITY_TRACK_EVENT_DISPATCH_INTERVAL_MS = 40;
+const unityTrackEventQueue = [];
+let unityTrackEventTimer = null;
+
+function scheduleUnityTrackQueueFlush(delayMs = 0) {
+  if (unityTrackEventTimer !== null) {
+    return;
+  }
+  unityTrackEventTimer = setTimeout(() => {
+    flushUnityTrackEventQueue();
+  }, Math.max(0, Math.round(Number(delayMs) || 0)));
+}
+
+function flushUnityTrackEventQueue() {
+  if (typeof window === "undefined") {
+    unityTrackEventQueue.length = 0;
+    unityTrackEventTimer = null;
+    return;
+  }
+  if (unityTrackEventQueue.length === 0) {
+    unityTrackEventTimer = null;
+    return;
+  }
+  const nextUrl = unityTrackEventQueue.shift();
+  try {
+    window.location.href = nextUrl;
+  } catch {
+    // Ignore dispatch failures and continue draining the queue.
+  }
+  if (unityTrackEventQueue.length === 0) {
+    unityTrackEventTimer = null;
+    return;
+  }
+  unityTrackEventTimer = null;
+  scheduleUnityTrackQueueFlush(UNITY_TRACK_EVENT_DISPATCH_INTERVAL_MS);
+}
+
+function enqueueUnityTrackEventUrl(url, options = {}) {
   if (typeof window === "undefined") {
     return false;
   }
-  try {
-    window.location.href = "uniwebview://track?event=tap&event_action=screen";
-    return true;
-  } catch {
+  const normalizedUrl = String(url || "").trim();
+  if (!normalizedUrl) {
     return false;
   }
+  const { dropWhenQueueIsBusy = false } = options;
+  if (dropWhenQueueIsBusy && unityTrackEventQueue.length >= 8) {
+    return false;
+  }
+  unityTrackEventQueue.push(normalizedUrl);
+  scheduleUnityTrackQueueFlush(0);
+  return true;
+}
+
+function dispatchUnityTapTrackEvent() {
+  return enqueueUnityTrackEventUrl("uniwebview://track?event=tap&event_action=screen", {
+    dropWhenQueueIsBusy: true,
+  });
+}
+
+function dispatchUnityPreviewTrackEvent(eventAction) {
+  const normalizedAction = String(eventAction || "").trim().toLowerCase();
+  if (normalizedAction !== "show" && normalizedAction !== "hide") {
+    return false;
+  }
+  const encodedAction = encodeURIComponent(normalizedAction);
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=preview&event_action=${encodedAction}&action=${encodedAction}`);
 }
 
 function dispatchUnityLevelLoadedTrackEvent(eventAction) {
-  if (typeof window === "undefined") {
-    return false;
-  }
   const normalizedAction = String(eventAction || "").trim().toLowerCase();
   if (normalizedAction !== "success" && normalizedAction !== "failure") {
     return false;
   }
-  try {
-    window.location.href = `uniwebview://track?event=level_loaded&event_action=${encodeURIComponent(normalizedAction)}`;
-    return true;
-  } catch {
-    return false;
-  }
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=level_loaded&event_action=${encodeURIComponent(normalizedAction)}`);
 }
 
 function dispatchUnityTutorialBirdTrackEvent(stepNumber) {
-  if (typeof window === "undefined") {
-    return false;
-  }
   const normalizedStep = Math.max(1, Math.trunc(Number(stepNumber) || 0));
   if (!Number.isFinite(normalizedStep)) {
     return false;
   }
-  try {
-    window.location.href = `uniwebview://track?event=tutorial_bird&event_action=${encodeURIComponent(String(normalizedStep))}`;
-    return true;
-  } catch {
-    return false;
-  }
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=tutorial_bird&event_action=${encodeURIComponent(String(normalizedStep))}`);
 }
 
 function dispatchUnityTutorialPointerShowTrackEvent(stepNumber) {
-  if (typeof window === "undefined") {
-    return false;
-  }
   const normalizedStep = Math.max(1, Math.trunc(Number(stepNumber) || 0));
   if (!Number.isFinite(normalizedStep)) {
     return false;
   }
-  try {
-    window.location.href = `uniwebview://track?event=tutorial_pointer_show&event_action=${encodeURIComponent(String(normalizedStep))}`;
-    return true;
-  } catch {
-    return false;
-  }
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=tutorial_pointer_show&event_action=${encodeURIComponent(String(normalizedStep))}`);
 }
 
 function dispatchUnityLosePopupTrackEvent(eventAction) {
-  if (typeof window === "undefined") {
-    return false;
-  }
   const normalizedAction = String(eventAction || "").trim();
   if (!normalizedAction) {
     return false;
   }
-  try {
-    window.location.href = `uniwebview://track?event=lose_popup&event_action=${encodeURIComponent(normalizedAction)}`;
-    return true;
-  } catch {
-    return false;
-  }
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=lose_popup&event_action=${encodeURIComponent(normalizedAction)}`);
 }
 
 function dispatchUnitySubscriptionRequestEvent() {
