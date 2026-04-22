@@ -2655,6 +2655,7 @@ class Game {
     this.previewEnabledBySetLevel = false;
     this.previewEnableFallbackTimer = null;
     this.previewEnableFallbackToken = 0;
+    this.queueCompletionTrackPending = false;
     this.losePopupAppear = 1;
     this.debugPanel = document.getElementById("debugPanel");
     this.debugButton = document.getElementById("debug6");
@@ -4150,6 +4151,26 @@ class Game {
     }
   }
 
+  setGameState(nextState, options = {}) {
+    const normalizedNextState = String(nextState || "").trim();
+    if (!normalizedNextState) {
+      return this.gameState;
+    }
+    const previousState = this.gameState;
+    const forcePreviewShow = options.forcePreviewShow === true;
+    if (previousState === "preview" && normalizedNextState !== "preview") {
+      dispatchUnityPreviewTrackEvent("hide");
+    }
+    if (
+      normalizedNextState === "preview"
+      && (previousState !== "preview" || forcePreviewShow)
+    ) {
+      dispatchUnityPreviewTrackEvent("show");
+    }
+    this.gameState = normalizedNextState;
+    return this.gameState;
+  }
+
   restart() {
     this.blocks = this.createBlocksFromReference();
     this.blocksBySpiral = this.blocks
@@ -4188,8 +4209,11 @@ class Game {
     this.levelStartFade = 0;
     this.levelPreviewTime = 0;
     this.losePopupAppear = 1;
+    this.queueCompletionTrackPending = true;
 
-    this.gameState = this.previewEnabledBySetLevel ? "preview" : "loading";
+    this.setGameState(this.previewEnabledBySetLevel ? "preview" : "loading", {
+      forcePreviewShow: true,
+    });
     this.remainingBlocks = this.blocks.length;
     this.loseCloseRect = this.getLoseCloseRect();
     this.rebuildBlockFieldLayer();
@@ -5310,6 +5334,7 @@ class Game {
       handTime: 0,
       firstBlackUnitId: null,
       firstGreenLeftUnitId: null,
+      lastShownPointerStepTracked: null,
     };
   }
 
@@ -5497,6 +5522,76 @@ class Game {
     return dispatchUnityTutorialBirdTrackEvent(stepNumber);
   }
 
+  getQueueChickenTapId(card) {
+    if (!card) {
+      return null;
+    }
+    const activeCards = this.cards
+      .filter((entry) => entry && !entry.used)
+      .slice()
+      .sort((a, b) => (a.row - b.row) || (a.lane - b.lane) || (a.index - b.index));
+    const queueIndex = activeCards.findIndex((entry) => entry.index === card.index);
+    if (queueIndex >= 0) {
+      return queueIndex + 1;
+    }
+    const fallbackIndex = Math.trunc(Number(card.index) || 0);
+    if (!Number.isFinite(fallbackIndex) || fallbackIndex < 0) {
+      return null;
+    }
+    return fallbackIndex + 1;
+  }
+
+  trackChickenTap(card, action) {
+    const chickenId = this.getQueueChickenTapId(card);
+    if (!Number.isFinite(chickenId)) {
+      return false;
+    }
+    const blockedByQueue = this.cardManager?.isCardBlockedByFront(card) === true;
+    const resolvedAction = blockedByQueue ? "blocked_queue" : action;
+    return dispatchUnityChickenTapTrackEvent(chickenId, resolvedAction);
+  }
+
+  getParkedChickenTapId(unit) {
+    if (!unit) {
+      return null;
+    }
+    const labelId = Math.trunc(Number(unit.label) || 0);
+    if (Number.isFinite(labelId) && labelId > 0) {
+      return labelId;
+    }
+    const unitId = Math.trunc(Number(unit.id) || 0);
+    if (Number.isFinite(unitId) && unitId > 0) {
+      return unitId;
+    }
+    return null;
+  }
+
+  trackParkedChickenTap(unit, action) {
+    const chickenId = this.getParkedChickenTapId(unit);
+    if (!Number.isFinite(chickenId)) {
+      return false;
+    }
+    return dispatchUnityChickenTapTrackEvent(chickenId, action);
+  }
+
+  trackTutorialPointerShow() {
+    if (!this.tutorial?.active) {
+      return false;
+    }
+    const stepNumber = this.getTutorialBirdStepNumber();
+    if (!Number.isFinite(stepNumber)) {
+      return false;
+    }
+    if (this.tutorial.lastShownPointerStepTracked === stepNumber) {
+      return false;
+    }
+    const tracked = dispatchUnityTutorialPointerShowTrackEvent(stepNumber);
+    if (tracked) {
+      this.tutorial.lastShownPointerStepTracked = stepNumber;
+    }
+    return tracked;
+  }
+
   isPointOnTutorialTarget(target, x, y) {
     if (!target) {
       return false;
@@ -5577,6 +5672,7 @@ class Game {
     if (!hand || !hand.complete || hand.naturalWidth <= 0 || hand.naturalHeight <= 0) {
       return;
     }
+    this.trackTutorialPointerShow();
 
     let targetX = 0;
     let targetY = 0;
@@ -5775,7 +5871,9 @@ class Game {
       }
     }
     if (bestUnit) {
-      return this.relaunchParkedUnit(bestUnit);
+      const didRelaunch = this.relaunchParkedUnit(bestUnit);
+      this.trackParkedChickenTap(bestUnit, didRelaunch ? "add" : "blocked_full");
+      return didRelaunch;
     }
     return false;
   }
@@ -7146,7 +7244,7 @@ class Game {
     if (this.gameState === "victory") {
       return;
     }
-    this.gameState = "victory";
+    this.setGameState("victory");
     this.playSound("win");
     this.cameraZoomTarget = VICTORY_ZOOM_TARGET;
     this.victoryConfettiTime = VICTORY_CONFETTI_DURATION;
@@ -7209,7 +7307,7 @@ class Game {
       return;
     }
     this.loseContinueSnapshot = this.buildLoseContinueSnapshotFromCurrentState();
-    this.gameState = "lose";
+    this.setGameState("lose");
     this.playSound("fail");
     const parkedUnits = this.units.filter(
       (unit) => unit.alive && unit.state === "parked" && unit.slotIndex !== null && unit.ammo > 0
@@ -7325,7 +7423,7 @@ class Game {
       }
     }
     this.normalizeShooterQueues(this.cards);
-    this.gameState = "playing";
+    this.setGameState("playing");
     this.losePopupAppear = 1;
     this.successStreak = 0;
     this.streakTimer = 0;
@@ -7441,7 +7539,7 @@ class Game {
     if (this.gameState === "preview") {
       this.levelPreviewTime = Math.min(LEVEL_PREVIEW_TOTAL_DURATION, this.levelPreviewTime + dt);
       if (this.levelPreviewTime >= LEVEL_PREVIEW_TOTAL_DURATION) {
-        this.gameState = "playing";
+        this.setGameState("playing");
       }
       return;
     }
@@ -8311,15 +8409,32 @@ class Game {
   drawCardState(ctx) {
     const queueLiftY = this.getQueueVisualLiftY();
     const cardsToDraw = [...this.cards].sort((a, b) => a.row - b.row);
+    let activeQueueCards = 0;
+    let renderedQueueChickens = 0;
     for (const card of cardsToDraw) {
       if (card.used) {
         continue;
       }
+      activeQueueCards += 1;
       const queueScale = clamp(card.queueScale || 1, 0.88, 1.12);
-      if (!this.drawQueueChicken(ctx, card, queueScale)) {
+      const renderedAsChicken = this.drawQueueChicken(ctx, card, queueScale);
+      if (renderedAsChicken) {
+        renderedQueueChickens += 1;
+      } else {
         const center = this.getCardPigCenter(card);
         this.drawUnitBlock(ctx, center.x, center.y - queueLiftY, UNIT_BLOCK_SIZE * queueScale, card.color, 1);
         this.drawAmmoOnBlock(ctx, center.x, center.y - queueLiftY, card.ammo, 30 * queueScale);
+      }
+    }
+    if (
+      this.queueCompletionTrackPending &&
+      this.gameState === "playing" &&
+      activeQueueCards > 0 &&
+      renderedQueueChickens === activeQueueCards
+    ) {
+      const tracked = dispatchUnityChickenQueueTrackEvent("completed");
+      if (tracked) {
+        this.queueCompletionTrackPending = false;
       }
     }
   }
@@ -9477,6 +9592,7 @@ class Game {
     }
     const sideButtonsVisible = this.shouldShowTopActionButtons();
     if (sideButtonsVisible && isInsideRect(x, y, this.restartButtonRect)) {
+      dispatchUnityLevelTrackEvent("restart");
       this.restart();
       return;
     }
@@ -9487,6 +9603,7 @@ class Game {
           visualLiftY: this.getQueueVisualLiftY(),
         });
         if (anyCard) {
+          this.trackChickenTap(anyCard, "blocked_tutorial");
           this.triggerBlockedQueueTapFeedback(anyCard);
           this.playSound("cant_select");
         }
@@ -9495,11 +9612,13 @@ class Game {
       this.trackTutorialBirdTap();
       if (target.type === "card") {
         const didSpawn = this.spawnUnit(target.card.index);
+        this.trackChickenTap(target.card, didSpawn ? "add" : "blocked_full");
         this.playSound(didSpawn ? "tap" : "cant_select");
         return;
       }
       if (target.type === "parkedUnit") {
-        this.relaunchParkedUnit(target.unit);
+        const didRelaunch = this.relaunchParkedUnit(target.unit);
+        this.trackParkedChickenTap(target.unit, didRelaunch ? "add" : "blocked_full");
       }
       return;
     }
@@ -9538,6 +9657,7 @@ class Game {
     });
     if (tapCard) {
       const didSpawn = this.spawnUnit(tapCard.index);
+      this.trackChickenTap(tapCard, didSpawn ? "add" : "blocked_full");
       this.playSound(didSpawn ? "tap" : "cant_select");
       return;
     }
@@ -9545,6 +9665,7 @@ class Game {
       visualLiftY: this.getQueueVisualLiftY(),
     });
     if (anyCard) {
+      this.trackChickenTap(anyCard, "blocked_full");
       this.triggerBlockedQueueTapFeedback(anyCard);
       this.playSound("cant_select");
     }
@@ -11316,64 +11437,143 @@ function dispatchUnityRewardEvent() {
   }
 }
 
-function dispatchUnityTapTrackEvent() {
+const UNITY_TRACK_EVENT_DISPATCH_INTERVAL_MS = 40;
+const unityTrackEventQueue = [];
+let unityTrackEventTimer = null;
+
+function scheduleUnityTrackQueueFlush(delayMs = 0) {
+  if (unityTrackEventTimer !== null) {
+    return;
+  }
+  unityTrackEventTimer = setTimeout(() => {
+    flushUnityTrackEventQueue();
+  }, Math.max(0, Math.round(Number(delayMs) || 0)));
+}
+
+function flushUnityTrackEventQueue() {
+  if (typeof window === "undefined") {
+    unityTrackEventQueue.length = 0;
+    unityTrackEventTimer = null;
+    return;
+  }
+  if (unityTrackEventQueue.length === 0) {
+    unityTrackEventTimer = null;
+    return;
+  }
+  const nextUrl = unityTrackEventQueue.shift();
+  try {
+    window.location.href = nextUrl;
+  } catch {
+    // Ignore dispatch failures and continue draining the queue.
+  }
+  if (unityTrackEventQueue.length === 0) {
+    unityTrackEventTimer = null;
+    return;
+  }
+  unityTrackEventTimer = null;
+  scheduleUnityTrackQueueFlush(UNITY_TRACK_EVENT_DISPATCH_INTERVAL_MS);
+}
+
+function enqueueUnityTrackEventUrl(url, options = {}) {
   if (typeof window === "undefined") {
     return false;
   }
-  try {
-    window.location.href = "uniwebview://track?event=tap&event_action=screen";
-    return true;
-  } catch {
+  const normalizedUrl = String(url || "").trim();
+  if (!normalizedUrl) {
     return false;
   }
+  const { dropWhenQueueIsBusy = false } = options;
+  if (dropWhenQueueIsBusy && unityTrackEventQueue.length >= 8) {
+    return false;
+  }
+  unityTrackEventQueue.push(normalizedUrl);
+  scheduleUnityTrackQueueFlush(0);
+  return true;
+}
+
+function dispatchUnityTapTrackEvent() {
+  return enqueueUnityTrackEventUrl("uniwebview://track?event=tap&event_action=screen", {
+    dropWhenQueueIsBusy: true,
+  });
+}
+
+function dispatchUnityChickenTapTrackEvent(chickenId, action) {
+  const normalizedId = Math.max(1, Math.trunc(Number(chickenId) || 0));
+  if (!Number.isFinite(normalizedId)) {
+    return false;
+  }
+  const normalizedAction = String(action || "").trim().toLowerCase();
+  if (
+    normalizedAction !== "add"
+    && normalizedAction !== "blocked_full"
+    && normalizedAction !== "blocked_tutorial"
+    && normalizedAction !== "blocked_queue"
+  ) {
+    return false;
+  }
+  const encodedEvent = encodeURIComponent(`chicken_tap_${normalizedId}`);
+  const encodedAction = encodeURIComponent(normalizedAction);
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=${encodedEvent}&event_action=${encodedAction}&action=${encodedAction}`);
+}
+
+function dispatchUnityChickenQueueTrackEvent(eventAction) {
+  const normalizedAction = String(eventAction || "").trim().toLowerCase();
+  if (normalizedAction !== "completed") {
+    return false;
+  }
+  const encodedAction = encodeURIComponent(normalizedAction);
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=chicken_queue&event_action=${encodedAction}&action=${encodedAction}`);
+}
+
+function dispatchUnityPreviewTrackEvent(eventAction) {
+  const normalizedAction = String(eventAction || "").trim().toLowerCase();
+  if (normalizedAction !== "show" && normalizedAction !== "hide") {
+    return false;
+  }
+  const encodedAction = encodeURIComponent(normalizedAction);
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=preview&event_action=${encodedAction}&action=${encodedAction}`);
 }
 
 function dispatchUnityLevelLoadedTrackEvent(eventAction) {
-  if (typeof window === "undefined") {
-    return false;
-  }
   const normalizedAction = String(eventAction || "").trim().toLowerCase();
   if (normalizedAction !== "success" && normalizedAction !== "failure") {
     return false;
   }
-  try {
-    window.location.href = `uniwebview://track?event=level_loaded&event_action=${encodeURIComponent(normalizedAction)}`;
-    return true;
-  } catch {
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=level_loaded&event_action=${encodeURIComponent(normalizedAction)}`);
+}
+
+function dispatchUnityLevelTrackEvent(eventAction) {
+  const normalizedAction = String(eventAction || "").trim().toLowerCase();
+  if (!normalizedAction) {
     return false;
   }
+  const encodedAction = encodeURIComponent(normalizedAction);
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=level&event_action=${encodedAction}&action=${encodedAction}`);
 }
 
 function dispatchUnityTutorialBirdTrackEvent(stepNumber) {
-  if (typeof window === "undefined") {
-    return false;
-  }
   const normalizedStep = Math.max(1, Math.trunc(Number(stepNumber) || 0));
   if (!Number.isFinite(normalizedStep)) {
     return false;
   }
-  try {
-    window.location.href = `uniwebview://track?event=tutorial_bird&event_action=${encodeURIComponent(String(normalizedStep))}`;
-    return true;
-  } catch {
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=tutorial_bird&event_action=${encodeURIComponent(String(normalizedStep))}`);
+}
+
+function dispatchUnityTutorialPointerShowTrackEvent(stepNumber) {
+  const normalizedStep = Math.max(1, Math.trunc(Number(stepNumber) || 0));
+  if (!Number.isFinite(normalizedStep)) {
     return false;
   }
+  const encodedStep = encodeURIComponent(String(normalizedStep));
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=tutorial_pointer_show&event_action=${encodedStep}&action=${encodedStep}`);
 }
 
 function dispatchUnityLosePopupTrackEvent(eventAction) {
-  if (typeof window === "undefined") {
-    return false;
-  }
   const normalizedAction = String(eventAction || "").trim();
   if (!normalizedAction) {
     return false;
   }
-  try {
-    window.location.href = `uniwebview://track?event=lose_popup&event_action=${encodeURIComponent(normalizedAction)}`;
-    return true;
-  } catch {
-    return false;
-  }
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=lose_popup&event_action=${encodeURIComponent(normalizedAction)}`);
 }
 
 function dispatchUnitySubscriptionRequestEvent() {
