@@ -9519,6 +9519,7 @@ class Game {
     }
     const sideButtonsVisible = this.shouldShowTopActionButtons();
     if (sideButtonsVisible && isInsideRect(x, y, this.restartButtonRect)) {
+      dispatchUnityLevelTrackEvent("restart");
       this.restart();
       return;
     }
@@ -11433,6 +11434,15 @@ function dispatchUnityLevelLoadedTrackEvent(eventAction) {
     return false;
   }
   return enqueueUnityTrackEventUrl(`uniwebview://track?event=level_loaded&event_action=${encodeURIComponent(normalizedAction)}`);
+}
+
+function dispatchUnityLevelTrackEvent(eventAction) {
+  const normalizedAction = String(eventAction || "").trim().toLowerCase();
+  if (!normalizedAction) {
+    return false;
+  }
+  const encodedAction = encodeURIComponent(normalizedAction);
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=level&event_action=${encodedAction}&action=${encodedAction}`);
 }
 
 function dispatchUnityTutorialBirdTrackEvent(stepNumber) {
