@@ -5310,6 +5310,7 @@ class Game {
       handTime: 0,
       firstBlackUnitId: null,
       firstGreenLeftUnitId: null,
+      lastShownPointerStepTracked: null,
     };
   }
 
@@ -5497,6 +5498,24 @@ class Game {
     return dispatchUnityTutorialBirdTrackEvent(stepNumber);
   }
 
+  trackTutorialPointerShow() {
+    if (!this.tutorial?.active) {
+      return false;
+    }
+    const stepNumber = this.getTutorialBirdStepNumber();
+    if (!Number.isFinite(stepNumber)) {
+      return false;
+    }
+    if (this.tutorial.lastShownPointerStepTracked === stepNumber) {
+      return false;
+    }
+    const tracked = dispatchUnityTutorialPointerShowTrackEvent(stepNumber);
+    if (tracked) {
+      this.tutorial.lastShownPointerStepTracked = stepNumber;
+    }
+    return tracked;
+  }
+
   isPointOnTutorialTarget(target, x, y) {
     if (!target) {
       return false;
@@ -5577,6 +5596,7 @@ class Game {
     if (!hand || !hand.complete || hand.naturalWidth <= 0 || hand.naturalHeight <= 0) {
       return;
     }
+    this.trackTutorialPointerShow();
 
     let targetX = 0;
     let targetY = 0;
@@ -11354,6 +11374,22 @@ function dispatchUnityTutorialBirdTrackEvent(stepNumber) {
   }
   try {
     window.location.href = `uniwebview://track?event=tutorial_bird&event_action=${encodeURIComponent(String(normalizedStep))}`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUnityTutorialPointerShowTrackEvent(stepNumber) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const normalizedStep = Math.max(1, Math.trunc(Number(stepNumber) || 0));
+  if (!Number.isFinite(normalizedStep)) {
+    return false;
+  }
+  try {
+    window.location.href = `uniwebview://track?event=tutorial_pointer_show&event_action=${encodeURIComponent(String(normalizedStep))}`;
     return true;
   } catch {
     return false;
