@@ -2655,6 +2655,7 @@ class Game {
     this.previewEnabledBySetLevel = false;
     this.previewEnableFallbackTimer = null;
     this.previewEnableFallbackToken = 0;
+    this.queueCompletionTrackPending = false;
     this.losePopupAppear = 1;
     this.debugPanel = document.getElementById("debugPanel");
     this.debugButton = document.getElementById("debug6");
@@ -4208,6 +4209,7 @@ class Game {
     this.levelStartFade = 0;
     this.levelPreviewTime = 0;
     this.losePopupAppear = 1;
+    this.queueCompletionTrackPending = true;
 
     this.setGameState(this.previewEnabledBySetLevel ? "preview" : "loading", {
       forcePreviewShow: true,
@@ -8407,15 +8409,32 @@ class Game {
   drawCardState(ctx) {
     const queueLiftY = this.getQueueVisualLiftY();
     const cardsToDraw = [...this.cards].sort((a, b) => a.row - b.row);
+    let activeQueueCards = 0;
+    let renderedQueueChickens = 0;
     for (const card of cardsToDraw) {
       if (card.used) {
         continue;
       }
+      activeQueueCards += 1;
       const queueScale = clamp(card.queueScale || 1, 0.88, 1.12);
-      if (!this.drawQueueChicken(ctx, card, queueScale)) {
+      const renderedAsChicken = this.drawQueueChicken(ctx, card, queueScale);
+      if (renderedAsChicken) {
+        renderedQueueChickens += 1;
+      } else {
         const center = this.getCardPigCenter(card);
         this.drawUnitBlock(ctx, center.x, center.y - queueLiftY, UNIT_BLOCK_SIZE * queueScale, card.color, 1);
         this.drawAmmoOnBlock(ctx, center.x, center.y - queueLiftY, card.ammo, 30 * queueScale);
+      }
+    }
+    if (
+      this.queueCompletionTrackPending &&
+      this.gameState === "playing" &&
+      activeQueueCards > 0 &&
+      renderedQueueChickens === activeQueueCards
+    ) {
+      const tracked = dispatchUnityChickenQueueTrackEvent("completed");
+      if (tracked) {
+        this.queueCompletionTrackPending = false;
       }
     }
   }
@@ -11495,6 +11514,15 @@ function dispatchUnityChickenTapTrackEvent(chickenId, action) {
   const encodedEvent = encodeURIComponent(`chicken_tap_${normalizedId}`);
   const encodedAction = encodeURIComponent(normalizedAction);
   return enqueueUnityTrackEventUrl(`uniwebview://track?event=${encodedEvent}&event_action=${encodedAction}&action=${encodedAction}`);
+}
+
+function dispatchUnityChickenQueueTrackEvent(eventAction) {
+  const normalizedAction = String(eventAction || "").trim().toLowerCase();
+  if (normalizedAction !== "completed") {
+    return false;
+  }
+  const encodedAction = encodeURIComponent(normalizedAction);
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=chicken_queue&event_action=${encodedAction}&action=${encodedAction}`);
 }
 
 function dispatchUnityPreviewTrackEvent(eventAction) {
