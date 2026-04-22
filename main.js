@@ -5520,6 +5520,58 @@ class Game {
     return dispatchUnityTutorialBirdTrackEvent(stepNumber);
   }
 
+  getQueueChickenTapId(card) {
+    if (!card) {
+      return null;
+    }
+    const activeCards = this.cards
+      .filter((entry) => entry && !entry.used)
+      .slice()
+      .sort((a, b) => (a.row - b.row) || (a.lane - b.lane) || (a.index - b.index));
+    const queueIndex = activeCards.findIndex((entry) => entry.index === card.index);
+    if (queueIndex >= 0) {
+      return queueIndex + 1;
+    }
+    const fallbackIndex = Math.trunc(Number(card.index) || 0);
+    if (!Number.isFinite(fallbackIndex) || fallbackIndex < 0) {
+      return null;
+    }
+    return fallbackIndex + 1;
+  }
+
+  trackChickenTap(card, action) {
+    const chickenId = this.getQueueChickenTapId(card);
+    if (!Number.isFinite(chickenId)) {
+      return false;
+    }
+    const blockedByQueue = this.cardManager?.isCardBlockedByFront(card) === true;
+    const resolvedAction = blockedByQueue ? "blocked_queue" : action;
+    return dispatchUnityChickenTapTrackEvent(chickenId, resolvedAction);
+  }
+
+  getParkedChickenTapId(unit) {
+    if (!unit) {
+      return null;
+    }
+    const labelId = Math.trunc(Number(unit.label) || 0);
+    if (Number.isFinite(labelId) && labelId > 0) {
+      return labelId;
+    }
+    const unitId = Math.trunc(Number(unit.id) || 0);
+    if (Number.isFinite(unitId) && unitId > 0) {
+      return unitId;
+    }
+    return null;
+  }
+
+  trackParkedChickenTap(unit, action) {
+    const chickenId = this.getParkedChickenTapId(unit);
+    if (!Number.isFinite(chickenId)) {
+      return false;
+    }
+    return dispatchUnityChickenTapTrackEvent(chickenId, action);
+  }
+
   trackTutorialPointerShow() {
     if (!this.tutorial?.active) {
       return false;
@@ -5817,7 +5869,9 @@ class Game {
       }
     }
     if (bestUnit) {
-      return this.relaunchParkedUnit(bestUnit);
+      const didRelaunch = this.relaunchParkedUnit(bestUnit);
+      this.trackParkedChickenTap(bestUnit, didRelaunch ? "add" : "blocked_full");
+      return didRelaunch;
     }
     return false;
   }
@@ -9530,6 +9584,7 @@ class Game {
           visualLiftY: this.getQueueVisualLiftY(),
         });
         if (anyCard) {
+          this.trackChickenTap(anyCard, "blocked_tutorial");
           this.triggerBlockedQueueTapFeedback(anyCard);
           this.playSound("cant_select");
         }
@@ -9538,11 +9593,13 @@ class Game {
       this.trackTutorialBirdTap();
       if (target.type === "card") {
         const didSpawn = this.spawnUnit(target.card.index);
+        this.trackChickenTap(target.card, didSpawn ? "add" : "blocked_full");
         this.playSound(didSpawn ? "tap" : "cant_select");
         return;
       }
       if (target.type === "parkedUnit") {
-        this.relaunchParkedUnit(target.unit);
+        const didRelaunch = this.relaunchParkedUnit(target.unit);
+        this.trackParkedChickenTap(target.unit, didRelaunch ? "add" : "blocked_full");
       }
       return;
     }
@@ -9581,6 +9638,7 @@ class Game {
     });
     if (tapCard) {
       const didSpawn = this.spawnUnit(tapCard.index);
+      this.trackChickenTap(tapCard, didSpawn ? "add" : "blocked_full");
       this.playSound(didSpawn ? "tap" : "cant_select");
       return;
     }
@@ -9588,6 +9646,7 @@ class Game {
       visualLiftY: this.getQueueVisualLiftY(),
     });
     if (anyCard) {
+      this.trackChickenTap(anyCard, "blocked_full");
       this.triggerBlockedQueueTapFeedback(anyCard);
       this.playSound("cant_select");
     }
@@ -11417,6 +11476,25 @@ function dispatchUnityTapTrackEvent() {
   return enqueueUnityTrackEventUrl("uniwebview://track?event=tap&event_action=screen", {
     dropWhenQueueIsBusy: true,
   });
+}
+
+function dispatchUnityChickenTapTrackEvent(chickenId, action) {
+  const normalizedId = Math.max(1, Math.trunc(Number(chickenId) || 0));
+  if (!Number.isFinite(normalizedId)) {
+    return false;
+  }
+  const normalizedAction = String(action || "").trim().toLowerCase();
+  if (
+    normalizedAction !== "add"
+    && normalizedAction !== "blocked_full"
+    && normalizedAction !== "blocked_tutorial"
+    && normalizedAction !== "blocked_queue"
+  ) {
+    return false;
+  }
+  const encodedEvent = encodeURIComponent(`chicken_tap_${normalizedId}`);
+  const encodedAction = encodeURIComponent(normalizedAction);
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=${encodedEvent}&event_action=${encodedAction}&action=${encodedAction}`);
 }
 
 function dispatchUnityPreviewTrackEvent(eventAction) {
