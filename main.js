@@ -11458,7 +11458,8 @@ function dispatchUnityTutorialPointerShowTrackEvent(stepNumber) {
   if (!Number.isFinite(normalizedStep)) {
     return false;
   }
-  return enqueueUnityTrackEventUrl(`uniwebview://track?event=tutorial_pointer_show&event_action=${encodeURIComponent(String(normalizedStep))}`);
+  const encodedStep = encodeURIComponent(String(normalizedStep));
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=tutorial_pointer_show&event_action=${encodedStep}&action=${encodedStep}`);
 }
 
 function dispatchUnityLosePopupTrackEvent(eventAction) {
