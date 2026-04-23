@@ -11407,6 +11407,14 @@ function dispatchUnityCloseEvent(gameInstance) {
   if (typeof window === "undefined") {
     return false;
   }
+  // Prevent a queued pointer tap track event from overriding the close URL on the same gesture.
+  if (unityTrackEventTimer !== null) {
+    clearTimeout(unityTrackEventTimer);
+    unityTrackEventTimer = null;
+  }
+  if (unityTrackEventQueue.length > 0) {
+    unityTrackEventQueue.length = 0;
+  }
   const coinsCount = resolveExternalCoinsCount(gameInstance);
   const heartsCount = resolveExternalHeartsCount(gameInstance);
   const closeUrl = `uniwebview://close?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
