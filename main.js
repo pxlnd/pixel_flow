@@ -2396,6 +2396,9 @@ class CardManager {
   }
 
   isPointOnCard(card, x, y, options = {}) {
+    if (!card || card.used) {
+      return false;
+    }
     const visualLiftY = Number.isFinite(options.visualLiftY) ? options.visualLiftY : 0;
     const blockedNudgeOffsetY = this.getBlockedTapNudgeOffsetY(card);
     const center = this.getCardPigCenter(card);
@@ -2465,7 +2468,10 @@ class CardManager {
     let best = null;
     let bestDistance = Infinity;
     for (const card of this.cards) {
-      if (!card || !this.isPointOnCard(card, x, y, { visualLiftY })) {
+      if (!card || card.used) {
+        continue;
+      }
+      if (!this.isPointOnCard(card, x, y, { visualLiftY })) {
         continue;
       }
       const center = this.getCardPigCenter(card);
@@ -9598,12 +9604,13 @@ class Game {
       return;
     }
     const sideButtonsVisible = this.shouldShowTopActionButtons();
+    const isTutorialPlaying = this.gameState === "playing" && this.tutorial?.active;
     if (sideButtonsVisible && isInsideRect(x, y, this.restartButtonRect)) {
       dispatchUnityLevelTrackEvent("restart");
       this.restart();
       return;
     }
-    if (this.gameState === "playing" && this.tutorial?.active) {
+    if (isTutorialPlaying) {
       const target = this.getTutorialTapTarget();
       if (!target || !this.isPointOnTutorialTarget(target, x, y)) {
         const anyCard = this.cardManager.findAnyTapTarget(x, y, {
@@ -9649,7 +9656,7 @@ class Game {
       }
       return;
     }
-    if (sideButtonsVisible && isInsideRect(x, y, this.backButtonRect)) {
+    if (!isTutorialPlaying && sideButtonsVisible && isInsideRect(x, y, this.backButtonRect)) {
       dispatchUnityCloseEvent(this);
       return;
     }
@@ -11409,12 +11416,7 @@ function dispatchUnityCloseEvent(gameInstance) {
   const coinsCount = resolveExternalCoinsCount(gameInstance);
   const heartsCount = resolveExternalHeartsCount(gameInstance);
   const closeUrl = `uniwebview://close?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
-  try {
-    window.location.href = closeUrl;
-    return true;
-  } catch {
-    return false;
-  }
+  return dispatchUnityNavigationUrl(closeUrl, { clearTrackQueue: true });
 }
 
 function dispatchUnityCompleteEvent(gameInstance) {
@@ -11424,8 +11426,23 @@ function dispatchUnityCompleteEvent(gameInstance) {
   const coinsCount = resolveExternalCoinsCount(gameInstance);
   const heartsCount = resolveExternalHeartsCount(gameInstance);
   const completeUrl = `uniwebview://complete?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
+  return dispatchUnityNavigationUrl(completeUrl);
+}
+
+function dispatchUnityNavigationUrl(url, options = {}) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const normalizedUrl = String(url || "").trim();
+  if (!normalizedUrl) {
+    return false;
+  }
+  const { clearTrackQueue = false } = options;
+  if (clearTrackQueue) {
+    clearQueuedUnityTrackEvents();
+  }
   try {
-    window.location.href = completeUrl;
+    window.location.href = normalizedUrl;
     return true;
   } catch {
     return false;
@@ -11433,20 +11450,20 @@ function dispatchUnityCompleteEvent(gameInstance) {
 }
 
 function dispatchUnityRewardEvent() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  try {
-    window.location.href = "uniwebview://reward";
-    return true;
-  } catch {
-    return false;
-  }
+  return dispatchUnityNavigationUrl("uniwebview://reward");
 }
 
 const UNITY_TRACK_EVENT_DISPATCH_INTERVAL_MS = 40;
 const unityTrackEventQueue = [];
 let unityTrackEventTimer = null;
+
+function clearQueuedUnityTrackEvents() {
+  unityTrackEventQueue.length = 0;
+  if (unityTrackEventTimer !== null) {
+    clearTimeout(unityTrackEventTimer);
+    unityTrackEventTimer = null;
+  }
+}
 
 function scheduleUnityTrackQueueFlush(delayMs = 0) {
   if (unityTrackEventTimer !== null) {
