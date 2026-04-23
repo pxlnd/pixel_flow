@@ -2396,6 +2396,9 @@ class CardManager {
   }
 
   isPointOnCard(card, x, y, options = {}) {
+    if (!card || card.used) {
+      return false;
+    }
     const visualLiftY = Number.isFinite(options.visualLiftY) ? options.visualLiftY : 0;
     const blockedNudgeOffsetY = this.getBlockedTapNudgeOffsetY(card);
     const center = this.getCardPigCenter(card);
@@ -2465,7 +2468,10 @@ class CardManager {
     let best = null;
     let bestDistance = Infinity;
     for (const card of this.cards) {
-      if (!card || !this.isPointOnCard(card, x, y, { visualLiftY })) {
+      if (!card || card.used) {
+        continue;
+      }
+      if (!this.isPointOnCard(card, x, y, { visualLiftY })) {
         continue;
       }
       const center = this.getCardPigCenter(card);
