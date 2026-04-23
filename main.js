@@ -400,7 +400,6 @@ const LEVEL_PREVIEW_HOLD_DURATION = 1.0;
 const LEVEL_PREVIEW_DISAPPEAR_DURATION = 1.0;
 const LEVEL_PREVIEW_TOTAL_DURATION =
   LEVEL_PREVIEW_HOLD_DURATION + LEVEL_PREVIEW_DISAPPEAR_DURATION;
-const STARTUP_LEVEL_FALLBACK_DELAY_MS = 400;
 const LEVEL_PREVIEW_CELL_FADE_SPAN = 0.24;
 const LEVEL_PREVIEW_MAX_ALPHA = 0.3;
 const LEVEL_PREVIEW_CELL_APPEAR_START_SCALE = 0.2;
@@ -11407,14 +11406,6 @@ function dispatchUnityCloseEvent(gameInstance) {
   if (typeof window === "undefined") {
     return false;
   }
-  // Prevent a queued pointer tap track event from overriding the close URL on the same gesture.
-  if (unityTrackEventTimer !== null) {
-    clearTimeout(unityTrackEventTimer);
-    unityTrackEventTimer = null;
-  }
-  if (unityTrackEventQueue.length > 0) {
-    unityTrackEventQueue.length = 0;
-  }
   const coinsCount = resolveExternalCoinsCount(gameInstance);
   const heartsCount = resolveExternalHeartsCount(gameInstance);
   const closeUrl = `uniwebview://close?coins=${encodeURIComponent(String(coinsCount))}&hearts=${encodeURIComponent(String(heartsCount))}`;
@@ -11674,34 +11665,6 @@ async function bootstrapGame() {
   game.externalMaxLivesCount = resolveExternalMaxLivesCount(game);
   game.externalLivesTimer = resolveExternalLivesTimer(game);
   game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
-  const startupSelection = {
-    fallbackTimer: null,
-    selectedLevelId: null,
-    selectedSource: null,
-  };
-
-  const clearStartupFallbackTimer = () => {
-    if (startupSelection.fallbackTimer === null) {
-      return;
-    }
-    clearTimeout(startupSelection.fallbackTimer);
-    startupSelection.fallbackTimer = null;
-  };
-
-  const markStartupSelection = (levelId, source) => {
-    startupSelection.selectedLevelId = String(levelId || "");
-    startupSelection.selectedSource = String(source || "external");
-  };
-
-  const buildDirectLevelSelection = (levelId, displayLevelNumber = null) => {
-    const normalizedLevelId = String(levelId || DEFAULT_LEVEL_ID);
-    return {
-      targetLevelId: normalizedLevelId,
-      displayLevelNumber: Number.isFinite(displayLevelNumber)
-        ? Math.max(1, Math.trunc(displayLevelNumber))
-        : (isPositiveIntegerString(normalizedLevelId) ? Number(normalizedLevelId) : null),
-    };
-  };
 
   const resolveExternalLevelSelection = (value) => {
     const levels = Array.isArray(game.availableLevels) ? game.availableLevels : [];
@@ -11751,31 +11714,17 @@ async function bootstrapGame() {
     };
   };
 
-  const isSelectionAlreadyOpen = (selection) => {
-    if (!selection?.targetLevelId) {
-      return false;
-    }
-    if (String(game.currentLevelId || "") !== String(selection.targetLevelId)) {
-      return false;
-    }
-    return game.gameState !== "loading" && game.gameState !== "error";
-  };
-
-  const applyResolvedLevelSelection = (selection, options = {}) => {
-    const {
-      source = "external",
-      persistDebugSettings = false,
-    } = options;
-    if (!selection?.targetLevelId || selection.deferUntilHydration) {
-      return false;
-    }
-    if (isSelectionAlreadyOpen(selection)) {
+  window.game = game;
+  window.setLevel = (indexOrId) => {
+    pendingExternalLevelSelection = indexOrId;
+    const selection = resolveExternalLevelSelection(indexOrId);
+    if (!selection) {
       game.externalLevelSelectionDeferred = false;
-      markStartupSelection(selection.targetLevelId, source);
-      if (persistDebugSettings) {
-        game.syncDebugContentSelectors();
-        game.saveDebugSettings();
-      }
+      dispatchUnityLevelLoadedTrackEvent("failure");
+      return false;
+    }
+    if (selection.deferUntilHydration) {
+      game.externalLevelSelectionDeferred = true;
       return true;
     }
     try {
@@ -11790,60 +11739,15 @@ async function bootstrapGame() {
         displayLevelNumber: selection.displayLevelNumber,
       });
       game.externalLevelSelectionDeferred = false;
-      markStartupSelection(selection.targetLevelId, source);
-      if (persistDebugSettings) {
-        game.syncDebugContentSelectors();
-        game.saveDebugSettings();
-      }
+      game.syncDebugContentSelectors();
+      game.saveDebugSettings();
+      dispatchUnityLevelLoadedTrackEvent("success");
       return true;
     } catch {
       game.externalLevelSelectionDeferred = false;
-      return false;
-    }
-  };
-
-  const scheduleStartupFallbackSelection = (delayMs = STARTUP_LEVEL_FALLBACK_DELAY_MS) => {
-    clearStartupFallbackTimer();
-    startupSelection.fallbackTimer = setTimeout(() => {
-      startupSelection.fallbackTimer = null;
-      if (game.gameState !== "loading") {
-        return;
-      }
-      const fallbackSelection = resolveExternalLevelSelection(DEFAULT_LEVEL_ID) || buildDirectLevelSelection(DEFAULT_LEVEL_ID);
-      void applyResolvedLevelSelection(fallbackSelection, { source: "fallback" });
-    }, Math.max(0, Math.round(Number(delayMs) || 0)));
-  };
-
-  window.game = game;
-  window.setLevel = (indexOrId) => {
-    pendingExternalLevelSelection = indexOrId;
-    clearStartupFallbackTimer();
-    const selection = resolveExternalLevelSelection(indexOrId);
-    if (!selection) {
-      game.externalLevelSelectionDeferred = false;
-      if (game.gameState === "loading") {
-        scheduleStartupFallbackSelection();
-      }
       dispatchUnityLevelLoadedTrackEvent("failure");
       return false;
     }
-    if (selection.deferUntilHydration) {
-      game.externalLevelSelectionDeferred = true;
-      return true;
-    }
-    const applied = applyResolvedLevelSelection(selection, {
-      source: "external",
-      persistDebugSettings: true,
-    });
-    if (applied) {
-      dispatchUnityLevelLoadedTrackEvent("success");
-      return true;
-    }
-    if (game.gameState === "loading") {
-      scheduleStartupFallbackSelection();
-    }
-    dispatchUnityLevelLoadedTrackEvent("failure");
-    return false;
   };
   window.setCoins = (coinsCount) => {
     pendingExternalCoinsCount = coinsCount;
@@ -11918,7 +11822,6 @@ async function bootstrapGame() {
   window.debug6 = () => game.triggerDebug6();
   window.debugLose = () => game.triggerDebugLose();
 
-  scheduleStartupFallbackSelection();
   if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined) {
     window.setLevel(pendingExternalLevelSelection);
   }
@@ -11968,7 +11871,7 @@ async function hydrateLevelDefinitionsInBackground(game) {
 
   const hasPendingExternalLevelSelection = pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined;
   const shouldReplayDeferredSelection = !!(game && game.externalLevelSelectionDeferred);
-  if (hasPendingExternalLevelSelection && typeof window.setLevel === "function" && shouldReplayDeferredSelection) {
+  if (hasPendingExternalLevelSelection && typeof window.setLevel === "function" && (loadedLevels.length > 0 || shouldReplayDeferredSelection)) {
     window.setLevel(pendingExternalLevelSelection);
   }
 }
