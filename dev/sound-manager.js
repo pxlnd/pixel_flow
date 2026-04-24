@@ -1,50 +1,41 @@
 class SoundManager {
   constructor(definitions = {}) {
     this.definitionByName = new Map();
-    this.bufferByName = new Map();
-    this.loadingByName = new Map();
-    this.webAudioFailureByName = new Set();
+    this.soundByName = new Map();
     this.poolByName = new Map();
     this.lastPlayAtByName = new Map();
-    this.webAudioGainByName = new Map();
-    this.webAudioMasterGain = null;
-    this.audioContext = null;
-    this.webAudioEnabled = false;
     this.unlocked = false;
-    this.warmupStarted = false;
-
-    const AudioContextClass =
-      typeof window !== "undefined"
-        ? (window.AudioContext || window.webkitAudioContext || null)
-        : null;
-    if (AudioContextClass && typeof fetch === "function") {
-      try {
-        this.audioContext = new AudioContextClass({ latencyHint: "interactive" });
-        this.webAudioEnabled = true;
-        this.webAudioMasterGain = this.audioContext.createGain();
-        this.webAudioMasterGain.gain.value = 1;
-        this.webAudioMasterGain.connect(this.audioContext.destination);
-      } catch {
-        this.audioContext = null;
-        this.webAudioEnabled = false;
-        this.webAudioMasterGain = null;
-      }
-    }
+    this.howlerEnabled = typeof Howl === "function" && typeof Howler !== "undefined" && !!Howler;
 
     for (const [name, config] of Object.entries(definitions)) {
       const src = typeof config?.src === "string" ? config.src : "";
       if (!src) {
         continue;
       }
-      const channelsCount = Math.max(1, Math.min(8, Math.round(Number(config.channels) || 1)));
-      const volume = Number.isFinite(config.volume) ? Math.max(0, Math.min(1, config.volume)) : 1;
+      const channelsCount = Math.max(1, Math.min(16, Math.round(Number(config.channels) || 1)));
+      const volume = Number.isFinite(config.volume) ? Math.max(0, Math.min(1, Number(config.volume))) : 1;
       const minIntervalMs = Math.max(0, Math.round(Number(config?.minIntervalMs) || 0));
-      this.definitionByName.set(name, {
-        src,
-        channelsCount,
-        volume,
-        minIntervalMs,
+      const definition = { src, channelsCount, volume, minIntervalMs };
+      this.definitionByName.set(name, definition);
+      if (this.howlerEnabled) {
+        const sound = this.createHowl(definition);
+        if (sound) {
+          this.soundByName.set(name, sound);
+        }
+      }
+    }
+  }
+
+  createHowl(definition) {
+    try {
+      return new Howl({
+        src: [definition.src],
+        preload: true,
+        volume: definition.volume,
+        pool: definition.channelsCount,
       });
+    } catch {
+      return null;
     }
   }
 
@@ -91,177 +82,14 @@ class SoundManager {
     return pool;
   }
 
-  queueWarmupBuffers() {
-    if (!this.webAudioEnabled || this.warmupStarted) {
-      return;
-    }
-    this.warmupStarted = true;
-    setTimeout(() => {
-      this.warmupBuffers();
-    }, 0);
-  }
-
-  warmupBuffers() {
-    if (!this.webAudioEnabled) {
-      return;
-    }
-    const names = [...this.definitionByName.keys()];
-    names.sort((a, b) => {
-      if (a === "buble") {
-        return -1;
-      }
-      if (b === "buble") {
-        return 1;
-      }
-      return 0;
-    });
-    for (const name of names) {
-      void this.ensureBufferLoaded(name);
-    }
-  }
-
-  decodeAudioData(ctx, arrayBuffer) {
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const finishResolve = (buffer) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        resolve(buffer);
-      };
-      const finishReject = (error) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        reject(error);
-      };
-
-      try {
-        const maybePromise = ctx.decodeAudioData(arrayBuffer, finishResolve, finishReject);
-        if (maybePromise && typeof maybePromise.then === "function") {
-          maybePromise.then(finishResolve).catch(finishReject);
-        }
-      } catch (error) {
-        finishReject(error);
-      }
-    });
-  }
-
-  ensureBufferLoaded(name) {
-    if (!this.webAudioEnabled || !this.audioContext) {
-      return Promise.resolve(null);
-    }
-    if (this.webAudioFailureByName.has(name)) {
-      return Promise.resolve(null);
-    }
-    if (this.bufferByName.has(name)) {
-      return Promise.resolve(this.bufferByName.get(name));
-    }
-    if (this.loadingByName.has(name)) {
-      return this.loadingByName.get(name);
-    }
-    const definition = this.definitionByName.get(name);
-    if (!definition?.src) {
-      return Promise.resolve(null);
-    }
-
-    const loadingPromise = (async () => {
-      try {
-        const response = await fetch(definition.src, { cache: "force-cache" });
-        const raw = await response.arrayBuffer();
-        if (!raw || raw.byteLength === 0) {
-          this.webAudioFailureByName.add(name);
-          return null;
-        }
-        const decoded = await this.decodeAudioData(this.audioContext, raw.slice(0));
-        this.bufferByName.set(name, decoded);
-        this.webAudioFailureByName.delete(name);
-        return decoded;
-      } catch {
-        this.webAudioFailureByName.add(name);
-        return null;
-      } finally {
-        this.loadingByName.delete(name);
-      }
-    })();
-    this.loadingByName.set(name, loadingPromise);
-    return loadingPromise;
-  }
-
-  unlockFallbackPools() {
-    if (this.poolByName.size === 0) {
-      return;
-    }
-    for (const pool of this.poolByName.values()) {
-      for (const audio of pool.channels) {
-        const prevMuted = !!audio.muted;
-        let settled = false;
-        const settle = () => {
-          if (settled) {
-            return;
-          }
-          settled = true;
-          try {
-            audio.pause();
-            audio.currentTime = 0;
-          } catch {
-            // Ignore reset failures.
-          }
-          audio.muted = prevMuted;
-        };
-        try {
-          audio.muted = true;
-          audio.currentTime = 0;
-          const playResult = audio.play();
-          const timeoutId = setTimeout(settle, 450);
-          if (playResult && typeof playResult.then === "function") {
-            playResult
-              .then(() => {
-                clearTimeout(timeoutId);
-                settle();
-              })
-              .catch(() => {
-                clearTimeout(timeoutId);
-                settle();
-              });
-          } else {
-            clearTimeout(timeoutId);
-            settle();
-          }
-        } catch {
-          settle();
-        }
-      }
-    }
-  }
-
-  playFromWebAudio(name) {
-    if (!this.webAudioEnabled || !this.audioContext || !this.unlocked) {
-      return false;
-    }
-    const definition = this.definitionByName.get(name);
-    const buffer = this.bufferByName.get(name);
-    if (!definition || !buffer) {
+  playFromHowler(name, definition) {
+    const sound = this.soundByName.get(name);
+    if (!sound) {
       return false;
     }
     try {
-      if (this.audioContext.state !== "running") {
-        void this.audioContext.resume();
-        return false;
-      }
-      const source = this.audioContext.createBufferSource();
-      source.buffer = buffer;
-      let gain = this.webAudioGainByName.get(name) || null;
-      if (!gain) {
-        gain = this.audioContext.createGain();
-        gain.gain.value = definition.volume;
-        gain.connect(this.webAudioMasterGain || this.audioContext.destination);
-        this.webAudioGainByName.set(name, gain);
-      }
-      source.connect(gain);
-      source.start(0);
+      sound.volume(definition.volume);
+      sound.play();
       return true;
     } catch {
       return false;
@@ -308,19 +136,39 @@ class SoundManager {
       return;
     }
     this.unlocked = true;
+
+    if (this.howlerEnabled) {
+      if (Howler.ctx && typeof Howler.ctx.resume === "function") {
+        try {
+          const resumeResult = Howler.ctx.resume();
+          if (resumeResult && typeof resumeResult.catch === "function") {
+            resumeResult.catch(() => {});
+          }
+        } catch {
+          // Ignore resume failures.
+        }
+      }
+
+      for (const sound of this.soundByName.values()) {
+        try {
+          if (typeof sound.state === "function" && sound.state() === "unloaded") {
+            sound.load();
+          }
+        } catch {
+          // Ignore explicit preload failures.
+        }
+      }
+      return;
+    }
+
     for (const name of this.definitionByName.keys()) {
       this.ensureFallbackPool(name);
     }
-    if (this.webAudioEnabled && this.audioContext) {
-      void this.audioContext.resume();
-      this.queueWarmupBuffers();
-    }
-    this.unlockFallbackPools();
   }
 
   play(name) {
     const definition = this.definitionByName.get(name);
-    if (!definition) {
+    if (!definition || !this.unlocked) {
       return;
     }
     const now = this.getNowMs();
@@ -331,15 +179,11 @@ class SoundManager {
       }
       this.lastPlayAtByName.set(name, now);
     }
-    if (this.webAudioEnabled) {
-      this.queueWarmupBuffers();
-      if (this.playFromWebAudio(name)) {
-        return;
-      }
-      if (!this.webAudioFailureByName.has(name)) {
-        void this.ensureBufferLoaded(name);
-      }
+
+    if (this.howlerEnabled && this.playFromHowler(name, definition)) {
+      return;
     }
+
     this.playFromFallbackPool(name);
   }
 }
