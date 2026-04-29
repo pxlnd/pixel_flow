@@ -407,6 +407,8 @@ const LEVEL_PREVIEW_MAX_ALPHA = 1.0;
 const LEVEL_PREVIEW_CELL_APPEAR_START_SCALE = 0.0;
 const LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE = 0.0;
 const LEVEL_PREVIEW_ELASTICITY = 1.4;
+const AUTOPLAY_ACTION_INTERVAL = 0.12;
+const AUTOPLAY_STUCK_TIMEOUT = 8;
 const CARD_QUEUE_SPRING_STIFFNESS = 42;
 const CARD_QUEUE_SPRING_DAMPING = 10.5;
 const CARD_QUEUE_SETTLE_EPSILON = 2;
@@ -2706,6 +2708,7 @@ class Game {
     this.debugPanel = document.getElementById("debugPanel");
     this.debugButton = document.getElementById("debug6");
     this.debugLoseButton = document.getElementById("debugLose");
+    this.debugAutoplayButton = document.getElementById("debugAutoplay");
     this.debugResetButton = document.getElementById("debugReset");
     this.debugExportButton = document.getElementById("debugExport");
     this.debugExportLevelButton = document.getElementById("debugExportLevel");
@@ -2739,6 +2742,7 @@ class Game {
     this.debugImageCreateButton = document.getElementById("debugImageCreate");
     this.debugImageRefreshButton = document.getElementById("debugImageRefresh");
     this.debugImageStatus = document.getElementById("debugImageStatus");
+    this.debugAutoplayStatus = document.getElementById("debugAutoplayStatus");
     this.debugSaveLevelNumberInput = document.getElementById("debugSaveLevelNumber");
     this.debugSaveLevelNameInput = document.getElementById("debugSaveLevelName");
     this.debugSaveCurrentLevelButton = document.getElementById("debugSaveCurrentLevel");
@@ -2822,6 +2826,12 @@ class Game {
     this.debugPaintTool = "paint";
     this.debugPaintColor = "blue";
     this.debugPaintHoverCell = null;
+    this.autoplayEnabled = false;
+    this.autoplayNextActionAt = 0;
+    this.autoplayLastProgressAt = 0;
+    this.autoplayLastProgressSignature = "";
+    this.autoplayActionCount = 0;
+    this.autoplayStatusMessage = "Автопрохождение выключено.";
     this.currentBackgroundId = DEFAULT_BACKGROUND_ID;
     this.topLevelNavVisible = true;
 
@@ -4264,6 +4274,7 @@ class Game {
     this.loseCloseRect = this.getLoseCloseRect();
     this.rebuildBlockFieldLayer();
     this.lastTimestamp = performance.now();
+    this.refreshAutoplayProgressTracker(true);
     this.invalidate(true);
   }
 
@@ -7588,6 +7599,7 @@ class Game {
       if (this.levelPreviewTime >= LEVEL_PREVIEW_TOTAL_DURATION) {
         this.setGameState("playing");
       }
+      this.updateAutoplayState();
       return;
     }
 
@@ -7613,15 +7625,18 @@ class Game {
       this.cameraShakeTime = 0;
       this.cameraShakeX = 0;
       this.cameraShakeY = 0;
+      this.updateAutoplayState();
       return;
     }
     if (this.gameState === "lose") {
       this.losePopupAppear = Math.min(1, this.losePopupAppear + dt / LOSE_POPUP_ANIM_DURATION);
+      this.updateAutoplayState();
       return;
     }
 
     if (this.isTutorialGameplayPaused()) {
       this.updateTutorialState(dt);
+      this.updateAutoplayState();
       return;
     }
 
@@ -7689,6 +7704,7 @@ class Game {
     this.updateTutorialState(dt);
     this.updateConfetti(dt);
     this.cameraZoom += (this.cameraZoomTarget - this.cameraZoom) * Math.min(1, dt * VICTORY_ZOOM_SPEED);
+    this.updateAutoplayState();
   }
 
   drawLoading(ctx) {
@@ -10466,6 +10482,7 @@ class Game {
     this.syncDebugBackgroundButtons();
     this.syncDebugPaintColorOptions();
     this.syncDebugImageFileName();
+    this.syncDebugAutoplayUi();
     this.setDebugImageStatus("Выбери изображение, затем укажи сетку и нажми создать.");
     const bindRange = (input, output, currentValue, parseValue, formatValue, onApply) => {
       if (!input) {
@@ -11023,6 +11040,12 @@ class Game {
         event.preventDefault();
       });
     }
+    if (this.debugAutoplayButton) {
+      this.debugAutoplayButton.addEventListener("click", (event) => {
+        this.toggleAutoplay();
+        event.preventDefault();
+      });
+    }
     if (this.debugResetButton) {
       this.debugResetButton.addEventListener("click", (event) => {
         this.resetDebugSettings();
@@ -11159,6 +11182,266 @@ class Game {
         h: card.h,
       })),
     });
+  }
+
+  syncDebugAutoplayUi() {
+    if (this.debugAutoplayButton) {
+      this.debugAutoplayButton.textContent = this.autoplayEnabled ? "авто: стоп" : "автопроход";
+      this.debugAutoplayButton.classList.toggle("is-active", this.autoplayEnabled);
+    }
+    if (this.debugAutoplayStatus) {
+      this.debugAutoplayStatus.textContent = this.autoplayStatusMessage || "Автопрохождение выключено.";
+    }
+  }
+
+  setAutoplayEnabled(enabled, options = {}) {
+    const nextEnabled = !!enabled;
+    const reason = String(options.reason || "").trim();
+    this.autoplayEnabled = nextEnabled;
+    if (nextEnabled) {
+      const now = performance.now() / 1000;
+      this.autoplayNextActionAt = now;
+      this.autoplayActionCount = 0;
+      this.refreshAutoplayProgressTracker(true);
+      this.autoplayStatusMessage = this.gameState === "playing"
+        ? "Автопрохождение запущено."
+        : "Автопрохождение ждёт старт уровня.";
+    } else {
+      this.autoplayNextActionAt = 0;
+      this.autoplayLastProgressAt = 0;
+      this.autoplayLastProgressSignature = "";
+      this.autoplayStatusMessage = reason || "Автопрохождение выключено.";
+    }
+    this.syncDebugAutoplayUi();
+    this.invalidate(false);
+    return this.autoplayEnabled;
+  }
+
+  toggleAutoplay() {
+    return this.setAutoplayEnabled(!this.autoplayEnabled);
+  }
+
+  refreshAutoplayProgressTracker(force = false) {
+    const signature = this.getAutoplayProgressSignature();
+    if (!force && signature === this.autoplayLastProgressSignature) {
+      return false;
+    }
+    this.autoplayLastProgressSignature = signature;
+    this.autoplayLastProgressAt = performance.now() / 1000;
+    return true;
+  }
+
+  getAutoplayProgressSignature() {
+    const unitsSignature = this.units
+      .filter((unit) => unit && unit.alive)
+      .slice()
+      .sort((unitA, unitB) => unitA.id - unitB.id)
+      .map((unit) => (
+        `${unit.id}:${unit.state}:${unit.color}:${Math.round(unit.distanceOnTrack || 0)}:${unit.slotIndex ?? "x"}:${Math.round(unit.ammo || 0)}`
+      ))
+      .join("|");
+    const frontSignature = this.getFrontLaneIds()
+      .map((lane) => {
+        const card = this.getActiveFrontCardInLane(lane);
+        return card ? `${lane}:${card.index}:${card.color}:${Math.round(card.ammo || 0)}` : `${lane}:-`;
+      })
+      .join("|");
+    const targetSignature = this.getNextSpiralTargets()
+      .map((target) => `${target.id}:${target.color}:${target.row}:${target.col}`)
+      .join("|");
+    return [
+      this.gameState,
+      this.remainingBlocks,
+      this.projectiles.length,
+      unitsSignature,
+      frontSignature,
+      targetSignature,
+    ].join(";");
+  }
+
+  getAutoplayTapPointForCard(card) {
+    if (!card) {
+      return null;
+    }
+    const center = this.getCardPigCenter(card);
+    return {
+      x: center.x,
+      y: center.y - this.getQueueVisualLiftY(),
+    };
+  }
+
+  getAutoplayTapPointForParkedUnit(unit) {
+    if (!unit) {
+      return null;
+    }
+    return {
+      x: unit.position.x,
+      y: unit.position.y,
+    };
+  }
+
+  getAutoplayCandidatePriority(color, preferredColor) {
+    if (!color) {
+      return 2;
+    }
+    if (preferredColor && color === preferredColor) {
+      return 0;
+    }
+    return 1;
+  }
+
+  sortAutoplayCandidates(candidates, preferredColor) {
+    return candidates.sort((candidateA, candidateB) => {
+      const priorityDiff =
+        this.getAutoplayCandidatePriority(candidateA.color, preferredColor)
+        - this.getAutoplayCandidatePriority(candidateB.color, preferredColor);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+      if ((candidateB.ammo || 0) !== (candidateA.ammo || 0)) {
+        return (candidateB.ammo || 0) - (candidateA.ammo || 0);
+      }
+      return (candidateA.id || 0) - (candidateB.id || 0);
+    });
+  }
+
+  getAutoplayNextAction() {
+    if (this.gameState !== "playing") {
+      return null;
+    }
+    if (this.tutorial?.active) {
+      const tutorialTarget = this.getTutorialTapTarget();
+      if (!tutorialTarget) {
+        return null;
+      }
+      if (tutorialTarget.type === "card") {
+        return {
+          type: "card",
+          color: tutorialTarget.card.color,
+          ammo: tutorialTarget.card.ammo,
+          id: tutorialTarget.card.index,
+          point: this.getAutoplayTapPointForCard(tutorialTarget.card),
+        };
+      }
+      if (tutorialTarget.type === "parkedUnit") {
+        return {
+          type: "parked-unit",
+          color: tutorialTarget.unit.color,
+          ammo: tutorialTarget.unit.ammo,
+          id: tutorialTarget.unit.id,
+          point: this.getAutoplayTapPointForParkedUnit(tutorialTarget.unit),
+        };
+      }
+      return null;
+    }
+
+    const preferredColor = this.getNextSpiralTarget()?.color || null;
+    const activeUnitCount = this.units.reduce((count, unit) => count + (unit.alive ? 1 : 0), 0);
+    const canLaunchFromQueue = activeUnitCount < ACTIVE_UNITS_LIMIT && this.isSpawnAreaClear();
+    const parkedCandidates = this.sortAutoplayCandidates(
+      this.units
+        .filter((unit) => unit && unit.alive && unit.state === "parked" && unit.ammo > 0 && this.hasTargetForColor(unit.color))
+        .map((unit) => ({
+          type: "parked-unit",
+          color: unit.color,
+          ammo: unit.ammo,
+          id: unit.id,
+          point: this.getAutoplayTapPointForParkedUnit(unit),
+        })),
+      preferredColor
+    );
+    if (parkedCandidates.length > 0) {
+      return parkedCandidates[0];
+    }
+
+    const frontCandidates = this.sortAutoplayCandidates(
+      this.getFrontLaneIds()
+        .map((lane) => this.getActiveFrontCardInLane(lane))
+        .filter((card) => canLaunchFromQueue && !!card && !card.used && card.ammo > 0 && this.hasTargetForColor(card.color))
+        .map((card) => ({
+          type: "card",
+          color: card.color,
+          ammo: card.ammo,
+          id: card.index,
+          point: this.getAutoplayTapPointForCard(card),
+        })),
+      preferredColor
+    );
+    if (frontCandidates.length > 0) {
+      return frontCandidates[0];
+    }
+
+    return null;
+  }
+
+  performAutoplayAction(action) {
+    if (!action?.point) {
+      return false;
+    }
+    this.autoplayActionCount += 1;
+    this.handlePointerDown(action.point.x, action.point.y);
+    this.autoplayStatusMessage = action.type === "parked-unit"
+      ? `Авто: перезапуск ${action.color} из ячейки.`
+      : `Авто: выпуск ${action.color} из очереди.`;
+    this.syncDebugAutoplayUi();
+    return true;
+  }
+
+  updateAutoplayState() {
+    if (!this.autoplayEnabled) {
+      return;
+    }
+
+    if (this.gameState === "victory") {
+      this.setAutoplayEnabled(false, {
+        reason: `Автопрохождение завершено: победа за ${this.autoplayActionCount} действий.`,
+      });
+      return;
+    }
+    if (this.gameState === "lose") {
+      this.setAutoplayEnabled(false, {
+        reason: "Автопрохождение остановлено: уровень не прошёлся, игра проиграла.",
+      });
+      return;
+    }
+    if (this.gameState === "loading" || this.gameState === "preview") {
+      this.refreshAutoplayProgressTracker(true);
+      this.autoplayStatusMessage = "Автопрохождение ждёт старт уровня.";
+      this.syncDebugAutoplayUi();
+      return;
+    }
+    if (this.gameState !== "playing") {
+      this.autoplayStatusMessage = "Автопрохождение ждёт игровой режим.";
+      this.syncDebugAutoplayUi();
+      return;
+    }
+
+    this.refreshAutoplayProgressTracker();
+
+    const now = performance.now() / 1000;
+    const action = this.getAutoplayNextAction();
+    if (action && now >= this.autoplayNextActionAt) {
+      if (this.performAutoplayAction(action)) {
+        this.autoplayNextActionAt = now + AUTOPLAY_ACTION_INTERVAL;
+        this.refreshAutoplayProgressTracker(true);
+        return;
+      }
+    }
+
+    const hasLiveMotion = this.units.some(
+      (unit) => unit && unit.alive && (unit.state === "launching" || unit.state === "moving" || unit.state === "landing")
+    ) || this.projectiles.length > 0;
+    if (!action && !hasLiveMotion && now - this.autoplayLastProgressAt >= AUTOPLAY_STUCK_TIMEOUT) {
+      this.setAutoplayEnabled(false, {
+        reason: "Автопрохождение остановлено: бот застрял без доступного хода.",
+      });
+      return;
+    }
+
+    this.autoplayStatusMessage = action
+      ? "Автопрохождение ждёт безопасное окно для следующего тапа."
+      : (hasLiveMotion ? "Автопрохождение наблюдает за текущим ходом." : "Автопрохождение ищет ход.");
+    this.syncDebugAutoplayUi();
   }
 }
 
@@ -11885,6 +12168,8 @@ async function bootstrapGame() {
   window.render_game_to_text = () => game.renderGameToText();
   window.debug6 = () => game.triggerDebug6();
   window.debugLose = () => game.triggerDebugLose();
+  window.setAutoplay = (enabled) => game.setAutoplayEnabled(enabled);
+  window.toggleAutoplay = () => game.toggleAutoplay();
 
   if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined) {
     window.setLevel(pendingExternalLevelSelection);
