@@ -275,6 +275,7 @@ body {
 
 #debug6,
 #debugLose,
+#debugAutoplay,
 #debugReset,
 #debugExport,
 #debugExportLevel,
@@ -297,6 +298,7 @@ body {
 
 #debug6:active,
 #debugLose:active,
+#debugAutoplay:active,
 #debugReset:active,
 #debugExport:active,
 #debugExportLevel:active,
@@ -308,6 +310,12 @@ body {
 #debugSaveTargetLevel:active,
 #debugPickLevelsFolder:active {
   transform: translateY(1px);
+}
+
+#debugAutoplay.is-active {
+  background: rgba(127, 226, 143, 0.26);
+  border-color: rgba(196, 255, 204, 0.9);
+  color: #f4fff2;
 }
 
 .debug-image-level.is-collapsed {
