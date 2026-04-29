@@ -396,14 +396,17 @@ const LAND_DURATION = 0.2;
 const STREAK_DECAY_TIME = 1.45;
 const LOSE_POPUP_ANIM_DURATION = 0.34;
 const LEVEL_START_FADE_DURATION = 0.22;
-const LEVEL_PREVIEW_HOLD_DURATION = 1.0;
+const LEVEL_PREVIEW_APPEAR_DURATION = 1.0;
+const LEVEL_PREVIEW_HOLD_DURATION = 0.6;
 const LEVEL_PREVIEW_DISAPPEAR_DURATION = 1.0;
 const LEVEL_PREVIEW_TOTAL_DURATION =
-  LEVEL_PREVIEW_HOLD_DURATION + LEVEL_PREVIEW_DISAPPEAR_DURATION;
-const LEVEL_PREVIEW_CELL_FADE_SPAN = 0.24;
-const LEVEL_PREVIEW_MAX_ALPHA = 0.3;
-const LEVEL_PREVIEW_CELL_APPEAR_START_SCALE = 0.2;
-const LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE = 0.2;
+  LEVEL_PREVIEW_APPEAR_DURATION + LEVEL_PREVIEW_HOLD_DURATION + LEVEL_PREVIEW_DISAPPEAR_DURATION;
+const LEVEL_PREVIEW_APPEAR_CELL_FADE_SPAN = 0.4;
+const LEVEL_PREVIEW_DISAPPEAR_CELL_FADE_SPAN = 0.2;
+const LEVEL_PREVIEW_MAX_ALPHA = 1.0;
+const LEVEL_PREVIEW_CELL_APPEAR_START_SCALE = 0.0;
+const LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE = 0.0;
+const LEVEL_PREVIEW_ELASTICITY = 1.4;
 const CARD_QUEUE_SPRING_STIFFNESS = 42;
 const CARD_QUEUE_SPRING_DAMPING = 10.5;
 const CARD_QUEUE_SETTLE_EPSILON = 2;
@@ -1454,6 +1457,11 @@ function easeOutCubic(t) {
   return 1 - u * u * u;
 }
 
+function easeInCubic(t) {
+  const u = clamp(t, 0, 1);
+  return u * u * u;
+}
+
 function easeInOutCubic(t) {
   const u = clamp(t, 0, 1);
   if (u < 0.5) {
@@ -1462,11 +1470,42 @@ function easeInOutCubic(t) {
   return 1 - ((-2 * u + 2) ** 3) / 2;
 }
 
+function easeInElastic(t, elasticity = 1) {
+  const u = clamp(t, 0, 1);
+  if (u === 0 || u === 1) {
+    return u;
+  }
+  const e = Math.max(0.01, Number.isFinite(elasticity) ? elasticity : 1);
+  const c4 = (2 * Math.PI) / (3 * e);
+  const amp = 1 + (e - 1) * 0.6;
+  const pow = 10 / e;
+  return -amp * Math.pow(2, pow * u - pow) * Math.sin((u * 10 - 10.75) * c4);
+}
+
+function easeOutElastic(t, elasticity = 1) {
+  const u = clamp(t, 0, 1);
+  if (u === 0 || u === 1) {
+    return u;
+  }
+  const e = Math.max(0.01, Number.isFinite(elasticity) ? elasticity : 1);
+  const c4 = (2 * Math.PI) / (3 * e);
+  const amp = 1 + (e - 1) * 0.6;
+  const pow = 10 / e;
+  return amp * Math.pow(2, -pow * u) * Math.sin((u * 10 - 0.75) * c4) + 1;
+}
+
 function easeOutBack(t) {
   const c1 = 1.70158;
   const c3 = c1 + 1;
   const u = clamp(t, 0, 1) - 1;
   return 1 + c3 * u * u * u + c1 * u * u;
+}
+
+function easeInBack(t) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  const u = clamp(t, 0, 1);
+  return c3 * u * u * u - c1 * u * u;
 }
 
 function quadraticBezierPoint(a, b, c, t) {
@@ -7824,47 +7863,50 @@ class Game {
     const disappearProgress = clamp(Number(options.disappearProgress) || 0, 0, 1);
     const rows = Math.max(1, LAYOUT.fieldRows);
     const cols = Math.max(1, LAYOUT.fieldCols);
-    const cellFadeSpan = clamp(
-      Number.isFinite(options.cellFadeSpan) ? options.cellFadeSpan : LEVEL_PREVIEW_CELL_FADE_SPAN,
+    const appearCellFadeSpan = clamp(
+      Number.isFinite(options.appearCellFadeSpan) ? options.appearCellFadeSpan : LEVEL_PREVIEW_APPEAR_CELL_FADE_SPAN,
       0.05,
       0.95
     );
-    const startRange = Math.max(0, 1 - cellFadeSpan);
+    const disappearCellFadeSpan = clamp(
+      Number.isFinite(options.disappearCellFadeSpan)
+        ? options.disappearCellFadeSpan
+        : LEVEL_PREVIEW_DISAPPEAR_CELL_FADE_SPAN,
+      0.05,
+      0.95
+    );
+    const appearStartRange = Math.max(0, 1 - appearCellFadeSpan);
+    const disappearStartRange = Math.max(0, 1 - disappearCellFadeSpan);
     const centerCol = (cols - 1) * 0.5;
     const centerRow = (rows - 1) * 0.5;
     const maxRadius = Math.max(0.0001, Math.hypot(centerCol, centerRow));
-    const getCellStart = (block) => {
+    const getRadiusNorm = (block) => {
       const dx = block.col - centerCol;
       const dy = block.row - centerRow;
-      const radiusNorm = clamp(Math.hypot(dx, dy) / maxRadius, 0, 1);
-      // Radial edge-to-center order: edges start fading first, center last.
-      const order = 1 - radiusNorm;
-      return order * startRange;
+      return clamp(Math.hypot(dx, dy) / maxRadius, 0, 1);
     };
 
     // Preview must show the full target image, not only already-opened cells.
     // `blockFieldLayer` stores only alive blocks, which are empty at level start.
     for (const block of this.blocks) {
-      const start = getCellStart(block);
-      const appearLocal = clamp((appearProgress - start) / cellFadeSpan, 0, 1);
-      const disappearLocal = clamp((disappearProgress - start) / cellFadeSpan, 0, 1);
-      const revealAlpha = easeInOutCubic(appearLocal);
-      const hideAlpha = 1 - easeInOutCubic(disappearLocal);
-      const blockAlpha = clampedAlpha * revealAlpha * hideAlpha;
-      if (blockAlpha <= 0.001) {
-        continue;
-      }
+      const radiusNorm = getRadiusNorm(block);
+      // Appear from center to edges.
+      const appearStart = radiusNorm * appearStartRange;
+      // Keep current hide behavior: edges fade first, center last.
+      const disappearStart = (1 - radiusNorm) * disappearStartRange;
+      const appearLocal = clamp((appearProgress - appearStart) / appearCellFadeSpan, 0, 1);
+      const disappearLocal = clamp((disappearProgress - disappearStart) / disappearCellFadeSpan, 0, 1);
       const appearScale = lerp(
         LEVEL_PREVIEW_CELL_APPEAR_START_SCALE,
         1,
-        easeOutBack(appearLocal)
+        easeOutElastic(appearLocal, LEVEL_PREVIEW_ELASTICITY)
       );
       const disappearScale = lerp(
         1,
         LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE,
-        easeOutBack(disappearLocal)
+        easeInElastic(disappearLocal, LEVEL_PREVIEW_ELASTICITY)
       );
-      const blockScale = clamp(appearScale * disappearScale, 0.7, 1.14);
+      const blockScale = appearScale * disappearScale;
       const centerX = block.x + block.size * 0.5;
       const centerY = block.y + block.size * 0.5;
 
@@ -7873,7 +7915,7 @@ class Game {
       ctx.scale(blockScale, blockScale);
       ctx.translate(-centerX, -centerY);
       this.drawVolumetricBlock(ctx, block, block.x, block.y, {
-        alpha: LEVEL_PREVIEW_MAX_ALPHA * blockAlpha,
+        alpha: LEVEL_PREVIEW_MAX_ALPHA,
         shadowOpacity: 0.22,
         bevelStrength: 0.26,
         offsetY: 0,
@@ -7883,8 +7925,12 @@ class Game {
   }
 
   drawLevelPreview(ctx) {
-    const appearProgress = 1;
-    const disappearStart = LEVEL_PREVIEW_HOLD_DURATION;
+    const appearProgress = clamp(
+      this.levelPreviewTime / LEVEL_PREVIEW_APPEAR_DURATION,
+      0,
+      1
+    );
+    const disappearStart = LEVEL_PREVIEW_APPEAR_DURATION + LEVEL_PREVIEW_HOLD_DURATION;
     const disappearProgress = clamp(
       (this.levelPreviewTime - disappearStart) / LEVEL_PREVIEW_DISAPPEAR_DURATION,
       0,
@@ -7903,7 +7949,8 @@ class Game {
       alpha: 1,
       appearProgress,
       disappearProgress,
-      cellFadeSpan: LEVEL_PREVIEW_CELL_FADE_SPAN,
+      appearCellFadeSpan: LEVEL_PREVIEW_APPEAR_CELL_FADE_SPAN,
+      disappearCellFadeSpan: LEVEL_PREVIEW_DISAPPEAR_CELL_FADE_SPAN,
     });
   }
 
