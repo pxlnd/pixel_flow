@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-04-08T09:28:47.315Z",
+  "exportedAt": "2026-04-30T08:19:53.573Z",
   "levelNumber": 14,
   "level": {
     "id": "14",
@@ -1696,7 +1696,8 @@
           "white",
           "white"
         ]
-      ]
+      ],
+      "birdCount": 7
     },
     "referenceGrid": {
       "x": 220,

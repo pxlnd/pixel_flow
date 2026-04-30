@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-04-17T08:52:03.424Z",
+  "exportedAt": "2026-04-30T08:19:53.573Z",
   "levelNumber": 15,
   "level": {
     "id": "15",
@@ -1040,7 +1040,8 @@
           "red_alt",
           "red_alt"
         ]
-      ]
+      ],
+      "birdCount": 7
     }
   }
 }

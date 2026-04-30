@@ -257,10 +257,11 @@
             <output id="railSpeedValue" for="railSpeed">980</output>
           </label>
           <label class="debug-control" for="queueCards">
-            <span>Карточек в очереди</span>
-            <input id="queueCards" type="range" min="2" max="24" step="1" value="7">
+            <span>Птиц в очереди</span>
+            <input id="queueCards" type="range" min="1" max="20" step="1" value="7">
             <output id="queueCardsValue" for="queueCards">7</output>
           </label>
+          <div id="queueCardsValidation" class="debug-status" data-tone="error" aria-live="polite" hidden></div>
           <label class="debug-control" for="maxActiveUnits">
             <span>Макс. птичек на поле</span>
             <input id="maxActiveUnits" type="range" min="1" max="10" step="1" value="5">

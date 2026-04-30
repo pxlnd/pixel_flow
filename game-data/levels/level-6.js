@@ -1133,6 +1133,7 @@ window.PIXELFLOW_LEVEL_6 = {
         "peach",
         "peach"
       ]
-    ]
+    ],
+    "birdCount": 7
   }
 };

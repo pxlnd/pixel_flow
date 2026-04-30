@@ -1293,6 +1293,7 @@ window.PIXELFLOW_LEVEL_7 = {
         "blue",
         "blue"
       ]
-    ]
+    ],
+    "birdCount": 7
   }
 };
