@@ -1161,6 +1161,7 @@ window.PIXELFLOW_LEVEL_10 = {
         "dark_purple",
         "dark_purple"
       ]
-    ]
+    ],
+    "birdCount": 7
   }
 };

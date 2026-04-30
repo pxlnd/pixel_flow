@@ -741,7 +741,8 @@ window.PIXELFLOW_LEVEL_2 = {
         "black",
         "black"
       ]
-    ]
+    ],
+    "birdCount": 7
   },
   "referenceGrid": {
     "x": 200,

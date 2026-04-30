@@ -1901,6 +1901,7 @@ window.PIXELFLOW_LEVEL_12 = {
         "green",
         "green"
       ]
-    ]
+    ],
+    "birdCount": 7
   }
 };

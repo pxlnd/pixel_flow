@@ -1037,6 +1037,7 @@ window.PIXELFLOW_LEVEL_15 = {
         "red_alt",
         "red_alt"
       ]
-    ]
+    ],
+    "birdCount": 7
   }
 };

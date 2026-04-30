@@ -620,7 +620,8 @@ window.PIXELFLOW_LEVEL_17 = {
         "black",
         "black"
       ]
-    ]
+    ],
+    "birdCount": 7
   },
   "queueCardCount": 7
 };

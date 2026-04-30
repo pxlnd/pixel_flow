@@ -1901,6 +1901,7 @@ window.PIXELFLOW_LEVEL_11 = {
         "pink",
         "pink"
       ]
-    ]
+    ],
+    "birdCount": 7
   }
 };
