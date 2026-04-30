@@ -362,6 +362,7 @@ window.PIXELFLOW_LEVEL_1 = {
         null,
         null
       ]
-    ]
+    ],
+    "birdCount": 6
   }
 };

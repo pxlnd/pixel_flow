@@ -1036,7 +1036,8 @@ window.PIXELFLOW_LEVEL_19 = {
         "white",
         "white"
       ]
-    ]
+    ],
+    "birdCount": 7
   },
   "referenceGrid": {
     "x": 227,

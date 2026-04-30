@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-04-06T14:40:09.250Z",
+  "exportedAt": "2026-04-30T08:19:53.573Z",
   "levelNumber": 16,
   "level": {
     "id": "16",
@@ -1740,7 +1740,8 @@
           null,
           null
         ]
-      ]
+      ],
+      "birdCount": 7
     }
   }
 }

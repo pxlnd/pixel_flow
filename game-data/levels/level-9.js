@@ -1037,6 +1037,7 @@ window.PIXELFLOW_LEVEL_9 = {
         "white",
         "white"
       ]
-    ]
+    ],
+    "birdCount": 7
   }
 };

@@ -436,8 +436,9 @@ const CARD_QUEUE_SCALE_STIFFNESS = 30;
 const CARD_QUEUE_SCALE_DAMPING = 9;
 const CARD_BLOCKED_NUDGE_DURATION = 0.28;
 const CARD_BLOCKED_NUDGE_OFFSET_Y = 64;
-const MIN_QUEUE_CARDS = 2;
-const MAX_QUEUE_CARDS = 24;
+const MIN_QUEUE_CARDS = 1;
+const MAX_QUEUE_CARDS = 20;
+const STABLE_TRAY_REFERENCE_CARD_COUNT = 7;
 const BACK_BUTTON_UI = {
   x: 34,
   y: 30,
@@ -2110,6 +2111,13 @@ class CardManager {
     }, {});
   }
 
+  getSortedSpiralBlocks(blocks) {
+    return (Array.isArray(blocks) ? blocks : [])
+      .filter((block) => !!block?.color)
+      .slice()
+      .sort((a, b) => (a.spiralIndex - b.spiralIndex) || (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
+  }
+
   getColorSample(color) {
     const normalized = normalizeBlockColorName(color);
     if (!normalized) {
@@ -2179,74 +2187,136 @@ class CardManager {
     return this.buildColorCounts(blocks);
   }
 
-  distributeColors(cards, blocks) {
-    const colorCounts = this.remapBlocksToQueueCapacity(blocks, cards.length);
+  buildBirdSplitGroups(colorCounts, requestedBirdCount) {
     const colors = Object.keys(colorCounts).filter((color) => colorCounts[color] > 0);
-    if (cards.length === 0) {
-      return colorCounts;
-    }
     if (colors.length === 0) {
-      for (const card of cards) {
-        card.color = "green";
-      }
-      return colorCounts;
+      return [];
     }
+    const minimumBirdCount = colors.length;
+    const targetBirdCount = Math.max(minimumBirdCount, Math.round(Number(requestedBirdCount) || minimumBirdCount));
+    const groups = colors
+      .map((color) => ({
+        color,
+        total: colorCounts[color],
+        segments: [colorCounts[color]],
+      }))
+      .sort((a, b) => {
+        const diff = b.total - a.total;
+        if (diff !== 0) {
+          return diff;
+        }
+        return a.color.localeCompare(b.color);
+      });
 
-    const totalBlocks = colors.reduce((sum, color) => sum + colorCounts[color], 0);
-    const targets = colors.map((color) => {
-      const exact = totalBlocks > 0 ? (colorCounts[color] / totalBlocks) * cards.length : cards.length / colors.length;
-      return { color, exact, count: Math.floor(exact), remainder: exact - Math.floor(exact) };
-    });
-
-    for (const target of targets) {
-      if (target.count === 0) {
-        target.count = 1;
-      }
-    }
-
-    let assigned = targets.reduce((sum, target) => sum + target.count, 0);
-    while (assigned > cards.length) {
-      targets.sort((a, b) => (a.remainder - b.remainder) || (b.count - a.count));
-      const candidate = targets.find((target) => target.count > 1);
-      if (!candidate) {
+    let birdsToAdd = Math.max(0, targetBirdCount - groups.length);
+    while (birdsToAdd > 0) {
+      groups.sort((a, b) => {
+        const maxA = Math.max(...a.segments);
+        const maxB = Math.max(...b.segments);
+        if (maxA !== maxB) {
+          return maxB - maxA;
+        }
+        if (a.segments.length !== b.segments.length) {
+          return a.segments.length - b.segments.length;
+        }
+        if (a.total !== b.total) {
+          return b.total - a.total;
+        }
+        return a.color.localeCompare(b.color);
+      });
+      const targetGroup = groups[0];
+      if (!targetGroup) {
         break;
       }
-      candidate.count -= 1;
-      assigned -= 1;
+      let splitIndex = 0;
+      for (let i = 1; i < targetGroup.segments.length; i += 1) {
+        if (targetGroup.segments[i] > targetGroup.segments[splitIndex]) {
+          splitIndex = i;
+        }
+      }
+      const amount = targetGroup.segments[splitIndex];
+      const left = Math.ceil(amount / 2);
+      const right = Math.floor(amount / 2);
+      targetGroup.segments.splice(splitIndex, 1, left, right);
+      birdsToAdd -= 1;
     }
-    while (assigned < cards.length) {
-      targets.sort((a, b) => (b.remainder - a.remainder) || (b.count - a.count));
-      targets[0].count += 1;
-      assigned += 1;
+    return groups;
+  }
+
+  buildQueuePlan(blocks, requestedBirdCount) {
+    const sortedBlocks = this.getSortedSpiralBlocks(blocks);
+    const fallbackPlan = [];
+    let effectiveBlocks = sortedBlocks.slice();
+    let colorCounts = this.buildColorCounts(effectiveBlocks);
+    let colors = Object.keys(colorCounts).filter((color) => colorCounts[color] > 0);
+    if (colors.length === 0) {
+      return fallbackPlan;
     }
 
-    const remaining = new Map(targets.map((target) => [target.color, target.count]));
-    let previousColor = null;
-    for (const card of cards) {
-      const candidates = targets
-        .filter((target) => (remaining.get(target.color) || 0) > 0)
+    const requestedCount = Math.max(1, Math.round(Number(requestedBirdCount) || colors.length));
+    if (requestedCount < colors.length) {
+      effectiveBlocks = sortedBlocks.map((block) => ({ ...block }));
+      colorCounts = this.remapBlocksToQueueCapacity(effectiveBlocks, requestedCount);
+      colors = Object.keys(colorCounts).filter((color) => colorCounts[color] > 0);
+    }
+
+    const minimumBirdCount = colors.length;
+    const targetBirdCount = Math.max(minimumBirdCount, requestedCount);
+    const planGroups = this.buildBirdSplitGroups(colorCounts, targetBirdCount);
+
+    const birdsByColor = new Map();
+    const allBirds = [];
+    for (const group of planGroups) {
+      const queue = group.segments
         .slice()
-        .sort((a, b) => {
-          const remainA = remaining.get(a.color) || 0;
-          const remainB = remaining.get(b.color) || 0;
-          if (remainA !== remainB) {
-            return remainB - remainA;
-          }
-          if (a.color === previousColor && b.color !== previousColor) {
-            return 1;
-          }
-          if (b.color === previousColor && a.color !== previousColor) {
-            return -1;
-          }
-          return 0;
+        .sort((a, b) => b - a)
+        .map((ammo, orderInColor) => {
+          const bird = {
+            color: group.color,
+            ammo,
+            orderInColor,
+            firstUseIndex: Number.POSITIVE_INFINITY,
+          };
+          allBirds.push(bird);
+          return bird;
         });
-      const pick = candidates[0] || targets[0];
-      card.color = pick.color;
-      remaining.set(pick.color, (remaining.get(pick.color) || 0) - 1);
-      previousColor = pick.color;
+      birdsByColor.set(group.color, queue);
     }
 
-    return colorCounts;
+    const activeBirdByColor = new Map();
+    for (let i = 0; i < effectiveBlocks.length; i += 1) {
+      const color = effectiveBlocks[i]?.color;
+      if (!color) {
+        continue;
+      }
+      let active = activeBirdByColor.get(color) || null;
+      if (!active || active.remaining <= 0) {
+        const nextBird = (birdsByColor.get(color) || []).shift();
+        if (!nextBird) {
+          continue;
+        }
+        nextBird.firstUseIndex = i;
+        active = { bird: nextBird, remaining: nextBird.ammo };
+        activeBirdByColor.set(color, active);
+      }
+      active.remaining -= 1;
+      if (active.remaining <= 0) {
+        activeBirdByColor.delete(color);
+      }
+    }
+
+    return allBirds.sort((a, b) => {
+      if (a.firstUseIndex !== b.firstUseIndex) {
+        return a.firstUseIndex - b.firstUseIndex;
+      }
+      if (a.ammo !== b.ammo) {
+        return b.ammo - a.ammo;
+      }
+      if (a.orderInColor !== b.orderInColor) {
+        return a.orderInColor - b.orderInColor;
+      }
+      return a.color.localeCompare(b.color);
+    });
   }
 
   resetFromBlocks(blocks) {
@@ -2271,34 +2341,22 @@ class CardManager {
       queueScaleV: 0,
       blockedNudgeStartTime: -Infinity,
     }));
-    const colorCounts = this.distributeColors(cards, blocks);
+    const queuePlan = this.buildQueuePlan(blocks, cards.length);
     const styleIndexByColor = {};
-    for (const card of cards) {
+    cards.forEach((card, index) => {
+      const planEntry = queuePlan[index] || null;
+      if (!planEntry) {
+        card.used = true;
+        card.ammo = 0;
+        return;
+      }
+      card.color = planEntry.color;
+      card.ammo = Math.max(0, Math.round(planEntry.ammo));
       styleIndexByColor[card.color] = styleIndexByColor[card.color] || 0;
       const styleKeys = getBlockColorConfig(card.color).styleKeys;
       card.styleKey = styleKeys[styleIndexByColor[card.color] % styleKeys.length] || styleKeys[0];
       styleIndexByColor[card.color] += 1;
-    }
-
-    const cardIndexesByColor = cards.reduce((acc, card, index) => {
-      if (!acc[card.color]) {
-        acc[card.color] = [];
-      }
-      acc[card.color].push(index);
-      return acc;
-    }, {});
-
-    for (const [color, indexes] of Object.entries(cardIndexesByColor)) {
-      const total = colorCounts[color] || 0;
-      if (indexes.length === 0 || total <= 0) {
-        continue;
-      }
-      const base = Math.floor(total / indexes.length);
-      const remainder = total % indexes.length;
-      indexes.forEach((cardIndex, i) => {
-        cards[cardIndex].ammo = base + (i < remainder ? 1 : 0);
-      });
-    }
+    });
 
     for (const card of cards) {
       if (card.ammo <= 0) {
@@ -2778,6 +2836,7 @@ class Game {
     this.railSpeedValue = document.getElementById("railSpeedValue");
     this.queueCardsInput = document.getElementById("queueCards");
     this.queueCardsValue = document.getElementById("queueCardsValue");
+    this.queueCardsValidation = document.getElementById("queueCardsValidation");
     this.maxActiveUnitsInput = document.getElementById("maxActiveUnits");
     this.maxActiveUnitsValue = document.getElementById("maxActiveUnitsValue");
     this.chickenSizeScaleInput = document.getElementById("chickenSizeScale");
@@ -4072,8 +4131,13 @@ class Game {
 
   getBottomQueueUnderlayRect() {
     const queueCards =
-      this.cardManager && Array.isArray(this.cardManager.cardLayouts) && this.cardManager.cardLayouts.length > 0
-        ? this.cardManager.cardLayouts
+      this.cardManager && typeof this.cardManager.buildLayouts === "function"
+        ? this.cardManager.buildLayouts(
+          Math.max(
+            STABLE_TRAY_REFERENCE_CARD_COUNT,
+            Array.isArray(this.cardManager.baseLayouts) ? this.cardManager.baseLayouts.length : 0
+          )
+        )
         : LAYOUT.cards;
     const elements = [...LAYOUT.slots, ...queueCards];
     if (!elements.length) {
@@ -5099,6 +5163,7 @@ class Game {
     );
     if (level.pixelArt && typeof level.pixelArt === "object") {
       level.pixelArt.id = `level-${levelNumber}-art`;
+      level.pixelArt.birdCount = level.queueCardCount;
     }
     return {
       exportedAt: new Date().toISOString(),
@@ -5376,7 +5441,6 @@ class Game {
 
   normalizeShooterQueues(cards) {
     this.cards = this.cardManager.normalizeQueues(cards);
-    this.ensurePlayableFrontQueueColor();
     return this.cards;
   }
 
@@ -5585,39 +5649,7 @@ class Game {
   }
 
   ensurePlayableFrontQueueColor() {
-    if (this.gameState !== "playing") {
-      return false;
-    }
-    if (this.isLevelOneTutorialEnabled()) {
-      return false;
-    }
-    const target = this.getNextSpiralTarget();
-    if (!target?.color) {
-      return false;
-    }
-    const targetColor = target.color;
-    const frontCards = this.getFrontLaneIds()
-      .map((lane) => this.getActiveFrontCardInLane(lane))
-      .filter((card) => !!card && !card.used && card.ammo > 0);
-    if (frontCards.length === 0) {
-      return false;
-    }
-    if (frontCards.some((card) => card.color === targetColor)) {
-      return false;
-    }
-    const donor = this.cards.find(
-      (card) => !card.used && card.ammo > 0 && card.color === targetColor && !frontCards.includes(card)
-    );
-    if (!donor) {
-      return false;
-    }
-    const receiver = frontCards.find((card) => card.color !== targetColor) || frontCards[0];
-    if (!receiver || receiver === donor) {
-      return false;
-    }
-    this.swapCardPayload(receiver, donor);
-    this.cards = this.cardManager.normalizeQueues(this.cards);
-    return true;
+    return false;
   }
 
   setupLevelOneTutorial() {
@@ -10280,6 +10312,16 @@ class Game {
     this.debugImageStatus.dataset.tone = tone;
   }
 
+  setQueueCardsValidation(message = "", tone = "error") {
+    if (!this.queueCardsValidation) {
+      return;
+    }
+    const hasMessage = String(message || "").trim().length > 0;
+    this.queueCardsValidation.hidden = !hasMessage;
+    this.queueCardsValidation.textContent = hasMessage ? String(message) : "";
+    this.queueCardsValidation.dataset.tone = tone;
+  }
+
   syncDebugImageFileName() {
     if (!this.debugImageFileName) {
       return;
@@ -10509,6 +10551,7 @@ class Game {
     const settings = this.getDebugImageSettingsForLevel(levelId);
     this.syncDebugImageScaleInput(settings.imageScale);
     this.syncDebugImageOffsetYInput(settings.offsetY);
+    this.setQueueCardsValidation("");
     return settings;
   }
 
@@ -10701,14 +10744,17 @@ class Game {
     const pattern = colorMatrix.map((row) => row.map((cell) => getPatternCellChar(cell)).join(""));
     const levelNumber = this.normalizeDebugLevelNumber(metadata.levelNumber, this.getSuggestedExportLevelNumber());
     const levelName = String(metadata.levelName || `Level ${levelNumber}`).trim() || `Level ${levelNumber}`;
+    const birdCount = clamp(Math.round(Number(metadata.birdCount || BOTTOM_QUEUE_CARD_COUNT)), MIN_QUEUE_CARDS, MAX_QUEUE_CARDS);
 
     level.id = DEBUG_IMAGE_LEVEL_ID;
     level.name = levelName;
+    level.queueCardCount = birdCount;
     level.fallbackFieldPattern = pattern;
     level.pixelArt = {
       id: DEBUG_IMAGE_LEVEL_ID,
       name: metadata.fileName || "Generated image",
       sourceFileName: metadata.fileName || "",
+      birdCount,
       artScale,
       offsetY,
       grid: { cols, rows },
@@ -10731,6 +10777,25 @@ class Game {
     return { level, baseLevelId };
   }
 
+  resolveDebugImageBirdCount(colorCounts) {
+    const distinctColors = Object.keys(colorCounts || {}).filter((color) => (colorCounts[color] || 0) > 0);
+    const effectiveBirdCount = clamp(
+      Math.round(Number(this.cardManager?.queueCardCount ?? BOTTOM_QUEUE_CARD_COUNT)),
+      MIN_QUEUE_CARDS,
+      MAX_QUEUE_CARDS
+    );
+    if (effectiveBirdCount < distinctColors.length) {
+      const message = `Недостаточное количество птиц: выбрано ${effectiveBirdCount}, а цветов на уровне ${distinctColors.length}.`;
+      this.setQueueCardsValidation(message, "error");
+      return null;
+    }
+    this.setQueueCardsValidation("");
+    return {
+      effectiveBirdCount,
+      distinctColorCount: distinctColors.length,
+    };
+  }
+
   generateDebugImageLevel() {
     if (!this.debugGeneratedSourceImage?.image) {
       this.setDebugImageStatus("Сначала загрузи картинку для генерации уровня.", "error");
@@ -10749,24 +10814,33 @@ class Game {
       return false;
     }
 
+    const birdCountConfig = this.resolveDebugImageBirdCount(colorCounts);
+    if (!birdCountConfig) {
+      this.setDebugImageStatus("Укажи корректное количество птиц для всех цветов уровня.", "error");
+      return false;
+    }
+
     const { level, baseLevelId } = this.buildDebugImageLevel(colorMatrix, {
       fileName: this.debugGeneratedSourceImage.fileName,
       imageScale,
       offsetY,
       levelNumber,
       levelName,
+      birdCount: birdCountConfig.effectiveBirdCount,
     });
     const colorSummary = Object.keys(colorCounts)
       .map((color) => `${BLOCK_COLOR_LABELS[color] || color}: ${colorCounts[color]}`)
       .join(", ");
 
     this.debugGeneratedBaseLevelId = baseLevelId;
+    this.setDebugImageSettingsForLevel(baseLevelId, { imageScale, offsetY });
+    this.saveDebugSettings();
     upsertLevelDefinition(level);
     this.fillDebugContentSelectors();
     this.applyLevelConfig(level.id, { restart: true });
     this.syncDebugContentSelectors();
     this.setDebugImageStatus(
-      `Собран ${levelName} (${cols}x${rows}) с размером ${imageScale.toFixed(2)}x и Y ${offsetY}. Блоков: ${filledCells}. ${colorSummary}`,
+      `Собран ${levelName} (${cols}x${rows}) с ${level.queueCardCount} птицами, размером ${imageScale.toFixed(2)}x и Y ${offsetY}. Блоков: ${filledCells}. ${colorSummary}`,
       "success"
     );
     return true;
@@ -10786,6 +10860,7 @@ class Game {
     this.syncDebugImageFileName();
     this.syncDebugAutoplayUi();
     this.setDebugImageStatus("Выбери изображение, затем укажи сетку и нажми создать.");
+    this.setQueueCardsValidation("");
     const bindRange = (input, output, currentValue, parseValue, formatValue, onApply) => {
       if (!input) {
         return;
@@ -10857,6 +10932,7 @@ class Game {
           this.queueCardsValue.value = text;
           this.queueCardsValue.textContent = text;
         }
+        this.setQueueCardsValidation("");
         this.setQueueCardCount(value);
         this.saveDebugSettings();
       });
@@ -11443,6 +11519,7 @@ class Game {
             fileName: this.debugGeneratedSourceImage?.fileName || "",
             cols: LAYOUT.fieldCols,
             rows: LAYOUT.fieldRows,
+            birdCount: CURRENT_LEVEL.queueCardCount,
             artScale: clampDebugImageScale(CURRENT_LEVEL.pixelArt?.artScale),
             offsetY: clampDebugImageOffsetY(CURRENT_LEVEL.pixelArt?.offsetY),
             baseLevelId: this.debugGeneratedBaseLevelId,
