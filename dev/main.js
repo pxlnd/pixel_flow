@@ -6643,7 +6643,80 @@ class Game {
     }
     const [dx, dy] = offset;
     const supportBlock = this.blockByCell.get(`${block.col + dx},${block.row + dy}`);
-    return Boolean(supportBlock?.alive);
+    if (supportBlock?.alive) {
+      return true;
+    }
+
+    // Fallback: allow building from another side only when the canonical support side
+    // is effectively sealed by already-filled blocks.
+    const hasAliveTowardSupportSide = this.hasAliveBlockTowardPerimeter(block, supportSide);
+    if (!hasAliveTowardSupportSide) {
+      return false;
+    }
+    return this.hasAdjacentAliveSupportOnAnySide(block, shootSide);
+  }
+
+  hasAliveBlockTowardPerimeter(block, side) {
+    if (!block || !side) {
+      return false;
+    }
+    const sideOffsets = {
+      left: [-1, 0],
+      right: [1, 0],
+      top: [0, -1],
+      bottom: [0, 1],
+    };
+    const offset = sideOffsets[side];
+    if (!offset) {
+      return false;
+    }
+    const [dx, dy] = offset;
+    let col = block.col + dx;
+    let row = block.row + dy;
+    while (col >= 0 && row >= 0 && col < LAYOUT.fieldCols && row < LAYOUT.fieldRows) {
+      const candidate = this.blockByCell.get(`${col},${row}`);
+      if (candidate?.alive) {
+        return true;
+      }
+      col += dx;
+      row += dy;
+    }
+    return false;
+  }
+
+  hasAdjacentAliveSupportOnAnySide(block, excludedShootSide = null) {
+    if (!block) {
+      return false;
+    }
+    const supportSideByShot = {
+      left: "right",
+      right: "left",
+      top: "bottom",
+      bottom: "top",
+    };
+    const sideOffsets = {
+      left: [-1, 0],
+      right: [1, 0],
+      top: [0, -1],
+      bottom: [0, 1],
+    };
+    const allShootSides = ["left", "right", "top", "bottom"];
+    for (const shootSide of allShootSides) {
+      if (shootSide === excludedShootSide) {
+        continue;
+      }
+      const supportSide = supportSideByShot[shootSide];
+      const offset = sideOffsets[supportSide];
+      if (!offset) {
+        continue;
+      }
+      const [dx, dy] = offset;
+      const supportBlock = this.blockByCell.get(`${block.col + dx},${block.row + dy}`);
+      if (supportBlock?.alive) {
+        return true;
+      }
+    }
+    return false;
   }
 
   getLineHitForBlock(sourcePoint, direction, block, lineHalfWidth) {
@@ -6790,6 +6863,20 @@ class Game {
     return block.alive || block.spawned;
   }
 
+  isCellAliveForLOS(col, row, simulatedBlockedCell = null, ignoreBlockId = null) {
+    if (simulatedBlockedCell && simulatedBlockedCell.col === col && simulatedBlockedCell.row === row) {
+      return true;
+    }
+    const block = this.blockByCell.get(`${col},${row}`);
+    if (!block) {
+      return false;
+    }
+    if (ignoreBlockId !== null && block.id === ignoreBlockId) {
+      return false;
+    }
+    return block.alive;
+  }
+
   hasClearPathToPerimeterSide(block, side, simulatedBlockedCell = null, ignoreBlockId = null) {
     if (!block || block.alive) {
       return false;
@@ -6839,6 +6926,81 @@ class Game {
       || this.hasClearPathToPerimeterSide(block, "top", simulatedBlockedCell, ignoreBlockId)
       || this.hasClearPathToPerimeterSide(block, "bottom", simulatedBlockedCell, ignoreBlockId)
     );
+  }
+
+  hasClearAlivePathToPerimeterSide(block, side, simulatedBlockedCell = null, ignoreBlockId = null) {
+    if (!block || block.alive) {
+      return false;
+    }
+    if (side === "left") {
+      for (let col = block.col - 1; col >= 0; col -= 1) {
+        if (this.isCellAliveForLOS(col, block.row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (side === "right") {
+      for (let col = block.col + 1; col < LAYOUT.fieldCols; col += 1) {
+        if (this.isCellAliveForLOS(col, block.row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (side === "top") {
+      for (let row = block.row - 1; row >= 0; row -= 1) {
+        if (this.isCellAliveForLOS(block.col, row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (side === "bottom") {
+      for (let row = block.row + 1; row < LAYOUT.fieldRows; row += 1) {
+        if (this.isCellAliveForLOS(block.col, row, simulatedBlockedCell, ignoreBlockId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  hasAnyClearAlivePathToPerimeter(block, simulatedBlockedCell = null, ignoreBlockId = null) {
+    if (!block || block.alive) {
+      return false;
+    }
+    return (
+      this.hasClearAlivePathToPerimeterSide(block, "left", simulatedBlockedCell, ignoreBlockId)
+      || this.hasClearAlivePathToPerimeterSide(block, "right", simulatedBlockedCell, ignoreBlockId)
+      || this.hasClearAlivePathToPerimeterSide(block, "top", simulatedBlockedCell, ignoreBlockId)
+      || this.hasClearAlivePathToPerimeterSide(block, "bottom", simulatedBlockedCell, ignoreBlockId)
+    );
+  }
+
+  autoFillOccludedPeninsulaBlocks() {
+    const autoFilled = [];
+    let changed = false;
+    do {
+      changed = false;
+      for (const block of this.blocksBySpiral) {
+        if (!block || block.alive) {
+          continue;
+        }
+        if (this.hasAnyClearAlivePathToPerimeter(block)) {
+          continue;
+        }
+        block.alive = true;
+        block.spawned = false;
+        block.hitFlash = 0.2;
+        this.remainingBlocks = Math.max(0, this.remainingBlocks - 1);
+        this.spawnGhostsAfterFill(block);
+        autoFilled.push(block);
+        changed = true;
+      }
+    } while (changed);
+    return autoFilled;
   }
 
   canSpawnGhostCandidate(candidate) {
@@ -7521,6 +7683,7 @@ class Game {
     block.hitFlash = 1;
     this.remainingBlocks -= 1;
     this.spawnGhostsAfterFill(block);
+    this.autoFillOccludedPeninsulaBlocks();
     this.invalidateTargetingCaches();
     this.markBlockFieldLayerDirty();
 
