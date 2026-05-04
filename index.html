@@ -14,7 +14,10 @@
 <body>
   <main class="app">
     <aside id="debugPanel" class="debug-panel" aria-label="Debug panel">
-      <div class="debug-title">ОТЛАДКА</div>
+      <div class="debug-header">
+        <div class="debug-title">ОТЛАДКА</div>
+        <button id="debugClose" class="debug-close" type="button" aria-label="Закрыть отладку">×</button>
+      </div>
       <div class="debug-actions">
         <button id="debug6" type="button" aria-label="Мгновенная победа">победа</button>
         <button id="debugLose" type="button" aria-label="Мгновенный проигрыш">проигрыш</button>
@@ -329,6 +332,8 @@
       <div id="debugLevelTopLabel" class="debug-level-nav-label">Level 1</div>
       <button id="debugLevelNextTop" type="button" aria-label="Следующий уровень">→</button>
     </div>
+    <button id="debugHotspotBottomLeft" class="debug-hotspot debug-hotspot-bottom-left" type="button" aria-hidden="true" tabindex="-1"></button>
+    <button id="debugHotspotTopRight" class="debug-hotspot debug-hotspot-top-right" type="button" aria-hidden="true" tabindex="-1"></button>
     <canvas id="gameCanvas" aria-label="PixelFlow mini puzzle game"></canvas>
   </main>
   <script src="game-data/themes/theme-classic.js?v=20260331-2"></script>

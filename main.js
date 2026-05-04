@@ -368,6 +368,9 @@ const QUEUE_CARDS_RAISE_RATIO = 0.3;
 const SLOT_SIZE_REDUCTION_RATIO = 0.2;
 const SLOT_BIRD_FORWARD_SHIFT_RATIO = 0.2;
 const SHOW_TAP_DEBUG = false;
+const DEBUG_HOTSPOT_TAP_WINDOW_MS = 850;
+const DEBUG_HOTSPOT_BOTTOM_LEFT_TAPS = 3;
+const DEBUG_HOTSPOT_TOP_RIGHT_TAPS = 4;
 const SPAWN_CLEAR_RADIUS = 118;
 const SLOT_CLAIM_ORDER = [0, 3, 1, 2];
 const TRAY_OFFSCREEN_OVERSCAN = 56;
@@ -2784,6 +2787,9 @@ class Game {
     this.queueCompletionTrackPending = false;
     this.losePopupAppear = 1;
     this.debugPanel = document.getElementById("debugPanel");
+    this.debugHotspotBottomLeft = document.getElementById("debugHotspotBottomLeft");
+    this.debugHotspotTopRight = document.getElementById("debugHotspotTopRight");
+    this.debugCloseButton = document.getElementById("debugClose");
     this.debugButton = document.getElementById("debug6");
     this.debugLoseButton = document.getElementById("debugLose");
     this.debugAutoplayButton = document.getElementById("debugAutoplay");
@@ -2893,6 +2899,12 @@ class Game {
     this.card4YOffsetInput = document.getElementById("card4YOffset");
     this.card4YOffsetValue = document.getElementById("card4YOffsetValue");
     this.debugPanelVisible = false;
+    this.debugHotspotSequence = {
+      step: "bottom-left",
+      bottomLeftTaps: 0,
+      topRightTaps: 0,
+      lastTapAt: 0,
+    };
     this.suppressDebugSave = false;
     this.debugContentSelectorsBound = false;
     this.debugGeneratedSourceImage = null;
@@ -11563,6 +11575,50 @@ class Game {
     this.setDebugPanelVisible(!this.debugPanelVisible);
   }
 
+  resetDebugHotspotSequence() {
+    this.debugHotspotSequence = {
+      step: "bottom-left",
+      bottomLeftTaps: 0,
+      topRightTaps: 0,
+      lastTapAt: 0,
+    };
+  }
+
+  handleDebugHotspotTap(zone) {
+    const now = performance.now();
+    const sequence = this.debugHotspotSequence || {};
+    if (!sequence.lastTapAt || now - sequence.lastTapAt > DEBUG_HOTSPOT_TAP_WINDOW_MS) {
+      this.resetDebugHotspotSequence();
+    }
+
+    const nextSequence = this.debugHotspotSequence;
+    nextSequence.lastTapAt = now;
+
+    if (nextSequence.step === "bottom-left") {
+      if (zone !== "bottom-left") {
+        this.resetDebugHotspotSequence();
+        return;
+      }
+      nextSequence.bottomLeftTaps += 1;
+      if (nextSequence.bottomLeftTaps >= DEBUG_HOTSPOT_BOTTOM_LEFT_TAPS) {
+        nextSequence.step = "top-right";
+        nextSequence.topRightTaps = 0;
+      }
+      return;
+    }
+
+    if (zone !== "top-right") {
+      this.resetDebugHotspotSequence();
+      return;
+    }
+
+    nextSequence.topRightTaps += 1;
+    if (nextSequence.topRightTaps >= DEBUG_HOTSPOT_TOP_RIGHT_TAPS) {
+      this.setDebugPanelVisible(true);
+      this.resetDebugHotspotSequence();
+    }
+  }
+
   bindEvents() {
     window.addEventListener("resize", () => this.resize());
     const unlockAudio = () => {
@@ -11616,6 +11672,26 @@ class Game {
       this.debugPanel.addEventListener("wheel", stopPropagation, { passive: true });
       this.debugPanel.addEventListener("touchstart", stopPropagation, { passive: true });
       this.debugPanel.addEventListener("touchmove", stopPropagation, { passive: true });
+    }
+    if (this.debugHotspotBottomLeft) {
+      this.debugHotspotBottomLeft.addEventListener("pointerdown", (event) => {
+        this.handleDebugHotspotTap("bottom-left");
+        event.stopPropagation();
+        event.preventDefault();
+      });
+    }
+    if (this.debugHotspotTopRight) {
+      this.debugHotspotTopRight.addEventListener("pointerdown", (event) => {
+        this.handleDebugHotspotTap("top-right");
+        event.stopPropagation();
+        event.preventDefault();
+      });
+    }
+    if (this.debugCloseButton) {
+      this.debugCloseButton.addEventListener("click", (event) => {
+        this.setDebugPanelVisible(false);
+        event.preventDefault();
+      });
     }
     if (this.debugButton) {
       this.debugButton.addEventListener("click", (event) => {
