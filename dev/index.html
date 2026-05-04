@@ -14,7 +14,10 @@
 <body>
   <main class="app">
     <aside id="debugPanel" class="debug-panel" aria-label="Debug panel">
-      <div class="debug-title">ОТЛАДКА</div>
+      <div class="debug-header">
+        <div class="debug-title">ОТЛАДКА</div>
+        <button id="debugClose" class="debug-close" type="button" aria-label="Закрыть отладку">×</button>
+      </div>
       <div class="debug-actions">
         <button id="debug6" type="button" aria-label="Мгновенная победа">победа</button>
         <button id="debugLose" type="button" aria-label="Мгновенный проигрыш">проигрыш</button>
@@ -324,11 +327,24 @@
       </div>
 
     </aside>
+    <form id="debugPasswordModal" class="debug-password-modal" aria-label="Пароль отладки" hidden>
+      <div class="debug-password-dialog">
+        <div class="debug-password-title">Пароль</div>
+        <input id="debugPasswordInput" class="debug-password-input" type="password" autocomplete="off" placeholder="Введите пароль" aria-label="Пароль отладки">
+        <div id="debugPasswordError" class="debug-password-error" aria-live="polite" hidden>Неверный пароль</div>
+        <div class="debug-password-actions">
+          <button id="debugPasswordCancel" class="debug-password-cancel" type="button">отмена</button>
+          <button id="debugPasswordConfirm" class="debug-password-confirm" type="submit">подтвердить</button>
+        </div>
+      </div>
+    </form>
     <div class="debug-level-nav" aria-label="Быстрое переключение уровня" hidden>
       <button id="debugLevelPrevTop" type="button" aria-label="Предыдущий уровень">←</button>
       <div id="debugLevelTopLabel" class="debug-level-nav-label">Level 1</div>
       <button id="debugLevelNextTop" type="button" aria-label="Следующий уровень">→</button>
     </div>
+    <button id="debugHotspotBottomLeft" class="debug-hotspot debug-hotspot-bottom-left" type="button" aria-hidden="true" tabindex="-1"></button>
+    <button id="debugHotspotTopRight" class="debug-hotspot debug-hotspot-top-right" type="button" aria-hidden="true" tabindex="-1"></button>
     <canvas id="gameCanvas" aria-label="PixelFlow mini puzzle game"></canvas>
   </main>
   <script src="game-data/themes/theme-classic.js?v=20260331-2"></script>
