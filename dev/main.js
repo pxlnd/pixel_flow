@@ -8200,7 +8200,7 @@ class Game {
   }
 
   drawLoading(ctx) {
-    ctx.fillStyle = "#343839";
+    ctx.fillStyle = "#cde9fd";
     ctx.fillRect(0, 0, this.width, this.height);
     ctx.fillStyle = COLORS.white;
     ctx.font = "700 42px Arial";
@@ -8845,36 +8845,17 @@ class Game {
     ctx.save();
     const text = String(value);
     const digits = text.length;
-    const fontSize = digits >= 4
-      ? Math.round(baseFontSize * 0.68)
-      : digits === 3
-        ? Math.round(baseFontSize * 0.82)
-        : Math.round(baseFontSize * 1.08);
-    ctx.font = `900 ${fontSize}px "Fedoka One", "Fredoka One", "Baloo 2", "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif`;
+    const fontSize = digits >= 4 ? Math.round(baseFontSize * 0.62) : digits === 3 ? Math.round(baseFontSize * 0.76) : baseFontSize;
+    ctx.font = `900 ${fontSize}px "Baloo 2", "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif`;
     ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    const metrics = ctx.measureText(text);
-    const ascent = Number.isFinite(metrics.actualBoundingBoxAscent)
-      ? metrics.actualBoundingBoxAscent
-      : fontSize * 0.74;
-    const descent = Number.isFinite(metrics.actualBoundingBoxDescent)
-      ? metrics.actualBoundingBoxDescent
-      : fontSize * 0.26;
-    const left = Number.isFinite(metrics.actualBoundingBoxLeft)
-      ? metrics.actualBoundingBoxLeft
-      : metrics.width * 0.5;
-    const right = Number.isFinite(metrics.actualBoundingBoxRight)
-      ? metrics.actualBoundingBoxRight
-      : metrics.width * 0.5;
-    const textX = x + (left - right) * 0.5;
-    const baselineY = y + (ascent - descent) * 0.5;
+    ctx.textBaseline = "middle";
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.strokeStyle = "#111111";
     ctx.lineWidth = Math.max(5, Math.round(fontSize * 0.28));
     ctx.fillStyle = "#ffffff";
-    ctx.strokeText(text, textX, baselineY);
-    ctx.fillText(text, textX, baselineY);
+    ctx.strokeText(text, x, y);
+    ctx.fillText(text, x, y);
     ctx.restore();
   }
 
