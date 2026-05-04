@@ -2744,6 +2744,7 @@ class Game {
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseOfferPurchaseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseContinueSnapshot = [];
+    this.quitScreen = null;
     this.cards = [];
     this.wagon = {
       x: LAYOUT.spawnPoint.x,
@@ -10174,6 +10175,34 @@ class Game {
     this.canvas.style.cursor = overBack || overRestart ? "pointer" : "default";
   }
 
+  ensureQuitScreen() {
+    if (this.quitScreen) {
+      return this.quitScreen;
+    }
+    if (typeof window === "undefined" || typeof window.QuitScreen !== "function") {
+      return null;
+    }
+    this.quitScreen = new window.QuitScreen({
+      assetBasePath: "quitModal",
+      stylesheetPath: "quitModal/quit-screen.css?v=20260504-1",
+      onQuit: () => {
+        dispatchUnityCloseEvent(this);
+      },
+    });
+    return this.quitScreen;
+  }
+
+  showQuitScreen() {
+    const quitScreen = this.ensureQuitScreen();
+    if (!quitScreen) {
+      dispatchUnityCloseEvent(this);
+      return;
+    }
+    quitScreen.setCoins(resolveExternalCoinsCount(this));
+    quitScreen.setHearts(resolveExternalHeartsCount(this));
+    quitScreen.show();
+  }
+
   handlePointerDown(x, y) {
     this.noteIdleAssistInteraction();
     if (this.debugPaintModeEnabled) {
@@ -10236,7 +10265,7 @@ class Game {
       return;
     }
     if (!isTutorialPlaying && sideButtonsVisible && isInsideRect(x, y, this.backButtonRect)) {
-      dispatchUnityCloseEvent(this);
+      this.showQuitScreen();
       return;
     }
     if (this.gameState !== "playing") {
