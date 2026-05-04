@@ -327,6 +327,17 @@
       </div>
 
     </aside>
+    <form id="debugPasswordModal" class="debug-password-modal" aria-label="Пароль отладки" hidden>
+      <div class="debug-password-dialog">
+        <div class="debug-password-title">Пароль</div>
+        <input id="debugPasswordInput" class="debug-password-input" type="password" autocomplete="off" placeholder="Введите пароль" aria-label="Пароль отладки">
+        <div id="debugPasswordError" class="debug-password-error" aria-live="polite" hidden>Неверный пароль</div>
+        <div class="debug-password-actions">
+          <button id="debugPasswordCancel" class="debug-password-cancel" type="button">отмена</button>
+          <button id="debugPasswordConfirm" class="debug-password-confirm" type="submit">подтвердить</button>
+        </div>
+      </div>
+    </form>
     <div class="debug-level-nav" aria-label="Быстрое переключение уровня" hidden>
       <button id="debugLevelPrevTop" type="button" aria-label="Предыдущий уровень">←</button>
       <div id="debugLevelTopLabel" class="debug-level-nav-label">Level 1</div>

@@ -371,6 +371,7 @@ const SHOW_TAP_DEBUG = false;
 const DEBUG_HOTSPOT_TAP_WINDOW_MS = 850;
 const DEBUG_HOTSPOT_BOTTOM_LEFT_TAPS = 3;
 const DEBUG_HOTSPOT_TOP_RIGHT_TAPS = 4;
+const DEBUG_PANEL_PASSWORD = "qapower";
 const SPAWN_CLEAR_RADIUS = 118;
 const SLOT_CLAIM_ORDER = [0, 3, 1, 2];
 const TRAY_OFFSCREEN_OVERSCAN = 56;
@@ -2790,6 +2791,10 @@ class Game {
     this.debugHotspotBottomLeft = document.getElementById("debugHotspotBottomLeft");
     this.debugHotspotTopRight = document.getElementById("debugHotspotTopRight");
     this.debugCloseButton = document.getElementById("debugClose");
+    this.debugPasswordModal = document.getElementById("debugPasswordModal");
+    this.debugPasswordInput = document.getElementById("debugPasswordInput");
+    this.debugPasswordCancelButton = document.getElementById("debugPasswordCancel");
+    this.debugPasswordError = document.getElementById("debugPasswordError");
     this.debugButton = document.getElementById("debug6");
     this.debugLoseButton = document.getElementById("debugLose");
     this.debugAutoplayButton = document.getElementById("debugAutoplay");
@@ -11571,8 +11576,49 @@ class Game {
     }
   }
 
+  setDebugPasswordModalVisible(visible) {
+    if (!this.debugPasswordModal) {
+      return;
+    }
+    this.debugPasswordModal.hidden = !visible;
+    this.debugPasswordModal.classList.toggle("is-visible", visible);
+    if (this.debugPasswordInput) {
+      this.debugPasswordInput.value = "";
+      if (visible) {
+        window.setTimeout(() => this.debugPasswordInput?.focus(), 0);
+      }
+    }
+    if (this.debugPasswordError) {
+      this.debugPasswordError.hidden = true;
+    }
+  }
+
+  requestDebugPanelOpen() {
+    if (this.debugPanelVisible) {
+      return;
+    }
+    this.setDebugPasswordModalVisible(true);
+  }
+
+  submitDebugPassword() {
+    const password = String(this.debugPasswordInput?.value || "");
+    if (password !== DEBUG_PANEL_PASSWORD) {
+      if (this.debugPasswordError) {
+        this.debugPasswordError.hidden = false;
+      }
+      this.debugPasswordInput?.select();
+      return;
+    }
+    this.setDebugPasswordModalVisible(false);
+    this.setDebugPanelVisible(true);
+  }
+
   toggleDebugPanel() {
-    this.setDebugPanelVisible(!this.debugPanelVisible);
+    if (this.debugPanelVisible) {
+      this.setDebugPanelVisible(false);
+      return;
+    }
+    this.requestDebugPanelOpen();
   }
 
   resetDebugHotspotSequence() {
@@ -11614,7 +11660,7 @@ class Game {
 
     nextSequence.topRightTaps += 1;
     if (nextSequence.topRightTaps >= DEBUG_HOTSPOT_TOP_RIGHT_TAPS) {
-      this.setDebugPanelVisible(true);
+      this.requestDebugPanelOpen();
       this.resetDebugHotspotSequence();
     }
   }
@@ -11690,6 +11736,23 @@ class Game {
     if (this.debugCloseButton) {
       this.debugCloseButton.addEventListener("click", (event) => {
         this.setDebugPanelVisible(false);
+        event.preventDefault();
+      });
+    }
+    if (this.debugPasswordModal) {
+      const stopPropagation = (event) => {
+        event.stopPropagation();
+      };
+      this.debugPasswordModal.addEventListener("pointerdown", stopPropagation);
+      this.debugPasswordModal.addEventListener("touchstart", stopPropagation);
+      this.debugPasswordModal.addEventListener("submit", (event) => {
+        this.submitDebugPassword();
+        event.preventDefault();
+      });
+    }
+    if (this.debugPasswordCancelButton) {
+      this.debugPasswordCancelButton.addEventListener("click", (event) => {
+        this.setDebugPasswordModalVisible(false);
         event.preventDefault();
       });
     }

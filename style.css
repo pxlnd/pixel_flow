@@ -138,6 +138,10 @@ body {
   pointer-events: none;
 }
 
+.debug-password-modal.is-visible ~ .debug-hotspot {
+  pointer-events: none;
+}
+
 .debug-hotspot-bottom-left {
   left: 0;
   bottom: 0;
@@ -211,6 +215,95 @@ body {
 }
 
 .debug-close:active {
+  transform: translateY(1px);
+}
+
+.debug-password-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: none;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.28);
+  font: 800 13px/1.15 Arial, sans-serif;
+  touch-action: none;
+}
+
+.debug-password-modal.is-visible {
+  display: grid;
+}
+
+.debug-password-dialog {
+  display: grid;
+  gap: 10px;
+  width: min(300px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 10px;
+  background: rgba(12, 24, 38, 0.9);
+  color: #ffffff;
+  padding: 14px;
+  backdrop-filter: blur(5px);
+}
+
+.debug-password-title {
+  font: 900 15px/1 Arial, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.debug-password-input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font: 800 14px/1 Arial, sans-serif;
+  padding: 0 10px;
+  outline: none;
+}
+
+.debug-password-input::placeholder {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.debug-password-input:focus {
+  border-color: rgba(255, 255, 255, 0.72);
+}
+
+.debug-password-error {
+  color: #ffb3b3;
+  font: 800 12px/1.2 Arial, sans-serif;
+}
+
+.debug-password-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.debug-password-cancel,
+.debug-password-confirm {
+  min-height: 34px;
+  border: 0;
+  border-radius: 7px;
+  color: #ffffff;
+  font: 900 12px/1 Arial, sans-serif;
+  cursor: pointer;
+  padding: 0 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.debug-password-cancel {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.debug-password-confirm {
+  background: #38a85d;
+}
+
+.debug-password-cancel:active,
+.debug-password-confirm:active {
   transform: translateY(1px);
 }
 
