@@ -6133,6 +6133,9 @@ class Game {
     if (this.gameState !== "playing") {
       return false;
     }
+    if (this.remainingBlocks <= 0) {
+      return false;
+    }
 
     const tutorialSecondTapForcedSpawn =
       this.isTutorialGameplayPaused()
@@ -7783,13 +7786,6 @@ class Game {
     }
   }
 
-  hasSpawnableSlimes() {
-    if (this.units.some((unit) => unit.alive)) {
-      return true;
-    }
-    return this.cards.some((card) => !card.used && card.ammo > 0);
-  }
-
   checkVictoryReady() {
     if (this.gameState !== "playing") {
       return false;
@@ -7800,7 +7796,7 @@ class Game {
     if (this.projectiles.length > 0) {
       return false;
     }
-    return !this.hasSpawnableSlimes();
+    return true;
   }
 
   startVictorySequence() {
