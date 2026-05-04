@@ -6642,6 +6642,11 @@ class Game {
     if (this.remainingBlocks === this.blocks.length) {
       return true;
     }
+    // Also allow starting a disconnected island: if a ghost has no painted orthogonal
+    // neighbors yet, it should be shootable as a new local seed.
+    if (block && this.getAdjacentAliveNeighborCount(block) === 0) {
+      return true;
+    }
     if (!block || !shootSide) {
       return false;
     }
@@ -6675,6 +6680,26 @@ class Game {
       return false;
     }
     return this.hasAdjacentAliveSupportOnAnySide(block, shootSide);
+  }
+
+  getAdjacentAliveNeighborCount(block) {
+    if (!block) {
+      return 0;
+    }
+    const offsets = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ];
+    let count = 0;
+    for (const [dx, dy] of offsets) {
+      const neighbor = this.blockByCell.get(`${block.col + dx},${block.row + dy}`);
+      if (neighbor?.alive) {
+        count += 1;
+      }
+    }
+    return count;
   }
 
   hasAliveBlockTowardPerimeter(block, side) {
@@ -6846,16 +6871,107 @@ class Game {
     }
   }
 
-  getSpawnedGhostTargets() {
-    if (this.nextSpiralTargetsCacheVersion === this.targetingCacheVersion) {
-      return this.nextSpiralTargetsCache;
-    }
+  collectSpawnedGhostTargets() {
     const targets = [];
     for (const block of this.blocksBySpiral) {
       if (block.alive || !block.spawned) {
         continue;
       }
       targets.push(block);
+    }
+    return targets;
+  }
+
+  getFallbackGhostSeedTargets() {
+    const pending = [];
+    for (const block of this.blocksBySpiral) {
+      if (!block || block.alive || block.spawned) {
+        continue;
+      }
+      pending.push(block);
+    }
+    if (pending.length === 0) {
+      return [];
+    }
+
+    const exposed = pending.filter((block) => this.hasAnyClearPathToPerimeter(block));
+    const sourcePool = exposed.length > 0 ? exposed : pending;
+    let minPendingSpiralIndex = Number.POSITIVE_INFINITY;
+    for (const block of sourcePool) {
+      minPendingSpiralIndex = Math.min(minPendingSpiralIndex, block.spiralIndex);
+    }
+    if (!Number.isFinite(minPendingSpiralIndex)) {
+      return [];
+    }
+
+    const neighbors = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ];
+    const targets = [];
+    for (const block of sourcePool) {
+      if (block.spiralIndex !== minPendingSpiralIndex) {
+        continue;
+      }
+      let hasPendingInnerNeighbor = false;
+      for (const [dx, dy] of neighbors) {
+        const neighbor = this.blockByCell.get(`${block.col + dx},${block.row + dy}`);
+        if (!neighbor) {
+          continue;
+        }
+        if (neighbor.spiralIndex < block.spiralIndex && !neighbor.alive) {
+          hasPendingInnerNeighbor = true;
+          break;
+        }
+      }
+      if (!hasPendingInnerNeighbor) {
+        targets.push(block);
+      }
+    }
+
+    if (targets.length === 0) {
+      for (const block of sourcePool) {
+        if (block.spiralIndex === minPendingSpiralIndex) {
+          targets.push(block);
+        }
+      }
+    }
+
+    targets.sort((a, b) => (a.spiralOrder - b.spiralOrder) || (a.id - b.id));
+    return targets;
+  }
+
+  seedFallbackGhostTargets() {
+    const targets = this.getFallbackGhostSeedTargets();
+    if (targets.length === 0) {
+      return 0;
+    }
+    let seeded = 0;
+    for (const block of targets) {
+      if (block.alive || block.spawned) {
+        continue;
+      }
+      block.spawned = true;
+      seeded += 1;
+    }
+    if (seeded > 0) {
+      this.invalidateTargetingCaches();
+    }
+    return seeded;
+  }
+
+  getSpawnedGhostTargets() {
+    if (this.nextSpiralTargetsCacheVersion === this.targetingCacheVersion) {
+      return this.nextSpiralTargetsCache;
+    }
+    let targets = this.collectSpawnedGhostTargets();
+    if (targets.length === 0 && this.remainingBlocks > 0) {
+      const seeded = this.seedFallbackGhostTargets();
+      if (seeded > 0) {
+        targets = this.collectSpawnedGhostTargets();
+      }
     }
     this.nextSpiralTargetsCache = targets;
     this.nextSpiralTargetsCacheVersion = this.targetingCacheVersion;
