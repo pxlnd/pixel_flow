@@ -8980,7 +8980,7 @@ class Game {
       : digits === 3
         ? Math.round(baseFontSize * 0.82)
         : Math.round(baseFontSize * 1.08);
-    ctx.font = `900 ${fontSize}px "Fedoka One", "Fredoka One", "Baloo 2", "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif`;
+    ctx.font = `800 ${fontSize}px "Baloo 2", "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     const metrics = ctx.measureText(text);
@@ -9001,7 +9001,7 @@ class Game {
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.strokeStyle = "#111111";
-    ctx.lineWidth = Math.max(5, Math.round(fontSize * 0.28));
+    ctx.lineWidth = 8;
     ctx.fillStyle = "#ffffff";
     ctx.strokeText(text, textX, baselineY);
     ctx.fillText(text, textX, baselineY);
