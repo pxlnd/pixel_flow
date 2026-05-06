@@ -5,6 +5,7 @@ class SoundManager {
     this.poolByName = new Map();
     this.lastPlayAtByName = new Map();
     this.unlocked = false;
+    this.soundsActive = true;
     this.howlerEnabled = typeof Howl === "function" && typeof Howler !== "undefined" && !!Howler;
 
     for (const [name, config] of Object.entries(definitions)) {
@@ -32,6 +33,7 @@ class SoundManager {
         src: [definition.src],
         preload: true,
         volume: definition.volume,
+        mute: !this.soundsActive,
         pool: definition.channelsCount,
       });
     } catch {
@@ -67,6 +69,7 @@ class SoundManager {
       }
       audio.preload = "auto";
       audio.volume = definition.volume;
+      audio.muted = !this.soundsActive;
       try {
         audio.load();
       } catch {
@@ -88,6 +91,7 @@ class SoundManager {
       return false;
     }
     try {
+      sound.mute(!this.soundsActive);
       sound.volume(definition.volume);
       sound.play();
       return true;
@@ -166,9 +170,42 @@ class SoundManager {
     }
   }
 
+  setSoundsActive(active) {
+    this.soundsActive = active === true;
+
+    if (this.howlerEnabled) {
+      for (const sound of this.soundByName.values()) {
+        try {
+          if (typeof sound.mute === "function") {
+            sound.mute(!this.soundsActive);
+          }
+          if (!this.soundsActive && typeof sound.stop === "function") {
+            sound.stop();
+          }
+        } catch {
+          // Ignore mute/stop failures.
+        }
+      }
+    }
+
+    for (const pool of this.poolByName.values()) {
+      for (const audio of pool.channels) {
+        try {
+          audio.muted = !this.soundsActive;
+          if (!this.soundsActive) {
+            audio.pause();
+            audio.currentTime = 0;
+          }
+        } catch {
+          // Ignore fallback audio failures.
+        }
+      }
+    }
+  }
+
   play(name) {
     const definition = this.definitionByName.get(name);
-    if (!definition || !this.unlocked) {
+    if (!definition || !this.unlocked || !this.soundsActive) {
       return;
     }
     const now = this.getNowMs();
