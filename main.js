@@ -2732,6 +2732,9 @@ class Game {
     this.contourGhostTargetsCache = [];
     this.contourGhostTargetsCacheVersion = -1;
     this.units = [];
+    this.unitsDepthScratch = [];
+    this.cardsDrawScratch = [];
+    this.ammoTextMetricsCache = new Map();
     this.projectiles = [];
     this.particles = [];
     this.impactRings = [];
@@ -3001,7 +3004,10 @@ class Game {
     };
 
     if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(() => this.invalidate(false));
+      document.fonts.ready.then(() => {
+        this.ammoTextMetricsCache.clear();
+        this.invalidate(false);
+      });
     }
 
     this.buildReferenceAssets();
@@ -4336,6 +4342,7 @@ class Game {
   }
 
   restart() {
+    this.ammoTextMetricsCache.clear();
     this.blocks = this.createBlocksFromReference();
     this.blocksBySpiral = this.blocks
       .slice()
@@ -8849,15 +8856,19 @@ class Game {
   }
 
   drawUnitsOnTrack(ctx) {
-    const unitsByDepth = this.units
-      .filter((unit) => unit.alive)
-      .slice()
-      .sort((a, b) => {
-        if (a.position.y !== b.position.y) {
-          return a.position.y - b.position.y;
-        }
-        return a.id - b.id;
-      });
+    const unitsByDepth = this.unitsDepthScratch;
+    unitsByDepth.length = 0;
+    for (const unit of this.units) {
+      if (unit.alive) {
+        unitsByDepth.push(unit);
+      }
+    }
+    unitsByDepth.sort((a, b) => {
+      if (a.position.y !== b.position.y) {
+        return a.position.y - b.position.y;
+      }
+      return a.id - b.id;
+    });
     for (const unit of unitsByDepth) {
       const drawX = unit.position.x;
       const drawY = unit.position.y;
@@ -8885,6 +8896,7 @@ class Game {
       }
       ctx.restore();
     }
+    unitsByDepth.length = 0;
   }
 
   drawSlotState(ctx) {
@@ -8983,19 +8995,8 @@ class Game {
     ctx.font = `800 ${fontSize}px "Baloo 2", "Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    const metrics = ctx.measureText(text);
-    const ascent = Number.isFinite(metrics.actualBoundingBoxAscent)
-      ? metrics.actualBoundingBoxAscent
-      : fontSize * 0.74;
-    const descent = Number.isFinite(metrics.actualBoundingBoxDescent)
-      ? metrics.actualBoundingBoxDescent
-      : fontSize * 0.26;
-    const left = Number.isFinite(metrics.actualBoundingBoxLeft)
-      ? metrics.actualBoundingBoxLeft
-      : metrics.width * 0.5;
-    const right = Number.isFinite(metrics.actualBoundingBoxRight)
-      ? metrics.actualBoundingBoxRight
-      : metrics.width * 0.5;
+    const metrics = this.getAmmoTextMetrics(ctx, text, fontSize);
+    const { ascent, descent, left, right } = metrics;
     const textX = x + (left - right) * 0.5;
     const baselineY = y + (ascent - descent) * 0.5;
     ctx.lineJoin = "round";
@@ -9006,6 +9007,36 @@ class Game {
     ctx.strokeText(text, textX, baselineY);
     ctx.fillText(text, textX, baselineY);
     ctx.restore();
+  }
+
+  getAmmoTextMetrics(ctx, text, fontSize) {
+    const font = ctx.font;
+    const cacheKey = `${font}|${text}`;
+    const cached = this.ammoTextMetricsCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const measured = ctx.measureText(text);
+    const metrics = {
+      ascent: Number.isFinite(measured.actualBoundingBoxAscent)
+        ? measured.actualBoundingBoxAscent
+        : fontSize * 0.74,
+      descent: Number.isFinite(measured.actualBoundingBoxDescent)
+        ? measured.actualBoundingBoxDescent
+        : fontSize * 0.26,
+      left: Number.isFinite(measured.actualBoundingBoxLeft)
+        ? measured.actualBoundingBoxLeft
+        : measured.width * 0.5,
+      right: Number.isFinite(measured.actualBoundingBoxRight)
+        ? measured.actualBoundingBoxRight
+        : measured.width * 0.5,
+    };
+    if (this.ammoTextMetricsCache.size >= 256) {
+      this.ammoTextMetricsCache.clear();
+    }
+    this.ammoTextMetricsCache.set(cacheKey, metrics);
+    return metrics;
   }
 
   drawChickenSprite(ctx, centerX, centerY, color, ammo, options = {}) {
@@ -9125,7 +9156,12 @@ class Game {
 
   drawCardState(ctx) {
     const queueLiftY = this.getQueueVisualLiftY();
-    const cardsToDraw = [...this.cards].sort((a, b) => a.row - b.row);
+    const cardsToDraw = this.cardsDrawScratch;
+    cardsToDraw.length = 0;
+    for (const card of this.cards) {
+      cardsToDraw.push(card);
+    }
+    cardsToDraw.sort((a, b) => a.row - b.row);
     let activeQueueCards = 0;
     let renderedQueueChickens = 0;
     for (const card of cardsToDraw) {
@@ -9143,6 +9179,7 @@ class Game {
         this.drawAmmoOnBlock(ctx, center.x, center.y - queueLiftY, card.ammo, 30 * queueScale);
       }
     }
+    cardsToDraw.length = 0;
     if (
       this.queueCompletionTrackPending &&
       this.gameState === "playing" &&
@@ -10174,9 +10211,10 @@ class Game {
 
     const dt = clamp((timestamp - this.lastTimestamp) / 1000, 0, MAX_SIMULATION_DT);
     this.lastTimestamp = timestamp;
-    let animating = this.hasActiveAnimations();
+    const wasAnimating = this.hasActiveAnimations();
+    let animating = wasAnimating;
 
-    if (animating) {
+    if (wasAnimating) {
       this.simAccumulator = Math.min(MAX_SIMULATION_DT, this.simAccumulator + dt);
       let steps = 0;
       const maxSteps = MAX_SIM_STEPS_PER_FRAME;
@@ -10197,7 +10235,7 @@ class Game {
       this.render();
     }
 
-    if (this.hasActiveAnimations()) {
+    if (animating) {
       requestAnimationFrame((t) => this.frame(t));
     } else {
       this.isLoopRunning = false;
