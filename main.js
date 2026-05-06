@@ -2627,7 +2627,7 @@ class Game {
     const SoundManagerClass = typeof SoundManager === "function" ? SoundManager : null;
     this.soundManager = SoundManagerClass
       ? new SoundManagerClass(SOUND_DEFINITIONS)
-      : { play: () => {} };
+      : { play: () => {}, setSoundsActive: () => true };
 
     this.backButtonImage = new Image();
     this.backButtonImage.src = getThemeAsset("backButton", "ui/back_button.png");
@@ -3016,6 +3016,14 @@ class Game {
 
   playSound(name) {
     this.soundManager.play(name);
+  }
+
+  setSoundsActive(active) {
+    if (this.soundManager && typeof this.soundManager.setSoundsActive === "function") {
+      this.soundManager.setSoundsActive(active);
+      return true;
+    }
+    return false;
   }
 
   buildReferenceAssets() {
@@ -12331,6 +12339,7 @@ let pendingExternalMaxLivesCount = null;
 let pendingExternalLivesTimer = null;
 let pendingExternalSubscriptionStatus = null;
 let pendingExternalTimeOutCoinsCost = null;
+let pendingExternalSoundsActive = null;
 const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
 const EXTERNAL_HEARTS_STORAGE_KEY = "pixelflow.external.hearts.v1";
 const EXTERNAL_MAX_LIVES_STORAGE_KEY = "pixelflow.external.max_lives.v1";
@@ -12441,6 +12450,29 @@ function persistExternalMaxLivesCount(value) {
 }
 
 function normalizeExternalSubscriptionStatus(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  const lowered = normalizedRaw.toLowerCase();
+  if (lowered === "true" || lowered === "1" || lowered === "yes") {
+    return true;
+  }
+  if (lowered === "false" || lowered === "0" || lowered === "no") {
+    return false;
+  }
+  return null;
+}
+
+function normalizeExternalSoundsActive(value) {
   const raw = String(value ?? "").trim();
   if (raw.length === 0) {
     return null;
@@ -12872,6 +12904,10 @@ if (typeof window !== "undefined") {
   };
   window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
   window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.setSounds = (soundsActive) => {
+    pendingExternalSoundsActive = soundsActive;
+    return normalizeExternalSoundsActive(soundsActive) !== null;
+  };
   window.rewardResult = () => false;
 }
 
@@ -13036,6 +13072,14 @@ async function bootstrapGame() {
   };
   window.setTimeOutCoinsCost = applyExternalTimeOutCoinsCost;
   window.setTimeoutCoinsCost = applyExternalTimeOutCoinsCost;
+  window.setSounds = (soundsActive) => {
+    pendingExternalSoundsActive = soundsActive;
+    const normalized = normalizeExternalSoundsActive(soundsActive);
+    if (normalized === null) {
+      return false;
+    }
+    return game.setSoundsActive(normalized);
+  };
   window.rewardResult = (result) => {
     const normalized = String(result ?? "").trim().toLowerCase();
     if (normalized !== "true") {
@@ -13070,6 +13114,9 @@ async function bootstrapGame() {
   }
   if (pendingExternalTimeOutCoinsCost !== null && pendingExternalTimeOutCoinsCost !== undefined) {
     window.setTimeOutCoinsCost(pendingExternalTimeOutCoinsCost);
+  }
+  if (pendingExternalSoundsActive !== null && pendingExternalSoundsActive !== undefined) {
+    window.setSounds(pendingExternalSoundsActive);
   }
 
   void hydrateLevelDefinitionsInBackground(game);
