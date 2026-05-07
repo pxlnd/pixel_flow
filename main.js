@@ -12842,15 +12842,7 @@ function dispatchUnityLosePopupTrackEvent(eventAction) {
 }
 
 function dispatchUnitySubscriptionRequestEvent() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  try {
-    window.location.href = "uniwebview://subscription_request";
-    return true;
-  } catch {
-    return false;
-  }
+  return dispatchUnityNavigationUrl("uniwebview://subscription_request", { clearTrackQueue: true });
 }
 
 if (typeof window !== "undefined") {
