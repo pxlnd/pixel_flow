@@ -772,6 +772,8 @@ const BLOCK_CHAR_TO_COLOR = {
   E: "peach",
   S: "rose",
   T: "orchid",
+  I: "light_beige",
+  J: "dark_green",
   ".": null,
   " ": null,
   "_": null,
@@ -797,6 +799,8 @@ const BLOCK_COLOR_TO_PATTERN_CHAR = {
   peach: "E",
   rose: "S",
   orchid: "T",
+  light_beige: "I",
+  dark_green: "J",
 };
 
 const BLOCK_COLOR_TO_RGB = {
@@ -821,6 +825,8 @@ const BLOCK_COLOR_TO_RGB = {
   red_alt: { r: 255, g: 56, b: 142 },
   dirty_pink: { r: 214, g: 146, b: 167 },
   beige: { r: 223, g: 177, b: 128 },
+  light_beige: { r: 234, g: 207, b: 169 },
+  dark_green: { r: 70, g: 123, b: 66 },
   gray_alt: { r: 156, g: 156, b: 156 },
 };
 
@@ -854,6 +860,8 @@ const BLOCK_COLOR_LABELS = {
   red_alt: "малиновый",
   dirty_pink: "припылённо-розовый",
   beige: "бежевый",
+  light_beige: "светло-бежевый",
+  dark_green: "тёмно-зелёный",
   gray_alt: "серый",
 };
 
@@ -874,6 +882,8 @@ const CHICKEN_SPRITE_SOURCE_BY_COLOR = {
   light_green: "ui/birds/light_green.png",
   dirty_pink: "ui/birds/dirty_pink.png",
   beige: "ui/birds/beige.png",
+  light_beige: "ui/birds/light_beige_chicken.png",
+  dark_green: "ui/birds/dark_green_chicken.png",
   gray: "ui/birds/grey.png",
   dark_dark_blue: "ui/birds/dark_dark_blue.png",
   very_dark_blue: "ui/birds/very_dark_blue.png",
@@ -906,6 +916,8 @@ const BLOCK_TILE_SOURCE_BY_COLOR = {
   magenta: "ui/blocks/magenta.png",
   dirty_pink: "ui/blocks/dirty_pink.png",
   beige: "ui/blocks/beige.png",
+  light_beige: "ui/blocks/light_beige.png",
+  dark_green: "ui/blocks/dark_green.png",
 };
 
 const BLOCK_TILE_COLOR_ALIASES = {
@@ -920,6 +932,8 @@ const BLOCK_TILE_COLOR_ALIASES = {
   малиновый: "red_alt",
   grey: "gray",
   lilac: "orchid",
+  light_biege: "light_beige",
+  biege: "beige",
 };
 
 const DEBUG_IMAGE_LEVEL_ID = "debug-image-level";
