@@ -1,6 +1,7 @@
-window.PIXELFLOW_LEVEL_22 = {
-  "id": "22",
-  "name": "Level 22",
+window.PIXELFLOW_LEVEL_DEBUG_AVOCADO = {
+  "id": "avocado",
+  "name": "Level 21",
+  "debugOnly": true,
   "fallbackFieldPattern": [
     "IIIIIIIIIIIIIIIIIIIIIIIIII",
     "IIIIIIIIIIIIIIIIIGGGGIIIII",
@@ -155,7 +156,7 @@ window.PIXELFLOW_LEVEL_22 = {
   },
   "queueCardCount": 6,
   "pixelArt": {
-    "id": "level-22-art",
+    "id": "level-avocado-art",
     "name": "avocado_26х26.png",
     "sourceFileName": "avocado_26х26.png",
     "birdCount": 6,

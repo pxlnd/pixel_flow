@@ -1,9 +1,10 @@
 {
   "exportedAt": "2026-05-08T10:44:49.811Z",
-  "levelNumber": 22,
+  "levelNumber": "avocado",
   "level": {
-    "id": "22",
-    "name": "Level 22",
+    "id": "avocado",
+    "name": "Level 21",
+    "debugOnly": true,
     "fallbackFieldPattern": [
       "IIIIIIIIIIIIIIIIIIIIIIIIII",
       "IIIIIIIIIIIIIIIIIGGGGIIIII",
@@ -158,7 +159,7 @@
     },
     "queueCardCount": 6,
     "pixelArt": {
-      "id": "level-22-art",
+      "id": "level-avocado-art",
       "name": "avocado_26х26.png",
       "sourceFileName": "avocado_26х26.png",
       "birdCount": 6,

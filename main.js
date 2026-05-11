@@ -6,6 +6,7 @@ const THEME_REGISTRY = window.PIXELFLOW_THEMES || {
 
 const LEVEL_REGISTRY = window.PIXELFLOW_LEVELS || {
   LEVEL_DEFINITIONS: [],
+  DEBUG_LEVEL_DEFINITIONS: [],
   DEFAULT_LEVEL_ID: "1",
   getLevelConfig: () => null,
 };
@@ -120,6 +121,9 @@ const THEME_DEFINITIONS = Array.isArray(THEME_REGISTRY.THEME_DEFINITIONS) ? THEM
 let DEFAULT_LEVEL_ID = BUILTIN_FALLBACK_LEVEL.id;
 const DEFAULT_THEME_ID = String(THEME_REGISTRY.DEFAULT_THEME_ID || BUILTIN_FALLBACK_THEME.id);
 const LEVEL_DEFINITIONS_FALLBACK = Array.isArray(LEVEL_REGISTRY.LEVEL_DEFINITIONS) ? LEVEL_REGISTRY.LEVEL_DEFINITIONS : [];
+const DEBUG_LEVEL_DEFINITIONS_FALLBACK = Array.isArray(LEVEL_REGISTRY.DEBUG_LEVEL_DEFINITIONS)
+  ? LEVEL_REGISTRY.DEBUG_LEVEL_DEFINITIONS
+  : [];
 const LEVEL_OVERRIDES_STORAGE_KEY = "pixelflow.level.overrides.v1";
 const getLevelConfigRaw = typeof LEVEL_REGISTRY.getLevelConfig === "function" ? LEVEL_REGISTRY.getLevelConfig : () => null;
 const getThemeConfigRaw = typeof THEME_REGISTRY.getThemeConfig === "function" ? THEME_REGISTRY.getThemeConfig : () => null;
@@ -138,17 +142,46 @@ function canonicalizeLevelName(levelConfig) {
   return isPositiveIntegerString(levelId) ? `Level ${levelId}` : "Level";
 }
 
+function normalizeLevelDefinition(levelConfig, options = {}) {
+  const { debugOnly = null } = options;
+  const normalized = cloneData(levelConfig);
+  normalized.id = String(normalized.id || "");
+  normalized.name = canonicalizeLevelName(normalized);
+  if (debugOnly === null) {
+    normalized.debugOnly = normalized.debugOnly === true;
+  } else {
+    normalized.debugOnly = !!debugOnly;
+  }
+  return normalized;
+}
+
+function mergeDebugOnlyLevelDefinitions(levelDefinitions) {
+  const merged = Array.isArray(levelDefinitions) ? [...levelDefinitions] : [];
+  if (!Array.isArray(DEBUG_LEVEL_DEFINITIONS_FALLBACK) || DEBUG_LEVEL_DEFINITIONS_FALLBACK.length === 0) {
+    return merged;
+  }
+  const knownIds = new Set(merged.map((level) => String(level?.id || "")));
+  for (const level of DEBUG_LEVEL_DEFINITIONS_FALLBACK) {
+    if (!isValidLevelConfig(level)) {
+      continue;
+    }
+    const normalized = normalizeLevelDefinition(level, { debugOnly: true });
+    if (!normalized.id || knownIds.has(normalized.id)) {
+      continue;
+    }
+    knownIds.add(normalized.id);
+    merged.push(normalized);
+  }
+  return merged;
+}
+
 function rebuildLevelRegistry(levelDefinitions) {
-  LEVEL_DEFINITIONS = Array.isArray(levelDefinitions)
+  const normalizedLevels = Array.isArray(levelDefinitions)
     ? levelDefinitions
       .filter(isValidLevelConfig)
-      .map((level) => {
-        const normalized = cloneData(level);
-        normalized.id = String(normalized.id || "");
-        normalized.name = canonicalizeLevelName(normalized);
-        return normalized;
-      })
+      .map((level) => normalizeLevelDefinition(level))
     : [];
+  LEVEL_DEFINITIONS = mergeDebugOnlyLevelDefinitions(normalizedLevels);
   DEFAULT_LEVEL_ID = String(LEVEL_DEFINITIONS[0]?.id || BUILTIN_FALLBACK_LEVEL.id);
   LEVEL_MAP = new Map(LEVEL_DEFINITIONS.map((level) => [String(level.id), level]));
 }
@@ -157,10 +190,12 @@ function upsertLevelDefinition(levelConfig) {
   if (!isValidLevelConfig(levelConfig)) {
     return;
   }
-  const normalized = cloneData(levelConfig);
-  const levelId = String(normalized.id || "");
-  normalized.id = levelId;
-  normalized.name = canonicalizeLevelName(normalized);
+  const normalized = normalizeLevelDefinition(levelConfig);
+  const levelId = normalized.id;
+  const existingLevel = LEVEL_MAP.get(levelId);
+  if (existingLevel?.debugOnly === true && normalized.debugOnly !== true) {
+    normalized.debugOnly = true;
+  }
   const existingIndex = LEVEL_DEFINITIONS.findIndex((level) => String(level?.id || "") === levelId);
   if (existingIndex >= 0) {
     LEVEL_DEFINITIONS[existingIndex] = normalized;
@@ -217,9 +252,7 @@ function loadLevelOverridesFromStorage() {
     if (!isValidLevelConfig(value)) {
       continue;
     }
-    const normalized = cloneData(value);
-    normalized.id = String(normalized.id || "");
-    normalized.name = canonicalizeLevelName(normalized);
+    const normalized = normalizeLevelDefinition(value);
     LEVEL_OVERRIDES_MAP.set(normalized.id, normalized);
   }
 }
@@ -2636,6 +2669,8 @@ class Game {
     this.currentLevelId = CURRENT_LEVEL.id;
     this.currentThemeId = CURRENT_THEME.id;
     this.availableLevels = [];
+    this.primaryLevels = [];
+    this.debugOnlyLevels = [];
     this.availableThemes = THEME_DEFINITIONS.map((theme) => ({ id: theme.id, name: theme.name }));
     this.refreshAvailableLevels();
     const SoundManagerClass = typeof SoundManager === "function" ? SoundManager : null;
@@ -2821,6 +2856,7 @@ class Game {
     this.debugImageLevelToggleButton = document.getElementById("debugImageLevelToggle");
     this.debugImageLevelSection = document.getElementById("debugImageLevelSection");
     this.debugLevelSelect = document.getElementById("debugLevelSelect");
+    this.debugOnlyLevelSelect = document.getElementById("debugOnlyLevelSelect");
     this.debugThemeSelect = document.getElementById("debugThemeSelect");
     this.debugBackgroundButtons = {
       default: document.getElementById("debugBgDefault"),
@@ -10498,8 +10534,12 @@ class Game {
   }
 
   syncDebugContentSelectors() {
+    const currentLevelId = String(this.currentLevelId || "");
     if (this.debugLevelSelect) {
-      this.debugLevelSelect.value = this.getValidLevelId(this.currentLevelId);
+      this.debugLevelSelect.value = this.getValidPrimaryLevelId(currentLevelId);
+    }
+    if (this.debugOnlyLevelSelect) {
+      this.debugOnlyLevelSelect.value = this.isDebugOnlyLevelId(currentLevelId) ? currentLevelId : "";
     }
     if (this.debugThemeSelect) {
       this.debugThemeSelect.value = this.getValidThemeId(this.currentThemeId);
@@ -10513,7 +10553,43 @@ class Game {
     this.availableLevels = LEVEL_DEFINITIONS.map((level) => ({
       id: String(level.id),
       name: String(level.name || `Level ${level.id}`),
+      debugOnly: level.debugOnly === true,
     }));
+    this.primaryLevels = this.availableLevels.filter((level) => !level.debugOnly);
+    this.debugOnlyLevels = this.availableLevels.filter((level) => level.debugOnly);
+  }
+
+  getValidPrimaryLevelId(levelId) {
+    const levels = Array.isArray(this.primaryLevels) ? this.primaryLevels : [];
+    const normalized = String(levelId || "");
+    if (levels.some((level) => level.id === normalized)) {
+      return normalized;
+    }
+    return String(levels[0]?.id || DEFAULT_LEVEL_ID);
+  }
+
+  isDebugOnlyLevelId(levelId) {
+    const normalized = String(levelId || "");
+    return Array.isArray(this.debugOnlyLevels) && this.debugOnlyLevels.some((level) => level.id === normalized);
+  }
+
+  fillDebugOnlyLevelSelect(selectedId = "") {
+    if (!this.debugOnlyLevelSelect) {
+      return;
+    }
+    this.debugOnlyLevelSelect.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "не выбран";
+    this.debugOnlyLevelSelect.appendChild(placeholder);
+    for (const optionData of this.debugOnlyLevels) {
+      const option = document.createElement("option");
+      option.value = optionData.id;
+      option.textContent = optionData.name;
+      this.debugOnlyLevelSelect.appendChild(option);
+    }
+    const resolvedSelectedId = this.isDebugOnlyLevelId(selectedId) ? String(selectedId) : "";
+    this.debugOnlyLevelSelect.value = resolvedSelectedId;
   }
 
   fillDebugContentSelectors() {
@@ -10532,7 +10608,8 @@ class Game {
     };
 
     this.refreshAvailableLevels();
-    fillSelect(this.debugLevelSelect, this.availableLevels, this.getValidLevelId(this.currentLevelId));
+    fillSelect(this.debugLevelSelect, this.primaryLevels, this.getValidPrimaryLevelId(this.currentLevelId));
+    this.fillDebugOnlyLevelSelect(this.currentLevelId);
     fillSelect(this.debugThemeSelect, this.availableThemes, this.getValidThemeId(this.currentThemeId));
     this.syncDebugCurrentLevelNameInput();
     this.updateTopLevelDebugNav();
@@ -10587,7 +10664,7 @@ class Game {
   }
 
   getTopLevelDebugList() {
-    const levels = Array.isArray(this.availableLevels) ? this.availableLevels : [];
+    const levels = Array.isArray(this.primaryLevels) ? this.primaryLevels : [];
     return levels.filter((level) => String(level?.id || "") !== DEBUG_IMAGE_LEVEL_ID);
   }
 
@@ -10648,6 +10725,19 @@ class Game {
     if (this.debugLevelSelect) {
       this.debugLevelSelect.addEventListener("change", () => {
         this.applyLevelConfig(this.debugLevelSelect.value, { restart: true });
+        this.debugSaveTargetDirty = false;
+        this.syncDebugContentSelectors();
+        this.saveDebugSettings();
+      });
+    }
+
+    if (this.debugOnlyLevelSelect) {
+      this.debugOnlyLevelSelect.addEventListener("change", () => {
+        const targetLevelId = String(this.debugOnlyLevelSelect?.value || "").trim();
+        if (!targetLevelId) {
+          return;
+        }
+        this.applyLevelConfig(targetLevelId, { restart: true });
         this.debugSaveTargetDirty = false;
         this.syncDebugContentSelectors();
         this.saveDebugSettings();
@@ -12935,7 +13025,11 @@ async function bootstrapGame() {
   game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
 
   const resolveExternalLevelSelection = (value) => {
-    const levels = Array.isArray(game.availableLevels) ? game.availableLevels : [];
+    const allLevels = Array.isArray(game.availableLevels) ? game.availableLevels : [];
+    const publicLevels = Array.isArray(game.primaryLevels) && game.primaryLevels.length > 0
+      ? game.primaryLevels
+      : allLevels.filter((level) => !level.debugOnly);
+    const levels = publicLevels.length > 0 ? publicLevels : allLevels;
     if (levels.length === 0) {
       return null;
     }

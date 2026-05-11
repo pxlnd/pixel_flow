@@ -1,6 +1,7 @@
-window.PIXELFLOW_LEVEL_21 = {
-  "id": "21",
-  "name": "Level 21",
+window.PIXELFLOW_LEVEL_DEBUG_POOP = {
+  "id": "poop",
+  "name": "Level 20",
+  "debugOnly": true,
   "fallbackFieldPattern": [
     "HHHHHHHHHHHHHHHHHHHHHHHHHHHH",
     "HHHHHHHHHHHHHHHHHHHHHHHHHHHH",
@@ -157,7 +158,7 @@ window.PIXELFLOW_LEVEL_21 = {
   },
   "queueCardCount": 6,
   "pixelArt": {
-    "id": "level-21-art",
+    "id": "level-poop-art",
     "name": "poop_28х28.png",
     "sourceFileName": "poop_28х28.png",
     "birdCount": 6,

@@ -1,9 +1,10 @@
 {
   "exportedAt": "2026-05-08T10:12:42.810Z",
-  "levelNumber": 21,
+  "levelNumber": "poop",
   "level": {
-    "id": "21",
-    "name": "Level 21",
+    "id": "poop",
+    "name": "Level 20",
+    "debugOnly": true,
     "fallbackFieldPattern": [
       "HHHHHHHHHHHHHHHHHHHHHHHHHHHH",
       "HHHHHHHHHHHHHHHHHHHHHHHHHHHH",
@@ -160,7 +161,7 @@
     },
     "queueCardCount": 6,
     "pixelArt": {
-      "id": "level-21-art",
+      "id": "level-poop-art",
       "name": "poop_28х28.png",
       "sourceFileName": "poop_28х28.png",
       "birdCount": 6,
