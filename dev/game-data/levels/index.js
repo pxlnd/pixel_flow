@@ -8,8 +8,18 @@
     })
     .map((key) => global[key])
     .filter(Boolean);
+  const DEBUG_LEVEL_DEFINITIONS = Object.keys(global)
+    .filter((key) => /^PIXELFLOW_LEVEL_DEBUG_[A-Z0-9_]+$/.test(key))
+    .map((key) => global[key])
+    .filter(Boolean)
+    .map((level) => ({
+      ...level,
+      debugOnly: true,
+    }));
   const DEFAULT_LEVEL_ID = LEVEL_DEFINITIONS[0]?.id || "1";
-  const LEVEL_MAP = new Map(LEVEL_DEFINITIONS.map((level) => [level.id, level]));
+  const LEVEL_MAP = new Map(
+    [...LEVEL_DEFINITIONS, ...DEBUG_LEVEL_DEFINITIONS].map((level) => [String(level.id), level])
+  );
 
   function clone(value) {
     if (typeof structuredClone === "function") {
@@ -19,11 +29,13 @@
   }
 
   function getLevelConfig(levelId) {
-    return clone(LEVEL_MAP.get(levelId) || LEVEL_MAP.get(DEFAULT_LEVEL_ID));
+    const resolvedId = String(levelId ?? "");
+    return clone(LEVEL_MAP.get(resolvedId) || LEVEL_MAP.get(String(DEFAULT_LEVEL_ID)));
   }
 
   global.PIXELFLOW_LEVELS = {
     LEVEL_DEFINITIONS,
+    DEBUG_LEVEL_DEFINITIONS,
     DEFAULT_LEVEL_ID,
     getLevelConfig,
   };
