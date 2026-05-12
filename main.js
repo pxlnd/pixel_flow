@@ -6249,6 +6249,7 @@ class Game {
     );
     this.units.push(unit);
     card.used = true;
+    this.normalizeShooterQueues(this.cards);
     if (this.tutorial?.active) {
       if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard && card.color === "yellow" && card.lane === 0) {
         this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitBlackLapComplete;
@@ -10439,8 +10440,8 @@ class Game {
     const sideButtonsVisible = this.shouldShowTopActionButtons();
     const isTutorialPlaying = this.gameState === "playing" && this.tutorial?.active;
     if (sideButtonsVisible && isInsideRect(x, y, this.restartButtonRect)) {
-      dispatchUnityLevelTrackEvent("restart");
       this.restart();
+      dispatchUnityLevelTrackEvent("restart");
       return;
     }
     if (isTutorialPlaying) {
@@ -11934,10 +11935,16 @@ class Game {
         this.soundManager.unlock();
       }
     };
-    const trackScreenTap = () => {
-      dispatchUnityTapTrackEvent();
+    const notePointerInputForUnity = () => {
+      noteUnityTrackInputQuietPeriod();
     };
-    window.addEventListener("pointerdown", trackScreenTap, { passive: true, capture: true });
+    const trackScreenTap = () => {
+      if (shouldDispatchUnityScreenTapTrackEvent()) {
+        dispatchUnityTapTrackEvent();
+      }
+    };
+    window.addEventListener("pointerdown", notePointerInputForUnity, { passive: true, capture: true });
+    window.addEventListener("pointerdown", trackScreenTap, { passive: true });
     window.addEventListener("pointerdown", unlockAudio, { passive: true, once: true });
     window.addEventListener("touchstart", unlockAudio, { passive: true, once: true });
     window.addEventListener("mousedown", unlockAudio, { passive: true, once: true });
@@ -12786,6 +12793,7 @@ function dispatchUnityNavigationUrl(url, options = {}) {
   if (clearTrackQueue) {
     clearQueuedUnityTrackEvents();
   }
+  suppressUnityScreenTapTrackEvent();
   try {
     window.location.href = normalizedUrl;
     return true;
@@ -12799,8 +12807,32 @@ function dispatchUnityRewardEvent() {
 }
 
 const UNITY_TRACK_EVENT_DISPATCH_INTERVAL_MS = 40;
+const UNITY_TRACK_EVENT_INPUT_QUIET_MS = 80;
 const unityTrackEventQueue = [];
 let unityTrackEventTimer = null;
+let unityTrackInputQuietUntil = 0;
+let unityScreenTapSuppressUntil = 0;
+
+function getUnityTrackNow() {
+  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+    return performance.now();
+  }
+  return Date.now();
+}
+
+function noteUnityTrackInputQuietPeriod(delayMs = UNITY_TRACK_EVENT_INPUT_QUIET_MS) {
+  const delay = Math.max(0, Math.round(Number(delayMs) || 0));
+  unityTrackInputQuietUntil = Math.max(unityTrackInputQuietUntil, getUnityTrackNow() + delay);
+}
+
+function suppressUnityScreenTapTrackEvent(delayMs = UNITY_TRACK_EVENT_INPUT_QUIET_MS) {
+  const delay = Math.max(0, Math.round(Number(delayMs) || 0));
+  unityScreenTapSuppressUntil = Math.max(unityScreenTapSuppressUntil, getUnityTrackNow() + delay);
+}
+
+function shouldDispatchUnityScreenTapTrackEvent() {
+  return getUnityTrackNow() >= unityScreenTapSuppressUntil;
+}
 
 function clearQueuedUnityTrackEvents() {
   unityTrackEventQueue.length = 0;
@@ -12823,6 +12855,12 @@ function flushUnityTrackEventQueue() {
   if (typeof window === "undefined") {
     unityTrackEventQueue.length = 0;
     unityTrackEventTimer = null;
+    return;
+  }
+  const quietRemainingMs = unityTrackInputQuietUntil - getUnityTrackNow();
+  if (quietRemainingMs > 0) {
+    unityTrackEventTimer = null;
+    scheduleUnityTrackQueueFlush(quietRemainingMs);
     return;
   }
   if (unityTrackEventQueue.length === 0) {
