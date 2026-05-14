@@ -124,6 +124,7 @@ body {
   outline: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  pointer-events: none;
 }
 
 .debug-hotspot:focus,
