@@ -2552,6 +2552,16 @@ class CardManager {
     };
   }
 
+  getCardPigTargetCenter(card) {
+    const targetX = Number.isFinite(card?.targetX) ? card.targetX : card?.x;
+    const targetY = Number.isFinite(card?.targetY) ? card.targetY : card?.y;
+    const blockedNudgeOffsetY = this.getBlockedTapNudgeOffsetY(card);
+    return {
+      x: targetX + card.w / 2,
+      y: targetY + card.h / 2 + blockedNudgeOffsetY,
+    };
+  }
+
   getCardBadgeRect(card) {
     const center = this.getCardPigCenter(card);
     const blockedNudgeOffsetY = this.getBlockedTapNudgeOffsetY(card);
@@ -2569,19 +2579,49 @@ class CardManager {
       return false;
     }
     const visualLiftY = Number.isFinite(options.visualLiftY) ? options.visualLiftY : 0;
+    const includeTarget = options.includeTarget !== false;
+    const includeTravelPath = options.includeTravelPath !== false;
     const blockedNudgeOffsetY = this.getBlockedTapNudgeOffsetY(card);
-    const center = this.getCardPigCenter(card);
-    const visualCenterY = center.y - visualLiftY;
-    const onPig = Math.hypot(x - center.x, y - visualCenterY) <= SHOOTER_HIT_RADIUS;
-    const onCardRect =
-      x >= card.x - CARD_HITBOX_PADDING_X &&
-      x <= card.x + card.w + CARD_HITBOX_PADDING_X &&
-      y >= card.y + blockedNudgeOffsetY - visualLiftY - CARD_HITBOX_PADDING_TOP &&
-      y <= card.y + blockedNudgeOffsetY - visualLiftY + card.h + CARD_HITBOX_PADDING_BOTTOM;
-    if (card.row === 0) {
-      return onCardRect;
+    const isPointOnCardAt = (cardX, cardY) => {
+      const centerX = cardX + card.w / 2;
+      const centerY = cardY + card.h / 2 + blockedNudgeOffsetY - visualLiftY;
+      const onPig = Math.hypot(x - centerX, y - centerY) <= SHOOTER_HIT_RADIUS;
+      const onCardRect =
+        x >= cardX - CARD_HITBOX_PADDING_X &&
+        x <= cardX + card.w + CARD_HITBOX_PADDING_X &&
+        y >= cardY + blockedNudgeOffsetY - visualLiftY - CARD_HITBOX_PADDING_TOP &&
+        y <= cardY + blockedNudgeOffsetY - visualLiftY + card.h + CARD_HITBOX_PADDING_BOTTOM;
+      return card.row === 0 ? onCardRect : onPig || onCardRect;
+    };
+    if (isPointOnCardAt(card.x, card.y)) {
+      return true;
     }
-    return onPig || onCardRect;
+    const targetX = Number.isFinite(card.targetX) ? card.targetX : card.x;
+    const targetY = Number.isFinite(card.targetY) ? card.targetY : card.y;
+    const isMovingToTarget = Math.abs(targetX - card.x) > CARD_QUEUE_SETTLE_EPSILON || Math.abs(targetY - card.y) > CARD_QUEUE_SETTLE_EPSILON;
+    if (includeTarget && isMovingToTarget && isPointOnCardAt(targetX, targetY)) {
+      return true;
+    }
+    if (includeTravelPath && isMovingToTarget) {
+      const from = this.getCardPigCenter(card);
+      const to = this.getCardPigTargetCenter(card);
+      const ax = from.x;
+      const ay = from.y - visualLiftY;
+      const bx = to.x;
+      const by = to.y - visualLiftY;
+      const abx = bx - ax;
+      const aby = by - ay;
+      const abLenSq = abx * abx + aby * aby;
+      if (abLenSq > 0.001) {
+        const t = clamp(((x - ax) * abx + (y - ay) * aby) / abLenSq, 0, 1);
+        const closestX = ax + abx * t;
+        const closestY = ay + aby * t;
+        if (Math.hypot(x - closestX, y - closestY) <= SHOOTER_HIT_RADIUS) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   isCardBlockedByFront(card) {
@@ -2623,7 +2663,11 @@ class CardManager {
         continue;
       }
       const center = this.getCardPigCenter(activeCard);
-      const score = Math.hypot(x - center.x, y - (center.y - visualLiftY));
+      const targetCenter = this.getCardPigTargetCenter(activeCard);
+      const score = Math.min(
+        Math.hypot(x - center.x, y - (center.y - visualLiftY)),
+        Math.hypot(x - targetCenter.x, y - (targetCenter.y - visualLiftY))
+      );
       if (score < bestDistance) {
         bestDistance = score;
         best = activeCard;
@@ -2644,7 +2688,11 @@ class CardManager {
         continue;
       }
       const center = this.getCardPigCenter(card);
-      const score = Math.hypot(x - center.x, y - (center.y - visualLiftY));
+      const targetCenter = this.getCardPigTargetCenter(card);
+      const score = Math.min(
+        Math.hypot(x - center.x, y - (center.y - visualLiftY)),
+        Math.hypot(x - targetCenter.x, y - (targetCenter.y - visualLiftY))
+      );
       if (score < bestDistance) {
         bestDistance = score;
         best = card;
@@ -6249,6 +6297,7 @@ class Game {
     );
     this.units.push(unit);
     card.used = true;
+    this.normalizeShooterQueues(this.cards);
     if (this.tutorial?.active) {
       if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard && card.color === "yellow" && card.lane === 0) {
         this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitBlackLapComplete;
@@ -9596,6 +9645,17 @@ class Game {
     };
   }
 
+  getRestartButtonHitRect() {
+    const rect = this.restartButtonRect || this.getRestartButtonRect();
+    const padding = Math.max(12, Math.round(Math.min(rect.w || 0, rect.h || 0) * 0.22));
+    return {
+      x: rect.x - padding,
+      y: rect.y - padding,
+      w: rect.w + padding * 2,
+      h: rect.h + padding * 2,
+    };
+  }
+
   getLoseTopStatsRects() {
     const sourceHeartW =
       this.loseTopHeartPanelImage?.naturalWidth > 0 ? this.loseTopHeartPanelImage.naturalWidth : 240;
@@ -10376,7 +10436,7 @@ class Game {
       return;
     }
     if (this.gameState === "playing" && this.tutorial?.active) {
-      const overRestart = isInsideRect(x, y, this.restartButtonRect);
+      const overRestart = isInsideRect(x, y, this.getRestartButtonHitRect());
       const target = this.getTutorialTapTarget();
       this.canvas.style.cursor = overRestart || (target && this.isPointOnTutorialTarget(target, x, y))
         ? "pointer"
@@ -10396,7 +10456,7 @@ class Game {
       return;
     }
     const overBack = isInsideRect(x, y, this.backButtonRect);
-    const overRestart = isInsideRect(x, y, this.restartButtonRect);
+    const overRestart = isInsideRect(x, y, this.getRestartButtonHitRect());
     this.canvas.style.cursor = overBack || overRestart ? "pointer" : "default";
   }
 
@@ -10438,9 +10498,9 @@ class Game {
     }
     const sideButtonsVisible = this.shouldShowTopActionButtons();
     const isTutorialPlaying = this.gameState === "playing" && this.tutorial?.active;
-    if (sideButtonsVisible && isInsideRect(x, y, this.restartButtonRect)) {
-      dispatchUnityLevelTrackEvent("restart");
+    if (sideButtonsVisible && isInsideRect(x, y, this.getRestartButtonHitRect())) {
       this.restart();
+      dispatchUnityLevelTrackEvent("restart");
       return;
     }
     if (isTutorialPlaying) {
@@ -11927,6 +11987,37 @@ class Game {
     }
   }
 
+  getDebugHotspotZoneFromPointerEvent(event) {
+    if (!event || this.debugPanelVisible || this.debugPasswordModal?.classList?.contains("is-visible")) {
+      return null;
+    }
+    const x = Number(event.clientX);
+    const y = Number(event.clientY);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+    const getRect = (node) => {
+      if (!node || typeof node.getBoundingClientRect !== "function") {
+        return null;
+      }
+      const rect = node.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) {
+        return null;
+      }
+      return rect;
+    };
+    const contains = (rect) => (
+      !!rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+    );
+    if (contains(getRect(this.debugHotspotBottomLeft))) {
+      return "bottom-left";
+    }
+    if (contains(getRect(this.debugHotspotTopRight))) {
+      return "top-right";
+    }
+    return null;
+  }
+
   bindEvents() {
     window.addEventListener("resize", () => this.resize());
     const unlockAudio = () => {
@@ -11934,10 +12025,23 @@ class Game {
         this.soundManager.unlock();
       }
     };
-    const trackScreenTap = () => {
-      dispatchUnityTapTrackEvent();
+    const notePointerInputForUnity = () => {
+      noteUnityTrackInputQuietPeriod();
     };
-    window.addEventListener("pointerdown", trackScreenTap, { passive: true, capture: true });
+    const trackDebugHotspotTap = (event) => {
+      const zone = this.getDebugHotspotZoneFromPointerEvent(event);
+      if (zone) {
+        this.handleDebugHotspotTap(zone);
+      }
+    };
+    const trackScreenTap = () => {
+      if (shouldDispatchUnityScreenTapTrackEvent()) {
+        dispatchUnityTapTrackEvent();
+      }
+    };
+    window.addEventListener("pointerdown", notePointerInputForUnity, { passive: true, capture: true });
+    window.addEventListener("pointerdown", trackDebugHotspotTap, { passive: true, capture: true });
+    window.addEventListener("pointerdown", trackScreenTap, { passive: true });
     window.addEventListener("pointerdown", unlockAudio, { passive: true, once: true });
     window.addEventListener("touchstart", unlockAudio, { passive: true, once: true });
     window.addEventListener("mousedown", unlockAudio, { passive: true, once: true });
@@ -11980,20 +12084,6 @@ class Game {
       this.debugPanel.addEventListener("wheel", stopPropagation, { passive: true });
       this.debugPanel.addEventListener("touchstart", stopPropagation, { passive: true });
       this.debugPanel.addEventListener("touchmove", stopPropagation, { passive: true });
-    }
-    if (this.debugHotspotBottomLeft) {
-      this.debugHotspotBottomLeft.addEventListener("pointerdown", (event) => {
-        this.handleDebugHotspotTap("bottom-left");
-        event.stopPropagation();
-        event.preventDefault();
-      });
-    }
-    if (this.debugHotspotTopRight) {
-      this.debugHotspotTopRight.addEventListener("pointerdown", (event) => {
-        this.handleDebugHotspotTap("top-right");
-        event.stopPropagation();
-        event.preventDefault();
-      });
     }
     if (this.debugCloseButton) {
       this.debugCloseButton.addEventListener("click", (event) => {
@@ -12786,6 +12876,7 @@ function dispatchUnityNavigationUrl(url, options = {}) {
   if (clearTrackQueue) {
     clearQueuedUnityTrackEvents();
   }
+  suppressUnityScreenTapTrackEvent();
   try {
     window.location.href = normalizedUrl;
     return true;
@@ -12799,8 +12890,32 @@ function dispatchUnityRewardEvent() {
 }
 
 const UNITY_TRACK_EVENT_DISPATCH_INTERVAL_MS = 40;
+const UNITY_TRACK_EVENT_INPUT_QUIET_MS = 80;
 const unityTrackEventQueue = [];
 let unityTrackEventTimer = null;
+let unityTrackInputQuietUntil = 0;
+let unityScreenTapSuppressUntil = 0;
+
+function getUnityTrackNow() {
+  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+    return performance.now();
+  }
+  return Date.now();
+}
+
+function noteUnityTrackInputQuietPeriod(delayMs = UNITY_TRACK_EVENT_INPUT_QUIET_MS) {
+  const delay = Math.max(0, Math.round(Number(delayMs) || 0));
+  unityTrackInputQuietUntil = Math.max(unityTrackInputQuietUntil, getUnityTrackNow() + delay);
+}
+
+function suppressUnityScreenTapTrackEvent(delayMs = UNITY_TRACK_EVENT_INPUT_QUIET_MS) {
+  const delay = Math.max(0, Math.round(Number(delayMs) || 0));
+  unityScreenTapSuppressUntil = Math.max(unityScreenTapSuppressUntil, getUnityTrackNow() + delay);
+}
+
+function shouldDispatchUnityScreenTapTrackEvent() {
+  return getUnityTrackNow() >= unityScreenTapSuppressUntil;
+}
 
 function clearQueuedUnityTrackEvents() {
   unityTrackEventQueue.length = 0;
@@ -12823,6 +12938,12 @@ function flushUnityTrackEventQueue() {
   if (typeof window === "undefined") {
     unityTrackEventQueue.length = 0;
     unityTrackEventTimer = null;
+    return;
+  }
+  const quietRemainingMs = unityTrackInputQuietUntil - getUnityTrackNow();
+  if (quietRemainingMs > 0) {
+    unityTrackEventTimer = null;
+    scheduleUnityTrackQueueFlush(quietRemainingMs);
     return;
   }
   if (unityTrackEventQueue.length === 0) {
