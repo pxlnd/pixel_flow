@@ -510,6 +510,14 @@ const COINS_UI = {
   plusOffsetX: 54,
   plusOffsetY: 50,
 };
+const PREGAME_START_BUTTON_UI = {
+  w: 310,
+  h: 98,
+  offsetFromRails: 42,
+  bottomSafeMargin: 64,
+  radius: 26,
+  label: "START",
+};
 const LOSE_POPUP_UI = {
   w: 646,
   h: 663,
@@ -2843,6 +2851,7 @@ class Game {
     this.slotManager = new SlotManager(LAYOUT.slots, SLOT_CLAIM_ORDER);
     this.backButtonRect = { ...BACK_BUTTON_UI };
     this.restartButtonRect = { x: 0, y: 0, w: COINS_UI.panelW, h: COINS_UI.panelH };
+    this.preGameStartButtonRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseCloseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
@@ -4434,13 +4443,12 @@ class Game {
     }
     const previousState = this.gameState;
     const forcePreviewShow = options.forcePreviewShow === true;
-    if (previousState === "preview" && normalizedNextState !== "preview") {
+    const wasPreviewVisible = previousState === "preview" || previousState === "pregame";
+    const willShowPreview = normalizedNextState === "preview" || normalizedNextState === "pregame";
+    if (wasPreviewVisible && !willShowPreview) {
       dispatchUnityPreviewTrackEvent("hide");
     }
-    if (
-      normalizedNextState === "preview"
-      && (previousState !== "preview" || forcePreviewShow)
-    ) {
+    if (willShowPreview && (!wasPreviewVisible || forcePreviewShow)) {
       dispatchUnityPreviewTrackEvent("show");
     }
     this.gameState = normalizedNextState;
@@ -4491,7 +4499,7 @@ class Game {
     this.idleAssistHandTime = 0;
     this.clearIdleAssistWakeTimer();
 
-    this.setGameState(this.previewEnabledBySetLevel ? "preview" : "loading", {
+    this.setGameState("pregame", {
       forcePreviewShow: true,
     });
     this.idleAssistLastKnownGameState = this.gameState;
@@ -8334,6 +8342,11 @@ class Game {
       this.updateAutoplayState();
       return;
     }
+    if (this.gameState === "pregame") {
+      this.updateIdleAssistState(dt);
+      this.updateAutoplayState();
+      return;
+    }
 
     if (this.gameState === "victory") {
       this.victoryConfettiTime = Math.max(0, this.victoryConfettiTime - dt);
@@ -8704,6 +8717,92 @@ class Game {
       appearCellFadeSpan: LEVEL_PREVIEW_APPEAR_CELL_FADE_SPAN,
       disappearCellFadeSpan: LEVEL_PREVIEW_DISAPPEAR_CELL_FADE_SPAN,
     });
+  }
+
+  drawPregameLevelImageOnField(ctx) {
+    for (const block of this.blocks) {
+      const grayBlock = { ...block, color: "gray" };
+      this.drawVolumetricBlock(ctx, grayBlock, block.x, block.y, {
+        alpha: 1,
+        shadowOpacity: 0.2,
+        bevelStrength: 0.24,
+        offsetY: 0,
+      });
+    }
+  }
+
+  getPregameStartButtonRect() {
+    const railsBottom = LAYOUT.track.y + LAYOUT.track.h;
+    const w = PREGAME_START_BUTTON_UI.w;
+    const h = PREGAME_START_BUTTON_UI.h;
+    const y = Math.min(
+      this.height - h - PREGAME_START_BUTTON_UI.bottomSafeMargin,
+      railsBottom + PREGAME_START_BUTTON_UI.offsetFromRails
+    );
+    const rect = {
+      x: Math.round((this.width - w) * 0.5),
+      y: Math.round(y),
+      w,
+      h,
+    };
+    this.preGameStartButtonRect = rect;
+    return rect;
+  }
+
+  getPregameStartButtonHitRect() {
+    const rect = this.preGameStartButtonRect || this.getPregameStartButtonRect();
+    const padding = 16;
+    return {
+      x: rect.x - padding,
+      y: rect.y - padding,
+      w: rect.w + padding * 2,
+      h: rect.h + padding * 2,
+    };
+  }
+
+  drawPregameStartButton(ctx) {
+    const rect = this.getPregameStartButtonRect();
+    const gradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+    gradient.addColorStop(0, "#67de67");
+    gradient.addColorStop(1, "#39b53d");
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.26)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 5;
+    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, PREGAME_START_BUTTON_UI.radius);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.48)";
+    roundedRect(ctx, rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4, PREGAME_START_BUTTON_UI.radius - 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.font = `900 52px ${TOP_PANEL_FONT_FAMILY}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(19, 88, 20, 0.45)";
+    ctx.lineWidth = 5;
+    const textX = rect.x + rect.w * 0.5;
+    const textY = rect.y + rect.h * 0.56;
+    ctx.strokeText(PREGAME_START_BUTTON_UI.label, textX, textY);
+    ctx.fillText(PREGAME_START_BUTTON_UI.label, textX, textY);
+    ctx.restore();
+  }
+
+  drawPregame(ctx) {
+    // The cached static scene includes bird slots. Keep pre-game cleaner by
+    // drawing only the world layer until the player presses START.
+    this.drawBackground(ctx);
+    this.drawWagonLayer(ctx);
+    this.drawPregameLevelImageOnField(ctx);
+    this.drawPregameStartButton(ctx);
   }
 
   drawVolumetricBlock(ctx, block, x, y, options = {}) {
@@ -9551,8 +9650,12 @@ class Game {
     }
   }
 
-  shouldShowTopActionButtons() {
+  shouldShowBackButton() {
     return this.gameState !== "loading" && this.gameState !== "preview" && this.gameState !== "victory";
+  }
+
+  shouldShowRestartButton() {
+    return this.shouldShowBackButton() && this.gameState !== "pregame";
   }
 
   shouldShowTopLevelPanel() {
@@ -10232,8 +10335,10 @@ class Game {
       if (this.shouldShowTopLevelPanel()) {
         this.drawTopTimerPanel(ctx);
       }
-      if (this.shouldShowTopActionButtons()) {
+      if (this.shouldShowRestartButton()) {
         this.drawTopCoinsPanel(ctx);
+      }
+      if (this.shouldShowBackButton()) {
         this.drawBackButton(ctx);
       }
       ctx.restore();
@@ -10246,8 +10351,20 @@ class Game {
       if (this.shouldShowTopLevelPanel()) {
         this.drawTopTimerPanel(ctx);
       }
-      if (this.shouldShowTopActionButtons()) {
-        this.drawTopCoinsPanel(ctx);
+      if (this.shouldShowBackButton()) {
+        this.drawBackButton(ctx);
+      }
+      ctx.restore();
+      this.needsRender = false;
+      return;
+    }
+
+    if (this.gameState === "pregame") {
+      this.drawPregame(ctx);
+      if (this.shouldShowTopLevelPanel()) {
+        this.drawTopTimerPanel(ctx);
+      }
+      if (this.shouldShowBackButton()) {
         this.drawBackButton(ctx);
       }
       ctx.restore();
@@ -10269,8 +10386,10 @@ class Game {
       if (this.shouldShowTopLevelPanel()) {
         this.drawTopTimerPanel(ctx);
       }
-      if (this.shouldShowTopActionButtons()) {
+      if (this.shouldShowRestartButton()) {
         this.drawTopCoinsPanel(ctx);
+      }
+      if (this.shouldShowBackButton()) {
         this.drawBackButton(ctx);
       }
       this.drawLevelStartFade(ctx);
@@ -10308,8 +10427,10 @@ class Game {
     if (this.shouldShowTopLevelPanel()) {
       this.drawTopTimerPanel(ctx);
     }
-    if (this.shouldShowTopActionButtons()) {
+    if (this.shouldShowRestartButton()) {
       this.drawTopCoinsPanel(ctx);
+    }
+    if (this.shouldShowBackButton()) {
       this.drawBackButton(ctx);
     }
     this.drawTutorialHand(ctx);
@@ -10451,12 +10572,18 @@ class Game {
       this.canvas.style.cursor = overClose || overContinue || overFree || overOfferPurchase ? "pointer" : "default";
       return;
     }
-    if (!this.shouldShowTopActionButtons()) {
+    if (this.gameState === "pregame") {
+      const overBack = this.shouldShowBackButton() && isInsideRect(x, y, this.backButtonRect);
+      const overStart = isInsideRect(x, y, this.getPregameStartButtonHitRect());
+      this.canvas.style.cursor = overBack || overStart ? "pointer" : "default";
+      return;
+    }
+    if (!this.shouldShowBackButton() && !this.shouldShowRestartButton()) {
       this.canvas.style.cursor = "default";
       return;
     }
-    const overBack = isInsideRect(x, y, this.backButtonRect);
-    const overRestart = isInsideRect(x, y, this.getRestartButtonHitRect());
+    const overBack = this.shouldShowBackButton() && isInsideRect(x, y, this.backButtonRect);
+    const overRestart = this.shouldShowRestartButton() && isInsideRect(x, y, this.getRestartButtonHitRect());
     this.canvas.style.cursor = overBack || overRestart ? "pointer" : "default";
   }
 
@@ -10496,11 +10623,24 @@ class Game {
       }
       return;
     }
-    const sideButtonsVisible = this.shouldShowTopActionButtons();
+    const backButtonVisible = this.shouldShowBackButton();
+    const restartButtonVisible = this.shouldShowRestartButton();
     const isTutorialPlaying = this.gameState === "playing" && this.tutorial?.active;
-    if (sideButtonsVisible && isInsideRect(x, y, this.getRestartButtonHitRect())) {
+    if (restartButtonVisible && isInsideRect(x, y, this.getRestartButtonHitRect())) {
       this.restart();
       dispatchUnityLevelTrackEvent("restart");
+      return;
+    }
+    if (this.gameState === "pregame") {
+      if (backButtonVisible && isInsideRect(x, y, this.backButtonRect)) {
+        this.showQuitScreen();
+        return;
+      }
+      if (isInsideRect(x, y, this.getPregameStartButtonHitRect())) {
+        this.setGameState("playing");
+        this.levelStartFade = 1;
+        this.invalidate(true);
+      }
       return;
     }
     if (isTutorialPlaying) {
@@ -10549,7 +10689,7 @@ class Game {
       }
       return;
     }
-    if (!isTutorialPlaying && sideButtonsVisible && isInsideRect(x, y, this.backButtonRect)) {
+    if (!isTutorialPlaying && backButtonVisible && isInsideRect(x, y, this.backButtonRect)) {
       this.showQuitScreen();
       return;
     }
