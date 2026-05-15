@@ -514,10 +514,41 @@ const PREGAME_START_BUTTON_UI = {
   w: 310,
   h: 98,
   offsetFromRails: 42,
+  offsetFromColorPanel: 22,
   bottomSafeMargin: 64,
   radius: 26,
   label: "START",
 };
+const PREGAME_COLOR_PANEL_UI = {
+  minW: 420,
+  sideMargin: 22,
+  offsetFromRails: 18,
+  paddingX: 18,
+  paddingTop: 16,
+  paddingBottom: 18,
+  sectionGap: 14,
+  rowGap: 10,
+  radius: 24,
+  sectorButtonW: 136,
+  sectorButtonH: 52,
+  sectorButtonGap: 10,
+  colorButtonSize: 56,
+  colorButtonGap: 10,
+};
+const PREGAME_EXTRA_COLOR_OPTIONS = [
+  "red",
+  "blue",
+  "green",
+  "yellow",
+  "orange",
+  "white",
+  "black",
+  "pink",
+  "light_green",
+  "dark_blue",
+  "dark_purple",
+  "light_purple",
+];
 const LOSE_POPUP_UI = {
   w: 646,
   h: 663,
@@ -1697,6 +1728,7 @@ class Block {
     this.id = id;
     this.col = col;
     this.row = row;
+    this.baseColor = color;
     this.color = color;
     this.layer = Math.min(
       col,
@@ -2852,6 +2884,14 @@ class Game {
     this.backButtonRect = { ...BACK_BUTTON_UI };
     this.restartButtonRect = { x: 0, y: 0, w: COINS_UI.panelW, h: COINS_UI.panelH };
     this.preGameStartButtonRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameSectorButtons = [];
+    this.preGameColorButtons = [];
+    this.pregameSectorKeys = [];
+    this.pregameColorPalette = [];
+    this.pregameSelectedSectorKey = null;
+    this.pregameSectorColorAssignments = {};
+    this.pregamePulseTime = 0;
     this.loseCloseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
@@ -4458,6 +4498,7 @@ class Game {
   restart() {
     this.ammoTextMetricsCache.clear();
     this.blocks = this.createBlocksFromReference();
+    this.initializePregameColoring();
     this.blocksBySpiral = this.blocks
       .slice()
       .sort((a, b) => (a.spiralIndex - b.spiralIndex) || (a.spiralOrder - b.spiralOrder));
@@ -4524,6 +4565,7 @@ class Game {
         }
         id += 1;
         const block = new Block(id, col, row, blockColor);
+        block.baseColor = blockColor;
         const key = `${col},${row}`;
         if (this.spiralOrderByCell.has(key)) {
           block.spiralIndex = this.spiralOrderByCell.get(key);
@@ -8343,6 +8385,8 @@ class Game {
       return;
     }
     if (this.gameState === "pregame") {
+      this.pregamePulseTime += dt;
+      this.needsRender = true;
       this.updateIdleAssistState(dt);
       this.updateAutoplayState();
       return;
@@ -8719,15 +8763,308 @@ class Game {
     });
   }
 
-  drawPregameLevelImageOnField(ctx) {
+  initializePregameColoring() {
+    const sectorKeys = [];
+    const seen = new Set();
     for (const block of this.blocks) {
-      const grayBlock = { ...block, color: "gray" };
-      this.drawVolumetricBlock(ctx, grayBlock, block.x, block.y, {
-        alpha: 1,
-        shadowOpacity: 0.2,
-        bevelStrength: 0.24,
+      const normalized = normalizeBlockColorName(block?.baseColor || block?.color);
+      if (!normalized || seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      sectorKeys.push(normalized);
+    }
+
+    const paletteSet = new Set();
+    for (const color of sectorKeys) {
+      paletteSet.add(color);
+    }
+    for (const color of PREGAME_EXTRA_COLOR_OPTIONS) {
+      const normalized = normalizeBlockColorName(color);
+      if (normalized && Object.prototype.hasOwnProperty.call(BLOCK_COLOR_CONFIG, normalized)) {
+        paletteSet.add(normalized);
+      }
+    }
+
+    this.pregameSectorKeys = sectorKeys;
+    this.pregameColorPalette = [...paletteSet];
+    this.pregameSelectedSectorKey = null;
+    this.pregameSectorColorAssignments = {};
+    for (const sectorKey of sectorKeys) {
+      this.pregameSectorColorAssignments[sectorKey] = null;
+    }
+    this.pregamePulseTime = 0;
+    this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameSectorButtons = [];
+    this.preGameColorButtons = [];
+    this.applyPregameColoringToBlocks({ rebuildCards: false });
+  }
+
+  applyPregameColoringToBlocks(options = {}) {
+    const rebuildCards = options.rebuildCards === true;
+    const assignments = this.pregameSectorColorAssignments || {};
+    for (const block of this.blocks) {
+      const sectorKey = normalizeBlockColorName(block?.baseColor || block?.color);
+      const assignedColor = normalizeBlockColorName(assignments[sectorKey]);
+      block.color = assignedColor || "gray";
+    }
+    if (!rebuildCards) {
+      return;
+    }
+    this.cards = this.cardManager.resetFromBlocks(this.blocks);
+    this.enforceLevelOneTutorialQueue();
+    this.invalidateTargetingCaches();
+    this.invalidate(true);
+  }
+
+  getPregameColorPanelRect() {
+    const sectors = this.pregameSectorKeys;
+    const palette = this.pregameColorPalette;
+    if (!Array.isArray(sectors) || sectors.length === 0 || !Array.isArray(palette) || palette.length === 0) {
+      this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+      this.preGameSectorButtons = [];
+      this.preGameColorButtons = [];
+      return this.preGameColorPanelRect;
+    }
+
+    const ui = PREGAME_COLOR_PANEL_UI;
+    const railsBottom = LAYOUT.track.y + LAYOUT.track.h;
+    const preferredW = LAYOUT.track.w + 40;
+    const maxW = this.width - ui.sideMargin * 2;
+    const panelW = Math.min(maxW, Math.max(ui.minW, preferredW));
+    const panelX = Math.round((this.width - panelW) * 0.5);
+    const innerX = panelX + ui.paddingX;
+    const innerW = Math.max(120, panelW - ui.paddingX * 2);
+
+    const sectorButtons = [];
+    const sectorButtonW = Math.max(92, Math.min(ui.sectorButtonW, innerW));
+    let cursorX = innerX;
+    let cursorY = Math.round(railsBottom + ui.offsetFromRails + ui.paddingTop);
+    let rowMaxH = 0;
+    for (const sectorKey of sectors) {
+      if (cursorX + sectorButtonW > innerX + innerW + 0.5 && sectorButtons.length > 0) {
+        cursorX = innerX;
+        cursorY += rowMaxH + ui.rowGap;
+        rowMaxH = 0;
+      }
+      const rect = {
+        x: Math.round(cursorX),
+        y: Math.round(cursorY),
+        w: Math.round(sectorButtonW),
+        h: ui.sectorButtonH,
+      };
+      sectorButtons.push({
+        sectorKey,
+        rect,
+      });
+      cursorX += sectorButtonW + ui.sectorButtonGap;
+      rowMaxH = Math.max(rowMaxH, ui.sectorButtonH);
+    }
+
+    const sectorRowsBottomY = cursorY + rowMaxH;
+    const colorTopY = Math.round(sectorRowsBottomY + ui.sectionGap);
+    const colorButtonSize = ui.colorButtonSize;
+    const colorGap = ui.colorButtonGap;
+    const columns = Math.max(1, Math.floor((innerW + colorGap) / (colorButtonSize + colorGap)));
+    const colorButtons = [];
+    for (let i = 0; i < palette.length; i += 1) {
+      const col = i % columns;
+      const row = Math.floor(i / columns);
+      const x = innerX + col * (colorButtonSize + colorGap);
+      const y = colorTopY + row * (colorButtonSize + colorGap);
+      colorButtons.push({
+        colorKey: palette[i],
+        rect: {
+          x: Math.round(x),
+          y: Math.round(y),
+          w: colorButtonSize,
+          h: colorButtonSize,
+        },
+      });
+    }
+
+    const colorRows = Math.max(1, Math.ceil(palette.length / columns));
+    const colorRowsBottomY = colorTopY + colorRows * colorButtonSize + (colorRows - 1) * colorGap;
+    const panelH = Math.round(
+      (colorRowsBottomY - (railsBottom + ui.offsetFromRails))
+      + ui.paddingBottom
+    );
+    const panelY = Math.round(railsBottom + ui.offsetFromRails);
+    const panelRect = { x: panelX, y: panelY, w: Math.round(panelW), h: panelH };
+
+    this.preGameColorPanelRect = panelRect;
+    this.preGameSectorButtons = sectorButtons;
+    this.preGameColorButtons = colorButtons;
+    return panelRect;
+  }
+
+  drawPregameColorPanel(ctx) {
+    const panelRect = this.getPregameColorPanelRect();
+    if (panelRect.w <= 0 || panelRect.h <= 0) {
+      return;
+    }
+
+    ctx.save();
+    ctx.fillStyle = "rgba(12, 17, 26, 0.72)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.26)";
+    ctx.lineWidth = 2;
+    roundedRect(ctx, panelRect.x, panelRect.y, panelRect.w, panelRect.h, PREGAME_COLOR_PANEL_UI.radius);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    for (let index = 0; index < this.preGameSectorButtons.length; index += 1) {
+      const entry = this.preGameSectorButtons[index];
+      const rect = entry.rect;
+      const isSelected = entry.sectorKey === this.pregameSelectedSectorKey;
+      const mappedColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[entry.sectorKey]) || "gray";
+      const chipColor = this.getBlockFaceColor(mappedColor);
+
+      ctx.save();
+      const grad = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+      grad.addColorStop(0, isSelected ? "rgba(112, 194, 255, 0.92)" : "rgba(255, 255, 255, 0.2)");
+      grad.addColorStop(1, isSelected ? "rgba(60, 142, 235, 0.9)" : "rgba(255, 255, 255, 0.08)");
+      roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 16);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.strokeStyle = isSelected ? "rgba(198, 235, 255, 0.95)" : "rgba(255, 255, 255, 0.3)";
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = chipColor;
+      ctx.beginPath();
+      ctx.arc(rect.x + rect.w - 22, rect.y + rect.h * 0.5, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.font = `800 24px ${TOP_PANEL_FONT_FAMILY}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(`${index + 1}`, rect.x + 18, rect.y + rect.h * 0.54);
+      ctx.restore();
+    }
+
+    const activeSectorKey = this.pregameSelectedSectorKey;
+    const activeMappedColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[activeSectorKey]);
+    for (const entry of this.preGameColorButtons) {
+      const rect = entry.rect;
+      const colorKey = entry.colorKey;
+      const fill = this.getBlockFaceColor(colorKey);
+      const isSelectedColor = activeMappedColor === colorKey;
+
+      ctx.save();
+      ctx.fillStyle = fill;
+      roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 16);
+      ctx.fill();
+      ctx.lineWidth = isSelectedColor ? 4 : 2;
+      ctx.strokeStyle = isSelectedColor ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.42)";
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  applyPregameColorPick(colorKey) {
+    const sectorKey = this.pregameSelectedSectorKey;
+    const normalizedColor = normalizeBlockColorName(colorKey);
+    if (!sectorKey || !normalizedColor) {
+      return false;
+    }
+    if (this.pregameSectorColorAssignments?.[sectorKey] === normalizedColor) {
+      return false;
+    }
+    this.pregameSectorColorAssignments[sectorKey] = normalizedColor;
+    this.applyPregameColoringToBlocks({ rebuildCards: true });
+    return true;
+  }
+
+  handlePregamePanelPointerDown(x, y) {
+    const panelRect = this.getPregameColorPanelRect();
+    if (!isInsideRect(x, y, panelRect)) {
+      return false;
+    }
+    for (const entry of this.preGameSectorButtons) {
+      if (!isInsideRect(x, y, entry.rect)) {
+        continue;
+      }
+      if (this.pregameSelectedSectorKey !== entry.sectorKey) {
+        this.pregameSelectedSectorKey = entry.sectorKey;
+        this.invalidate(true);
+      }
+      return true;
+    }
+    for (const entry of this.preGameColorButtons) {
+      if (!isInsideRect(x, y, entry.rect)) {
+        continue;
+      }
+      this.applyPregameColorPick(entry.colorKey);
+      return true;
+    }
+    return true;
+  }
+
+  isPointOnPregamePanelControls(x, y) {
+    this.getPregameColorPanelRect();
+    for (const entry of this.preGameSectorButtons) {
+      if (isInsideRect(x, y, entry.rect)) {
+        return true;
+      }
+    }
+    for (const entry of this.preGameColorButtons) {
+      if (isInsideRect(x, y, entry.rect)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  drawPregameLevelImageOnField(ctx) {
+    const selectedSectorKey = this.pregameSelectedSectorKey;
+    const pulseRaw = 0.5 + 0.5 * Math.sin(this.pregamePulseTime * 8.4);
+    const pulse = Math.pow(pulseRaw, 0.65);
+    for (const block of this.blocks) {
+      const sectorKey = normalizeBlockColorName(block?.baseColor || block?.color);
+      const isSelectedSector = !!selectedSectorKey && sectorKey === selectedSectorKey;
+      const blockScale = isSelectedSector ? 1 + 0.14 * pulse : 1;
+      const centerX = block.x + block.size * 0.5;
+      const centerY = block.y + block.size * 0.5;
+
+      ctx.save();
+      if (isSelectedSector) {
+        ctx.translate(centerX, centerY);
+        ctx.scale(blockScale, blockScale);
+        ctx.translate(-centerX, -centerY);
+      }
+      this.drawVolumetricBlock(ctx, block, block.x, block.y, {
+        alpha: isSelectedSector ? 0.92 + pulse * 0.08 : 1,
+        shadowOpacity: isSelectedSector ? 0.12 : 0.2,
+        bevelStrength: isSelectedSector ? 0.5 : 0.24,
         offsetY: 0,
       });
+      if (isSelectedSector) {
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.14 + pulse * 0.26;
+        roundedRect(ctx, block.x, block.y, block.size, block.size, Math.max(6, Math.round(block.size * 0.24)));
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalAlpha = 0.42 + pulse * 0.34;
+        ctx.lineWidth = 3 + pulse * 3;
+        roundedRect(ctx, block.x + 1, block.y + 1, block.size - 2, block.size - 2, Math.max(5, Math.round(block.size * 0.2)));
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
     }
   }
 
@@ -8735,9 +9072,13 @@ class Game {
     const railsBottom = LAYOUT.track.y + LAYOUT.track.h;
     const w = PREGAME_START_BUTTON_UI.w;
     const h = PREGAME_START_BUTTON_UI.h;
+    const panelRect = this.getPregameColorPanelRect();
+    const baseTopY = panelRect.h > 0
+      ? panelRect.y + panelRect.h + PREGAME_START_BUTTON_UI.offsetFromColorPanel
+      : railsBottom + PREGAME_START_BUTTON_UI.offsetFromRails;
     const y = Math.min(
       this.height - h - PREGAME_START_BUTTON_UI.bottomSafeMargin,
-      railsBottom + PREGAME_START_BUTTON_UI.offsetFromRails
+      baseTopY
     );
     const rect = {
       x: Math.round((this.width - w) * 0.5),
@@ -8802,6 +9143,7 @@ class Game {
     this.drawBackground(ctx);
     this.drawWagonLayer(ctx);
     this.drawPregameLevelImageOnField(ctx);
+    this.drawPregameColorPanel(ctx);
     this.drawPregameStartButton(ctx);
   }
 
@@ -10485,6 +10827,9 @@ class Game {
     if (this.gameState === "preview") {
       return true;
     }
+    if (this.gameState === "pregame" && this.pregameSelectedSectorKey) {
+      return true;
+    }
     if (this.gameState === "lose") {
       return this.losePopupAppear < 0.999 || this.levelStartFade > 0.001 || this.hasAnimatingCards();
     }
@@ -10575,7 +10920,8 @@ class Game {
     if (this.gameState === "pregame") {
       const overBack = this.shouldShowBackButton() && isInsideRect(x, y, this.backButtonRect);
       const overStart = isInsideRect(x, y, this.getPregameStartButtonHitRect());
-      this.canvas.style.cursor = overBack || overStart ? "pointer" : "default";
+      const overPanelControl = this.isPointOnPregamePanelControls(x, y);
+      this.canvas.style.cursor = overBack || overStart || overPanelControl ? "pointer" : "default";
       return;
     }
     if (!this.shouldShowBackButton() && !this.shouldShowRestartButton()) {
@@ -10634,6 +10980,9 @@ class Game {
     if (this.gameState === "pregame") {
       if (backButtonVisible && isInsideRect(x, y, this.backButtonRect)) {
         this.showQuitScreen();
+        return;
+      }
+      if (this.handlePregamePanelPointerDown(x, y)) {
         return;
       }
       if (isInsideRect(x, y, this.getPregameStartButtonHitRect())) {
