@@ -8788,7 +8788,7 @@ class Game {
 
     this.pregameSectorKeys = sectorKeys;
     this.pregameColorPalette = [...paletteSet];
-    this.pregameSelectedSectorKey = null;
+    this.pregameSelectedSectorKey = sectorKeys[0] || null;
     this.pregameSectorColorAssignments = {};
     for (const sectorKey of sectorKeys) {
       this.pregameSectorColorAssignments[sectorKey] = null;
