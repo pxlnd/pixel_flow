@@ -9136,16 +9136,44 @@ class Game {
     const blockCenterX = block.x + size * 0.5;
     const blockCenterY = block.y + size * 0.5;
     const distanceToWave = Math.hypot(blockCenterX - centerX, blockCenterY - centerY);
-    const waveFront = clamp(1 - Math.abs(distanceToWave - revealRadius) / Math.max(1, edgeWidth), 0, 1);
+    const seedBase = (block.col + 1) * 12.9898 + (block.row + 1) * 78.233;
+    const seed = seedBase - Math.floor(seedBase);
+    const edgeNoise = (
+      Math.sin(seedBase * 0.53 + progress * 1.8) * 0.55 +
+      Math.sin(seedBase * 1.17 - progress * 2.4) * 0.45
+    ) * edgeWidth * 0.16;
+    const localRevealRadius = revealRadius + edgeNoise;
+    const paintRadius = localRevealRadius + edgeWidth * (0.38 + seed * 0.2);
+    const waveFront = clamp(1 - Math.abs(distanceToWave - localRevealRadius) / Math.max(1, edgeWidth), 0, 1);
+    const paintWake = clamp(1 - Math.max(0, distanceToWave - paintRadius) / Math.max(1, edgeWidth), 0, 1);
+    const brushFront = clamp(1 - Math.abs(distanceToWave - paintRadius) / Math.max(1, edgeWidth * 0.9), 0, 1);
     const sparklePulse = Math.sin(progress * Math.PI);
+    const paintSample = this.getColorSampleForColorKey(effect.toColor) || BLOCK_COLOR_TO_RGB.green || { r: 129, g: 195, b: 65 };
+    const paintColor = (alpha) => `rgba(${paintSample.r}, ${paintSample.g}, ${paintSample.b}, ${alpha})`;
 
     this.drawVolumetricBlock(ctx, fromBlock, block.x, block.y, options);
+
+    if (paintWake > 0.001) {
+      ctx.save();
+      roundedRect(ctx, block.x, block.y, size, size, corner);
+      ctx.clip();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, paintRadius, 0, Math.PI * 2);
+      ctx.clip();
+      this.drawVolumetricBlock(ctx, toBlock, block.x, block.y, {
+        ...options,
+        alpha: (options.alpha ?? 1) * (0.16 + paintWake * 0.34),
+        shadowOpacity: 0,
+        bevelStrength: 0.1,
+      });
+      ctx.restore();
+    }
 
     ctx.save();
     roundedRect(ctx, block.x, block.y, size, size, corner);
     ctx.clip();
     ctx.beginPath();
-    ctx.arc(centerX, centerY, revealRadius, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, localRevealRadius, 0, Math.PI * 2);
     ctx.clip();
     this.drawVolumetricBlock(ctx, toBlock, block.x, block.y, {
       ...options,
@@ -9162,10 +9190,10 @@ class Game {
       const glow = ctx.createRadialGradient(
         centerX,
         centerY,
-        Math.max(0, revealRadius - edgeWidth),
+        Math.max(0, localRevealRadius - edgeWidth),
         centerX,
         centerY,
-        revealRadius + edgeWidth
+        localRevealRadius + edgeWidth
       );
       glow.addColorStop(0, "rgba(255, 255, 255, 0)");
       glow.addColorStop(0.5, "rgba(255, 255, 255, 0.34)");
@@ -9175,8 +9203,38 @@ class Game {
       ctx.restore();
     }
 
+    if (brushFront > 0.001) {
+      ctx.save();
+      roundedRect(ctx, block.x, block.y, size, size, corner);
+      ctx.clip();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, paintRadius, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.globalCompositeOperation = "source-over";
+      for (let i = 0; i < 3; i += 1) {
+        const dabSeed = seedBase + i * 31.37;
+        const dabPhase = clamp(brushFront - i * 0.12, 0, 1);
+        if (dabPhase <= 0.001) {
+          continue;
+        }
+        const dabX = block.x + size * (0.24 + 0.52 * (0.5 + 0.5 * Math.sin(dabSeed * 1.91)));
+        const dabY = block.y + size * (0.24 + 0.5 * (0.5 + 0.5 * Math.cos(dabSeed * 1.63)));
+        const dabW = size * (0.34 + 0.12 * Math.sin(dabSeed * 2.11));
+        const dabH = size * (0.13 + 0.06 * Math.cos(dabSeed * 1.47));
+        ctx.save();
+        ctx.translate(dabX, dabY);
+        ctx.rotate(Math.sin(dabSeed) * 0.9);
+        ctx.globalAlpha = 0.2 * Math.pow(dabPhase, 1.35) * (1 - progress * 0.28);
+        ctx.fillStyle = paintColor(1);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, Math.max(1, dabW), Math.max(1, dabH), 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
     if (waveFront > 0.001) {
-      const seed = ((block.col + 1) * 12.9898 + (block.row + 1) * 78.233) % 1;
       const twinkle = Math.pow(waveFront, 1.8) * sparklePulse;
       const sparkleX = block.x + size * (0.36 + 0.28 * Math.sin(seed * 87.1));
       const sparkleY = block.y + size * (0.34 + 0.26 * Math.cos(seed * 53.7));
