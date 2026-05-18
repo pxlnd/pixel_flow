@@ -549,6 +549,7 @@ const PREGAME_EXTRA_COLOR_OPTIONS = [
   "dark_purple",
   "light_purple",
 ];
+const PREGAME_COLOR_FILL_DURATION = 0.86;
 const LOSE_POPUP_UI = {
   w: 646,
   h: 663,
@@ -2891,6 +2892,7 @@ class Game {
     this.pregameColorPalette = [];
     this.pregameSelectedSectorKey = null;
     this.pregameSectorColorAssignments = {};
+    this.pregameColorFillEffects = {};
     this.pregamePulseTime = 0;
     this.loseCloseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
@@ -8386,6 +8388,7 @@ class Game {
     }
     if (this.gameState === "pregame") {
       this.pregamePulseTime += dt;
+      this.cleanupPregameColorFillEffects();
       this.needsRender = true;
       this.updateIdleAssistState(dt);
       this.updateAutoplayState();
@@ -8793,6 +8796,7 @@ class Game {
     for (const sectorKey of sectorKeys) {
       this.pregameSectorColorAssignments[sectorKey] = null;
     }
+    this.pregameColorFillEffects = {};
     this.pregamePulseTime = 0;
     this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
     this.preGameSectorButtons = [];
@@ -8970,6 +8974,77 @@ class Game {
     }
   }
 
+  startPregameColorFillEffect(sectorKey, fromColor, toColor) {
+    const normalizedSectorKey = normalizeBlockColorName(sectorKey);
+    const normalizedToColor = normalizeBlockColorName(toColor);
+    if (!normalizedSectorKey || !normalizedToColor) {
+      return;
+    }
+    const normalizedFromColor = normalizeBlockColorName(fromColor) || "gray";
+    const figureBlocks = this.blocks.filter((block) => !!block);
+    const bounds = figureBlocks.reduce((acc, block) => ({
+      minX: Math.min(acc.minX, block.x),
+      minY: Math.min(acc.minY, block.y),
+      maxX: Math.max(acc.maxX, block.x + block.size),
+      maxY: Math.max(acc.maxY, block.y + block.size),
+    }), {
+      minX: Infinity,
+      minY: Infinity,
+      maxX: -Infinity,
+      maxY: -Infinity,
+    });
+    const hasBounds = Number.isFinite(bounds.minX) && Number.isFinite(bounds.minY);
+    const centerX = hasBounds ? (bounds.minX + bounds.maxX) * 0.5 : this.width * 0.5;
+    const centerY = hasBounds ? (bounds.minY + bounds.maxY) * 0.5 : this.height * 0.5;
+    const maxRadius = figureBlocks.reduce((radius, block) => Math.max(
+      radius,
+      Math.hypot(block.x - centerX, block.y - centerY),
+      Math.hypot(block.x + block.size - centerX, block.y - centerY),
+      Math.hypot(block.x - centerX, block.y + block.size - centerY),
+      Math.hypot(block.x + block.size - centerX, block.y + block.size - centerY)
+    ), 1);
+    this.pregameColorFillEffects = this.pregameColorFillEffects || {};
+    this.pregameColorFillEffects[normalizedSectorKey] = {
+      fromColor: normalizedFromColor,
+      toColor: normalizedToColor,
+      centerX,
+      centerY,
+      maxRadius,
+      startTime: this.pregamePulseTime,
+      duration: PREGAME_COLOR_FILL_DURATION,
+    };
+  }
+
+  cleanupPregameColorFillEffects() {
+    const effects = this.pregameColorFillEffects || {};
+    for (const [sectorKey, effect] of Object.entries(effects)) {
+      const duration = Math.max(0.001, Number(effect?.duration) || PREGAME_COLOR_FILL_DURATION);
+      if (this.pregamePulseTime - (Number(effect?.startTime) || 0) >= duration) {
+        delete effects[sectorKey];
+      }
+    }
+  }
+
+  getPregameColorFillEffect(sectorKey) {
+    const normalizedSectorKey = normalizeBlockColorName(sectorKey);
+    if (!normalizedSectorKey) {
+      return null;
+    }
+    const effect = this.pregameColorFillEffects?.[normalizedSectorKey];
+    if (!effect) {
+      return null;
+    }
+    const duration = Math.max(0.001, Number(effect.duration) || PREGAME_COLOR_FILL_DURATION);
+    const progress = clamp((this.pregamePulseTime - (Number(effect.startTime) || 0)) / duration, 0, 1);
+    if (progress >= 0.999) {
+      return null;
+    }
+    return {
+      ...effect,
+      progress,
+    };
+  }
+
   applyPregameColorPick(colorKey) {
     const sectorKey = this.pregameSelectedSectorKey;
     const normalizedColor = normalizeBlockColorName(colorKey);
@@ -8979,7 +9054,9 @@ class Game {
     if (this.pregameSectorColorAssignments?.[sectorKey] === normalizedColor) {
       return false;
     }
+    const previousColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[sectorKey]) || "gray";
     this.pregameSectorColorAssignments[sectorKey] = normalizedColor;
+    this.startPregameColorFillEffect(sectorKey, previousColor, normalizedColor);
     this.applyPregameColoringToBlocks({ rebuildCards: true });
     return true;
   }
@@ -9039,6 +9116,92 @@ class Game {
     return true;
   }
 
+  drawPregameColorFillBlock(ctx, block, effect, options = {}) {
+    if (!effect) {
+      this.drawVolumetricBlock(ctx, block, block.x, block.y, options);
+      return;
+    }
+
+    const size = block.size;
+    const progress = clamp(Number(effect.progress) || 0, 0, 1);
+    const waveProgress = easeOutCubic(progress);
+    const centerX = Number.isFinite(effect.centerX) ? effect.centerX : block.x + size * 0.5;
+    const centerY = Number.isFinite(effect.centerY) ? effect.centerY : block.y + size * 0.5;
+    const maxRadius = Math.max(size, Number(effect.maxRadius) || size);
+    const revealRadius = lerp(size * 0.18, maxRadius + size * 0.18, waveProgress);
+    const edgeWidth = Math.max(7, lerp(size * 0.9, size * 0.34, progress));
+    const corner = Math.max(6, Math.round(size * 0.24));
+    const fromBlock = { ...block, color: effect.fromColor || "gray" };
+    const toBlock = { ...block, color: effect.toColor || block.color };
+    const blockCenterX = block.x + size * 0.5;
+    const blockCenterY = block.y + size * 0.5;
+    const distanceToWave = Math.hypot(blockCenterX - centerX, blockCenterY - centerY);
+    const waveFront = clamp(1 - Math.abs(distanceToWave - revealRadius) / Math.max(1, edgeWidth), 0, 1);
+    const sparklePulse = Math.sin(progress * Math.PI);
+
+    this.drawVolumetricBlock(ctx, fromBlock, block.x, block.y, options);
+
+    ctx.save();
+    roundedRect(ctx, block.x, block.y, size, size, corner);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, revealRadius, 0, Math.PI * 2);
+    ctx.clip();
+    this.drawVolumetricBlock(ctx, toBlock, block.x, block.y, {
+      ...options,
+      shadowOpacity: 0,
+    });
+    ctx.restore();
+
+    if (progress < 0.96) {
+      ctx.save();
+      roundedRect(ctx, block.x, block.y, size, size, corner);
+      ctx.clip();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.88 * (1 - easeInCubic(progress));
+      const glow = ctx.createRadialGradient(
+        centerX,
+        centerY,
+        Math.max(0, revealRadius - edgeWidth),
+        centerX,
+        centerY,
+        revealRadius + edgeWidth
+      );
+      glow.addColorStop(0, "rgba(255, 255, 255, 0)");
+      glow.addColorStop(0.5, "rgba(255, 255, 255, 0.34)");
+      glow.addColorStop(1, "rgba(255, 255, 255, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(block.x, block.y, size, size);
+      ctx.restore();
+    }
+
+    if (waveFront > 0.001) {
+      const seed = ((block.col + 1) * 12.9898 + (block.row + 1) * 78.233) % 1;
+      const twinkle = Math.pow(waveFront, 1.8) * sparklePulse;
+      const sparkleX = block.x + size * (0.36 + 0.28 * Math.sin(seed * 87.1));
+      const sparkleY = block.y + size * (0.34 + 0.26 * Math.cos(seed * 53.7));
+
+      ctx.save();
+      roundedRect(ctx, block.x, block.y, size, size, corner);
+      ctx.clip();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.58 * twinkle;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, Math.max(1.4, size * 0.065), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = Math.max(1, size * 0.035);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+      ctx.beginPath();
+      ctx.moveTo(sparkleX - size * 0.14, sparkleY);
+      ctx.lineTo(sparkleX + size * 0.14, sparkleY);
+      ctx.moveTo(sparkleX, sparkleY - size * 0.14);
+      ctx.lineTo(sparkleX, sparkleY + size * 0.14);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   drawPregameLevelImageOnField(ctx) {
     const selectedSectorKey = this.pregameSelectedSectorKey;
     const assignments = this.pregameSectorColorAssignments || {};
@@ -9054,19 +9217,26 @@ class Game {
       const blockScale = isSelectedSector ? 1 + 0.18 * pulse : 1;
       const centerX = block.x + block.size * 0.5;
       const centerY = block.y + block.size * 0.5;
+      const fillEffect = this.getPregameColorFillEffect(sectorKey);
 
       ctx.save();
-      if (isSelectedSector) {
+      if (isSelectedSector && !fillEffect) {
         ctx.translate(centerX, centerY);
         ctx.scale(blockScale, blockScale);
         ctx.translate(-centerX, -centerY);
       }
-      this.drawVolumetricBlock(ctx, block, block.x, block.y, {
+      const blockDrawOptions = {
         alpha: shouldKeepFullAlpha ? 1 : (isSelectedSector ? 0.9 + pulse * 0.1 : 1),
         shadowOpacity: shouldUseSelectionTint ? 0.1 : 0.2,
         bevelStrength: shouldUseSelectionTint ? 0.56 : 0.24,
         offsetY: 0,
-      });
+      };
+      this.drawPregameColorFillBlock(
+        ctx,
+        block,
+        fillEffect,
+        blockDrawOptions
+      );
       if (shouldUseSelectionTint) {
         ctx.save();
         ctx.globalCompositeOperation = "screen";
