@@ -462,6 +462,10 @@ const LEVEL_PREVIEW_MAX_ALPHA = 1.0;
 const LEVEL_PREVIEW_CELL_APPEAR_START_SCALE = 0.0;
 const LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE = 0.0;
 const LEVEL_PREVIEW_ELASTICITY = 1.4;
+const PREGAME_FIGURE_APPEAR_DURATION = LEVEL_PREVIEW_APPEAR_DURATION;
+const PREGAME_FIGURE_DISAPPEAR_DURATION = LEVEL_PREVIEW_DISAPPEAR_DURATION;
+const PREGAME_FIGURE_APPEAR_CELL_FADE_SPAN = LEVEL_PREVIEW_APPEAR_CELL_FADE_SPAN;
+const PREGAME_FIGURE_DISAPPEAR_CELL_FADE_SPAN = LEVEL_PREVIEW_DISAPPEAR_CELL_FADE_SPAN;
 const AUTOPLAY_ACTION_INTERVAL = 0.12;
 const AUTOPLAY_STUCK_TIMEOUT = 8;
 const IDLE_ASSIST_POINTER_DELAY_SECONDS = 2;
@@ -2894,6 +2898,10 @@ class Game {
     this.pregameSectorColorAssignments = {};
     this.pregameColorFillEffects = {};
     this.pregamePulseTime = 0;
+    this.pregameFigureAppearTime = 0;
+    this.pregameFigureDisappearTime = 0;
+    this.pregameStartTransitionActive = false;
+    this.pregameAutoSelectPending = false;
     this.loseCloseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
@@ -4493,6 +4501,15 @@ class Game {
     if (willShowPreview && (!wasPreviewVisible || forcePreviewShow)) {
       dispatchUnityPreviewTrackEvent("show");
     }
+    if (normalizedNextState === "pregame" && previousState !== "pregame") {
+      this.pregameFigureAppearTime = 0;
+      this.pregameFigureDisappearTime = 0;
+      this.pregameStartTransitionActive = false;
+    }
+    if (previousState === "pregame" && normalizedNextState !== "pregame") {
+      this.pregameStartTransitionActive = false;
+      this.pregameFigureDisappearTime = 0;
+    }
     this.gameState = normalizedNextState;
     return this.gameState;
   }
@@ -4536,6 +4553,9 @@ class Game {
     this.victoryCompleteEventPending = false;
     this.levelStartFade = 0;
     this.levelPreviewTime = 0;
+    this.pregameFigureAppearTime = 0;
+    this.pregameFigureDisappearTime = 0;
+    this.pregameStartTransitionActive = false;
     this.losePopupAppear = 1;
     this.queueCompletionTrackPending = true;
     this.idleAssistLastInteractionAt = performance.now() / 1000;
@@ -8388,6 +8408,34 @@ class Game {
     }
     if (this.gameState === "pregame") {
       this.pregamePulseTime += dt;
+      if (this.pregameStartTransitionActive) {
+        this.pregameFigureAppearTime = PREGAME_FIGURE_APPEAR_DURATION;
+        this.pregameFigureDisappearTime = Math.min(
+          PREGAME_FIGURE_DISAPPEAR_DURATION,
+          this.pregameFigureDisappearTime + dt
+        );
+        if (this.pregameFigureDisappearTime >= PREGAME_FIGURE_DISAPPEAR_DURATION) {
+          this.pregameStartTransitionActive = false;
+          this.setGameState("playing");
+          this.levelStartFade = 1;
+          this.invalidate(true);
+          return;
+        }
+      } else {
+        this.pregameFigureDisappearTime = 0;
+        this.pregameFigureAppearTime = Math.min(
+          PREGAME_FIGURE_APPEAR_DURATION,
+          this.pregameFigureAppearTime + dt
+        );
+        if (
+          this.pregameAutoSelectPending
+          && !this.pregameSelectedSectorKey
+          && this.pregameFigureAppearTime >= PREGAME_FIGURE_APPEAR_DURATION
+        ) {
+          this.pregameSelectedSectorKey = this.pregameSectorKeys[0] || null;
+          this.pregameAutoSelectPending = false;
+        }
+      }
       this.cleanupPregameColorFillEffects();
       this.needsRender = true;
       this.updateIdleAssistState(dt);
@@ -8666,11 +8714,7 @@ class Game {
     }
   }
 
-  drawLevelPreviewImageOnField(ctx, options = {}) {
-    const clampedAlpha = clamp(Number.isFinite(options.alpha) ? options.alpha : 1, 0, 1);
-    if (clampedAlpha <= 0.001) {
-      return;
-    }
+  getPreviewBlockScale(block, options = {}) {
     const appearProgress = clamp(Number(options.appearProgress) || 0, 0, 1);
     const disappearProgress = clamp(Number(options.disappearProgress) || 0, 0, 1);
     const rows = Math.max(1, LAYOUT.fieldRows);
@@ -8697,28 +8741,37 @@ class Game {
       const dy = block.row - centerRow;
       return clamp(Math.hypot(dx, dy) / maxRadius, 0, 1);
     };
+    const radiusNorm = getRadiusNorm(block);
+    const appearStart = radiusNorm * appearStartRange;
+    const disappearStart = (1 - radiusNorm) * disappearStartRange;
+    const appearLocal = clamp((appearProgress - appearStart) / appearCellFadeSpan, 0, 1);
+    const disappearLocal = clamp((disappearProgress - disappearStart) / disappearCellFadeSpan, 0, 1);
+    const appearScale = lerp(
+      LEVEL_PREVIEW_CELL_APPEAR_START_SCALE,
+      1,
+      easeOutElastic(appearLocal, LEVEL_PREVIEW_ELASTICITY)
+    );
+    const disappearScale = lerp(
+      1,
+      LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE,
+      easeInElastic(disappearLocal, LEVEL_PREVIEW_ELASTICITY)
+    );
+    return appearScale * disappearScale;
+  }
+
+  drawLevelPreviewImageOnField(ctx, options = {}) {
+    const clampedAlpha = clamp(Number.isFinite(options.alpha) ? options.alpha : 1, 0, 1);
+    if (clampedAlpha <= 0.001) {
+      return;
+    }
 
     // Preview must show the full target image, not only already-opened cells.
     // `blockFieldLayer` stores only alive blocks, which are empty at level start.
     for (const block of this.blocks) {
-      const radiusNorm = getRadiusNorm(block);
-      // Appear from center to edges.
-      const appearStart = radiusNorm * appearStartRange;
-      // Keep current hide behavior: edges fade first, center last.
-      const disappearStart = (1 - radiusNorm) * disappearStartRange;
-      const appearLocal = clamp((appearProgress - appearStart) / appearCellFadeSpan, 0, 1);
-      const disappearLocal = clamp((disappearProgress - disappearStart) / disappearCellFadeSpan, 0, 1);
-      const appearScale = lerp(
-        LEVEL_PREVIEW_CELL_APPEAR_START_SCALE,
-        1,
-        easeOutElastic(appearLocal, LEVEL_PREVIEW_ELASTICITY)
-      );
-      const disappearScale = lerp(
-        1,
-        LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE,
-        easeInElastic(disappearLocal, LEVEL_PREVIEW_ELASTICITY)
-      );
-      const blockScale = appearScale * disappearScale;
+      const blockScale = this.getPreviewBlockScale(block, options);
+      if (blockScale <= 0.001) {
+        continue;
+      }
       const centerX = block.x + block.size * 0.5;
       const centerY = block.y + block.size * 0.5;
 
@@ -8791,7 +8844,8 @@ class Game {
 
     this.pregameSectorKeys = sectorKeys;
     this.pregameColorPalette = [...paletteSet];
-    this.pregameSelectedSectorKey = sectorKeys[0] || null;
+    this.pregameSelectedSectorKey = null;
+    this.pregameAutoSelectPending = sectorKeys.length > 0;
     this.pregameSectorColorAssignments = {};
     for (const sectorKey of sectorKeys) {
       this.pregameSectorColorAssignments[sectorKey] = null;
@@ -9072,6 +9126,7 @@ class Game {
       }
       if (this.pregameSelectedSectorKey !== entry.sectorKey) {
         this.pregameSelectedSectorKey = entry.sectorKey;
+        this.pregameAutoSelectPending = false;
         this.invalidate(true);
       }
       return true;
@@ -9265,6 +9320,16 @@ class Game {
     const assignments = this.pregameSectorColorAssignments || {};
     const pulseRaw = 0.5 + 0.5 * Math.sin(this.pregamePulseTime * 8.4);
     const pulse = Math.pow(pulseRaw, 0.65);
+    const appearProgress = clamp(
+      this.pregameFigureAppearTime / Math.max(0.001, PREGAME_FIGURE_APPEAR_DURATION),
+      0,
+      1
+    );
+    const disappearProgress = clamp(
+      this.pregameFigureDisappearTime / Math.max(0.001, PREGAME_FIGURE_DISAPPEAR_DURATION),
+      0,
+      1
+    );
     for (const block of this.blocks) {
       const sectorKey = normalizeBlockColorName(block?.baseColor || block?.color);
       const isSelectedSector = !!selectedSectorKey && sectorKey === selectedSectorKey;
@@ -9272,13 +9337,23 @@ class Game {
       const hasAssignedColor = !!assignedColor;
       const shouldKeepFullAlpha = isSelectedSector && hasAssignedColor;
       const shouldUseSelectionTint = isSelectedSector && !hasAssignedColor;
-      const blockScale = isSelectedSector ? 1 + 0.18 * pulse : 1;
+      const fillEffect = this.getPregameColorFillEffect(sectorKey);
+      const selectionScale = isSelectedSector && !fillEffect ? 1 + 0.18 * pulse : 1;
+      const appearDisappearScale = this.getPreviewBlockScale(block, {
+        appearProgress,
+        disappearProgress,
+        appearCellFadeSpan: PREGAME_FIGURE_APPEAR_CELL_FADE_SPAN,
+        disappearCellFadeSpan: PREGAME_FIGURE_DISAPPEAR_CELL_FADE_SPAN,
+      });
+      const blockScale = selectionScale * appearDisappearScale;
+      if (blockScale <= 0.001) {
+        continue;
+      }
       const centerX = block.x + block.size * 0.5;
       const centerY = block.y + block.size * 0.5;
-      const fillEffect = this.getPregameColorFillEffect(sectorKey);
 
       ctx.save();
-      if (isSelectedSector && !fillEffect) {
+      if (Math.abs(blockScale - 1) > 0.001) {
         ctx.translate(centerX, centerY);
         ctx.scale(blockScale, blockScale);
         ctx.translate(-centerX, -centerY);
@@ -9384,8 +9459,10 @@ class Game {
     this.drawBackground(ctx);
     this.drawWagonLayer(ctx);
     this.drawPregameLevelImageOnField(ctx);
-    this.drawPregameColorPanel(ctx);
-    if (this.isPregameStartAvailable()) {
+    if (!this.pregameStartTransitionActive) {
+      this.drawPregameColorPanel(ctx);
+    }
+    if (!this.pregameStartTransitionActive && this.isPregameStartAvailable()) {
       this.drawPregameStartButton(ctx);
     }
   }
@@ -11070,8 +11147,16 @@ class Game {
     if (this.gameState === "preview") {
       return true;
     }
-    if (this.gameState === "pregame" && this.pregameSelectedSectorKey) {
-      return true;
+    if (this.gameState === "pregame") {
+      if (this.pregameStartTransitionActive) {
+        return true;
+      }
+      if (this.pregameFigureAppearTime < PREGAME_FIGURE_APPEAR_DURATION - 0.001) {
+        return true;
+      }
+      if (this.pregameSelectedSectorKey) {
+        return true;
+      }
     }
     if (this.gameState === "lose") {
       return this.losePopupAppear < 0.999 || this.levelStartFade > 0.001 || this.hasAnimatingCards();
@@ -11162,8 +11247,10 @@ class Game {
     }
     if (this.gameState === "pregame") {
       const overBack = this.shouldShowBackButton() && isInsideRect(x, y, this.backButtonRect);
-      const overStart = this.isPregameStartAvailable() && isInsideRect(x, y, this.getPregameStartButtonHitRect());
-      const overPanelControl = this.isPointOnPregamePanelControls(x, y);
+      const overStart = !this.pregameStartTransitionActive
+        && this.isPregameStartAvailable()
+        && isInsideRect(x, y, this.getPregameStartButtonHitRect());
+      const overPanelControl = !this.pregameStartTransitionActive && this.isPointOnPregamePanelControls(x, y);
       this.canvas.style.cursor = overBack || overStart || overPanelControl ? "pointer" : "default";
       return;
     }
@@ -11225,12 +11312,15 @@ class Game {
         this.showQuitScreen();
         return;
       }
+      if (this.pregameStartTransitionActive) {
+        return;
+      }
       if (this.handlePregamePanelPointerDown(x, y)) {
         return;
       }
       if (this.isPregameStartAvailable() && isInsideRect(x, y, this.getPregameStartButtonHitRect())) {
-        this.setGameState("playing");
-        this.levelStartFade = 1;
+        this.pregameStartTransitionActive = true;
+        this.pregameFigureDisappearTime = 0;
         this.invalidate(true);
       }
       return;
