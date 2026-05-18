@@ -462,6 +462,10 @@ const LEVEL_PREVIEW_MAX_ALPHA = 1.0;
 const LEVEL_PREVIEW_CELL_APPEAR_START_SCALE = 0.0;
 const LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE = 0.0;
 const LEVEL_PREVIEW_ELASTICITY = 1.4;
+const PREGAME_FIGURE_APPEAR_DURATION = LEVEL_PREVIEW_APPEAR_DURATION;
+const PREGAME_FIGURE_DISAPPEAR_DURATION = LEVEL_PREVIEW_DISAPPEAR_DURATION;
+const PREGAME_FIGURE_APPEAR_CELL_FADE_SPAN = LEVEL_PREVIEW_APPEAR_CELL_FADE_SPAN;
+const PREGAME_FIGURE_DISAPPEAR_CELL_FADE_SPAN = LEVEL_PREVIEW_DISAPPEAR_CELL_FADE_SPAN;
 const AUTOPLAY_ACTION_INTERVAL = 0.12;
 const AUTOPLAY_STUCK_TIMEOUT = 8;
 const IDLE_ASSIST_POINTER_DELAY_SECONDS = 2;
@@ -510,6 +514,46 @@ const COINS_UI = {
   plusOffsetX: 54,
   plusOffsetY: 50,
 };
+const PREGAME_START_BUTTON_UI = {
+  w: 310,
+  h: 98,
+  offsetFromRails: 42,
+  offsetFromColorPanel: 22,
+  bottomSafeMargin: 64,
+  radius: 26,
+  label: "START",
+};
+const PREGAME_COLOR_PANEL_UI = {
+  minW: 420,
+  sideMargin: 22,
+  offsetFromRails: 18,
+  paddingX: 18,
+  paddingTop: 16,
+  paddingBottom: 18,
+  sectionGap: 14,
+  rowGap: 10,
+  radius: 24,
+  sectorButtonW: 136,
+  sectorButtonH: 52,
+  sectorButtonGap: 10,
+  colorButtonSize: 56,
+  colorButtonGap: 10,
+};
+const PREGAME_EXTRA_COLOR_OPTIONS = [
+  "red",
+  "blue",
+  "green",
+  "yellow",
+  "orange",
+  "white",
+  "black",
+  "pink",
+  "light_green",
+  "dark_blue",
+  "dark_purple",
+  "light_purple",
+];
+const PREGAME_COLOR_FILL_DURATION = 0.86;
 const LOSE_POPUP_UI = {
   w: 646,
   h: 663,
@@ -1689,6 +1733,7 @@ class Block {
     this.id = id;
     this.col = col;
     this.row = row;
+    this.baseColor = color;
     this.color = color;
     this.layer = Math.min(
       col,
@@ -2843,6 +2888,20 @@ class Game {
     this.slotManager = new SlotManager(LAYOUT.slots, SLOT_CLAIM_ORDER);
     this.backButtonRect = { ...BACK_BUTTON_UI };
     this.restartButtonRect = { x: 0, y: 0, w: COINS_UI.panelW, h: COINS_UI.panelH };
+    this.preGameStartButtonRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameSectorButtons = [];
+    this.preGameColorButtons = [];
+    this.pregameSectorKeys = [];
+    this.pregameColorPalette = [];
+    this.pregameSelectedSectorKey = null;
+    this.pregameSectorColorAssignments = {};
+    this.pregameColorFillEffects = {};
+    this.pregamePulseTime = 0;
+    this.pregameFigureAppearTime = 0;
+    this.pregameFigureDisappearTime = 0;
+    this.pregameStartTransitionActive = false;
+    this.pregameAutoSelectPending = false;
     this.loseCloseRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseContinueRect = { x: 0, y: 0, w: 0, h: 0 };
     this.loseFreeRect = { x: 0, y: 0, w: 0, h: 0 };
@@ -4434,14 +4493,22 @@ class Game {
     }
     const previousState = this.gameState;
     const forcePreviewShow = options.forcePreviewShow === true;
-    if (previousState === "preview" && normalizedNextState !== "preview") {
+    const wasPreviewVisible = previousState === "preview" || previousState === "pregame";
+    const willShowPreview = normalizedNextState === "preview" || normalizedNextState === "pregame";
+    if (wasPreviewVisible && !willShowPreview) {
       dispatchUnityPreviewTrackEvent("hide");
     }
-    if (
-      normalizedNextState === "preview"
-      && (previousState !== "preview" || forcePreviewShow)
-    ) {
+    if (willShowPreview && (!wasPreviewVisible || forcePreviewShow)) {
       dispatchUnityPreviewTrackEvent("show");
+    }
+    if (normalizedNextState === "pregame" && previousState !== "pregame") {
+      this.pregameFigureAppearTime = 0;
+      this.pregameFigureDisappearTime = 0;
+      this.pregameStartTransitionActive = false;
+    }
+    if (previousState === "pregame" && normalizedNextState !== "pregame") {
+      this.pregameStartTransitionActive = false;
+      this.pregameFigureDisappearTime = 0;
     }
     this.gameState = normalizedNextState;
     return this.gameState;
@@ -4450,6 +4517,7 @@ class Game {
   restart() {
     this.ammoTextMetricsCache.clear();
     this.blocks = this.createBlocksFromReference();
+    this.initializePregameColoring();
     this.blocksBySpiral = this.blocks
       .slice()
       .sort((a, b) => (a.spiralIndex - b.spiralIndex) || (a.spiralOrder - b.spiralOrder));
@@ -4485,13 +4553,16 @@ class Game {
     this.victoryCompleteEventPending = false;
     this.levelStartFade = 0;
     this.levelPreviewTime = 0;
+    this.pregameFigureAppearTime = 0;
+    this.pregameFigureDisappearTime = 0;
+    this.pregameStartTransitionActive = false;
     this.losePopupAppear = 1;
     this.queueCompletionTrackPending = true;
     this.idleAssistLastInteractionAt = performance.now() / 1000;
     this.idleAssistHandTime = 0;
     this.clearIdleAssistWakeTimer();
 
-    this.setGameState(this.previewEnabledBySetLevel ? "preview" : "loading", {
+    this.setGameState("pregame", {
       forcePreviewShow: true,
     });
     this.idleAssistLastKnownGameState = this.gameState;
@@ -4516,6 +4587,7 @@ class Game {
         }
         id += 1;
         const block = new Block(id, col, row, blockColor);
+        block.baseColor = blockColor;
         const key = `${col},${row}`;
         if (this.spiralOrderByCell.has(key)) {
           block.spiralIndex = this.spiralOrderByCell.get(key);
@@ -8334,6 +8406,42 @@ class Game {
       this.updateAutoplayState();
       return;
     }
+    if (this.gameState === "pregame") {
+      this.pregamePulseTime += dt;
+      if (this.pregameStartTransitionActive) {
+        this.pregameFigureAppearTime = PREGAME_FIGURE_APPEAR_DURATION;
+        this.pregameFigureDisappearTime = Math.min(
+          PREGAME_FIGURE_DISAPPEAR_DURATION,
+          this.pregameFigureDisappearTime + dt
+        );
+        if (this.pregameFigureDisappearTime >= PREGAME_FIGURE_DISAPPEAR_DURATION) {
+          this.pregameStartTransitionActive = false;
+          this.setGameState("playing");
+          this.levelStartFade = 1;
+          this.invalidate(true);
+          return;
+        }
+      } else {
+        this.pregameFigureDisappearTime = 0;
+        this.pregameFigureAppearTime = Math.min(
+          PREGAME_FIGURE_APPEAR_DURATION,
+          this.pregameFigureAppearTime + dt
+        );
+        if (
+          this.pregameAutoSelectPending
+          && !this.pregameSelectedSectorKey
+          && this.pregameFigureAppearTime >= PREGAME_FIGURE_APPEAR_DURATION
+        ) {
+          this.pregameSelectedSectorKey = this.pregameSectorKeys[0] || null;
+          this.pregameAutoSelectPending = false;
+        }
+      }
+      this.cleanupPregameColorFillEffects();
+      this.needsRender = true;
+      this.updateIdleAssistState(dt);
+      this.updateAutoplayState();
+      return;
+    }
 
     if (this.gameState === "victory") {
       this.victoryConfettiTime = Math.max(0, this.victoryConfettiTime - dt);
@@ -8606,11 +8714,7 @@ class Game {
     }
   }
 
-  drawLevelPreviewImageOnField(ctx, options = {}) {
-    const clampedAlpha = clamp(Number.isFinite(options.alpha) ? options.alpha : 1, 0, 1);
-    if (clampedAlpha <= 0.001) {
-      return;
-    }
+  getPreviewBlockScale(block, options = {}) {
     const appearProgress = clamp(Number(options.appearProgress) || 0, 0, 1);
     const disappearProgress = clamp(Number(options.disappearProgress) || 0, 0, 1);
     const rows = Math.max(1, LAYOUT.fieldRows);
@@ -8637,28 +8741,37 @@ class Game {
       const dy = block.row - centerRow;
       return clamp(Math.hypot(dx, dy) / maxRadius, 0, 1);
     };
+    const radiusNorm = getRadiusNorm(block);
+    const appearStart = radiusNorm * appearStartRange;
+    const disappearStart = (1 - radiusNorm) * disappearStartRange;
+    const appearLocal = clamp((appearProgress - appearStart) / appearCellFadeSpan, 0, 1);
+    const disappearLocal = clamp((disappearProgress - disappearStart) / disappearCellFadeSpan, 0, 1);
+    const appearScale = lerp(
+      LEVEL_PREVIEW_CELL_APPEAR_START_SCALE,
+      1,
+      easeOutElastic(appearLocal, LEVEL_PREVIEW_ELASTICITY)
+    );
+    const disappearScale = lerp(
+      1,
+      LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE,
+      easeInElastic(disappearLocal, LEVEL_PREVIEW_ELASTICITY)
+    );
+    return appearScale * disappearScale;
+  }
+
+  drawLevelPreviewImageOnField(ctx, options = {}) {
+    const clampedAlpha = clamp(Number.isFinite(options.alpha) ? options.alpha : 1, 0, 1);
+    if (clampedAlpha <= 0.001) {
+      return;
+    }
 
     // Preview must show the full target image, not only already-opened cells.
     // `blockFieldLayer` stores only alive blocks, which are empty at level start.
     for (const block of this.blocks) {
-      const radiusNorm = getRadiusNorm(block);
-      // Appear from center to edges.
-      const appearStart = radiusNorm * appearStartRange;
-      // Keep current hide behavior: edges fade first, center last.
-      const disappearStart = (1 - radiusNorm) * disappearStartRange;
-      const appearLocal = clamp((appearProgress - appearStart) / appearCellFadeSpan, 0, 1);
-      const disappearLocal = clamp((disappearProgress - disappearStart) / disappearCellFadeSpan, 0, 1);
-      const appearScale = lerp(
-        LEVEL_PREVIEW_CELL_APPEAR_START_SCALE,
-        1,
-        easeOutElastic(appearLocal, LEVEL_PREVIEW_ELASTICITY)
-      );
-      const disappearScale = lerp(
-        1,
-        LEVEL_PREVIEW_CELL_DISAPPEAR_END_SCALE,
-        easeInElastic(disappearLocal, LEVEL_PREVIEW_ELASTICITY)
-      );
-      const blockScale = appearScale * disappearScale;
+      const blockScale = this.getPreviewBlockScale(block, options);
+      if (blockScale <= 0.001) {
+        continue;
+      }
       const centerX = block.x + block.size * 0.5;
       const centerY = block.y + block.size * 0.5;
 
@@ -8704,6 +8817,654 @@ class Game {
       appearCellFadeSpan: LEVEL_PREVIEW_APPEAR_CELL_FADE_SPAN,
       disappearCellFadeSpan: LEVEL_PREVIEW_DISAPPEAR_CELL_FADE_SPAN,
     });
+  }
+
+  initializePregameColoring() {
+    const sectorKeys = [];
+    const seen = new Set();
+    for (const block of this.blocks) {
+      const normalized = normalizeBlockColorName(block?.baseColor || block?.color);
+      if (!normalized || seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      sectorKeys.push(normalized);
+    }
+
+    const paletteSet = new Set();
+    for (const color of sectorKeys) {
+      paletteSet.add(color);
+    }
+    for (const color of PREGAME_EXTRA_COLOR_OPTIONS) {
+      const normalized = normalizeBlockColorName(color);
+      if (normalized && Object.prototype.hasOwnProperty.call(BLOCK_COLOR_CONFIG, normalized)) {
+        paletteSet.add(normalized);
+      }
+    }
+
+    this.pregameSectorKeys = sectorKeys;
+    this.pregameColorPalette = [...paletteSet];
+    this.pregameSelectedSectorKey = null;
+    this.pregameAutoSelectPending = sectorKeys.length > 0;
+    this.pregameSectorColorAssignments = {};
+    for (const sectorKey of sectorKeys) {
+      this.pregameSectorColorAssignments[sectorKey] = null;
+    }
+    this.pregameColorFillEffects = {};
+    this.pregamePulseTime = 0;
+    this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameSectorButtons = [];
+    this.preGameColorButtons = [];
+    this.applyPregameColoringToBlocks({ rebuildCards: false });
+  }
+
+  applyPregameColoringToBlocks(options = {}) {
+    const rebuildCards = options.rebuildCards === true;
+    const assignments = this.pregameSectorColorAssignments || {};
+    for (const block of this.blocks) {
+      const sectorKey = normalizeBlockColorName(block?.baseColor || block?.color);
+      const assignedColor = normalizeBlockColorName(assignments[sectorKey]);
+      block.color = assignedColor || "gray";
+    }
+    if (!rebuildCards) {
+      return;
+    }
+    this.cards = this.cardManager.resetFromBlocks(this.blocks);
+    this.enforceLevelOneTutorialQueue();
+    this.invalidateTargetingCaches();
+    this.invalidate(true);
+  }
+
+  getPregameColorPanelRect() {
+    const sectors = this.pregameSectorKeys;
+    const palette = this.pregameColorPalette;
+    if (!Array.isArray(sectors) || sectors.length === 0 || !Array.isArray(palette) || palette.length === 0) {
+      this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+      this.preGameSectorButtons = [];
+      this.preGameColorButtons = [];
+      return this.preGameColorPanelRect;
+    }
+
+    const ui = PREGAME_COLOR_PANEL_UI;
+    const railsBottom = LAYOUT.track.y + LAYOUT.track.h;
+    const preferredW = LAYOUT.track.w + 40;
+    const maxW = this.width - ui.sideMargin * 2;
+    const panelW = Math.min(maxW, Math.max(ui.minW, preferredW));
+    const panelX = Math.round((this.width - panelW) * 0.5);
+    const innerX = panelX + ui.paddingX;
+    const innerW = Math.max(120, panelW - ui.paddingX * 2);
+
+    const sectorButtons = [];
+    const sectorButtonW = Math.max(92, Math.min(ui.sectorButtonW, innerW));
+    let cursorX = innerX;
+    let cursorY = Math.round(railsBottom + ui.offsetFromRails + ui.paddingTop);
+    let rowMaxH = 0;
+    for (const sectorKey of sectors) {
+      if (cursorX + sectorButtonW > innerX + innerW + 0.5 && sectorButtons.length > 0) {
+        cursorX = innerX;
+        cursorY += rowMaxH + ui.rowGap;
+        rowMaxH = 0;
+      }
+      const rect = {
+        x: Math.round(cursorX),
+        y: Math.round(cursorY),
+        w: Math.round(sectorButtonW),
+        h: ui.sectorButtonH,
+      };
+      sectorButtons.push({
+        sectorKey,
+        rect,
+      });
+      cursorX += sectorButtonW + ui.sectorButtonGap;
+      rowMaxH = Math.max(rowMaxH, ui.sectorButtonH);
+    }
+
+    const sectorRowsBottomY = cursorY + rowMaxH;
+    const colorTopY = Math.round(sectorRowsBottomY + ui.sectionGap);
+    const colorButtonSize = ui.colorButtonSize;
+    const colorGap = ui.colorButtonGap;
+    const columns = Math.max(1, Math.floor((innerW + colorGap) / (colorButtonSize + colorGap)));
+    const colorButtons = [];
+    for (let i = 0; i < palette.length; i += 1) {
+      const col = i % columns;
+      const row = Math.floor(i / columns);
+      const x = innerX + col * (colorButtonSize + colorGap);
+      const y = colorTopY + row * (colorButtonSize + colorGap);
+      colorButtons.push({
+        colorKey: palette[i],
+        rect: {
+          x: Math.round(x),
+          y: Math.round(y),
+          w: colorButtonSize,
+          h: colorButtonSize,
+        },
+      });
+    }
+
+    const colorRows = Math.max(1, Math.ceil(palette.length / columns));
+    const colorRowsBottomY = colorTopY + colorRows * colorButtonSize + (colorRows - 1) * colorGap;
+    const panelH = Math.round(
+      (colorRowsBottomY - (railsBottom + ui.offsetFromRails))
+      + ui.paddingBottom
+    );
+    const panelY = Math.round(railsBottom + ui.offsetFromRails);
+    const panelRect = { x: panelX, y: panelY, w: Math.round(panelW), h: panelH };
+
+    this.preGameColorPanelRect = panelRect;
+    this.preGameSectorButtons = sectorButtons;
+    this.preGameColorButtons = colorButtons;
+    return panelRect;
+  }
+
+  drawPregameColorPanel(ctx) {
+    const panelRect = this.getPregameColorPanelRect();
+    if (panelRect.w <= 0 || panelRect.h <= 0) {
+      return;
+    }
+
+    ctx.save();
+    ctx.fillStyle = "rgba(12, 17, 26, 0.72)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.26)";
+    ctx.lineWidth = 2;
+    roundedRect(ctx, panelRect.x, panelRect.y, panelRect.w, panelRect.h, PREGAME_COLOR_PANEL_UI.radius);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    for (let index = 0; index < this.preGameSectorButtons.length; index += 1) {
+      const entry = this.preGameSectorButtons[index];
+      const rect = entry.rect;
+      const isSelected = entry.sectorKey === this.pregameSelectedSectorKey;
+      const mappedColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[entry.sectorKey]) || "gray";
+      const chipColor = this.getBlockFaceColor(mappedColor);
+
+      ctx.save();
+      const grad = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+      grad.addColorStop(0, isSelected ? "rgba(112, 194, 255, 0.92)" : "rgba(255, 255, 255, 0.2)");
+      grad.addColorStop(1, isSelected ? "rgba(60, 142, 235, 0.9)" : "rgba(255, 255, 255, 0.08)");
+      roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 16);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.strokeStyle = isSelected ? "rgba(198, 235, 255, 0.95)" : "rgba(255, 255, 255, 0.3)";
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = chipColor;
+      ctx.beginPath();
+      ctx.arc(rect.x + rect.w - 22, rect.y + rect.h * 0.5, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.font = `800 24px ${TOP_PANEL_FONT_FAMILY}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(`${index + 1}`, rect.x + 18, rect.y + rect.h * 0.54);
+      ctx.restore();
+    }
+
+    const activeSectorKey = this.pregameSelectedSectorKey;
+    const activeMappedColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[activeSectorKey]);
+    for (const entry of this.preGameColorButtons) {
+      const rect = entry.rect;
+      const colorKey = entry.colorKey;
+      const fill = this.getBlockFaceColor(colorKey);
+      const isSelectedColor = activeMappedColor === colorKey;
+
+      ctx.save();
+      ctx.fillStyle = fill;
+      roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 16);
+      ctx.fill();
+      ctx.lineWidth = isSelectedColor ? 4 : 2;
+      ctx.strokeStyle = isSelectedColor ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.42)";
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  startPregameColorFillEffect(sectorKey, fromColor, toColor) {
+    const normalizedSectorKey = normalizeBlockColorName(sectorKey);
+    const normalizedToColor = normalizeBlockColorName(toColor);
+    if (!normalizedSectorKey || !normalizedToColor) {
+      return;
+    }
+    const normalizedFromColor = normalizeBlockColorName(fromColor) || "gray";
+    const figureBlocks = this.blocks.filter((block) => !!block);
+    const bounds = figureBlocks.reduce((acc, block) => ({
+      minX: Math.min(acc.minX, block.x),
+      minY: Math.min(acc.minY, block.y),
+      maxX: Math.max(acc.maxX, block.x + block.size),
+      maxY: Math.max(acc.maxY, block.y + block.size),
+    }), {
+      minX: Infinity,
+      minY: Infinity,
+      maxX: -Infinity,
+      maxY: -Infinity,
+    });
+    const hasBounds = Number.isFinite(bounds.minX) && Number.isFinite(bounds.minY);
+    const centerX = hasBounds ? (bounds.minX + bounds.maxX) * 0.5 : this.width * 0.5;
+    const centerY = hasBounds ? (bounds.minY + bounds.maxY) * 0.5 : this.height * 0.5;
+    const maxRadius = figureBlocks.reduce((radius, block) => Math.max(
+      radius,
+      Math.hypot(block.x - centerX, block.y - centerY),
+      Math.hypot(block.x + block.size - centerX, block.y - centerY),
+      Math.hypot(block.x - centerX, block.y + block.size - centerY),
+      Math.hypot(block.x + block.size - centerX, block.y + block.size - centerY)
+    ), 1);
+    this.pregameColorFillEffects = this.pregameColorFillEffects || {};
+    this.pregameColorFillEffects[normalizedSectorKey] = {
+      fromColor: normalizedFromColor,
+      toColor: normalizedToColor,
+      centerX,
+      centerY,
+      maxRadius,
+      startTime: this.pregamePulseTime,
+      duration: PREGAME_COLOR_FILL_DURATION,
+    };
+  }
+
+  cleanupPregameColorFillEffects() {
+    const effects = this.pregameColorFillEffects || {};
+    for (const [sectorKey, effect] of Object.entries(effects)) {
+      const duration = Math.max(0.001, Number(effect?.duration) || PREGAME_COLOR_FILL_DURATION);
+      if (this.pregamePulseTime - (Number(effect?.startTime) || 0) >= duration) {
+        delete effects[sectorKey];
+      }
+    }
+  }
+
+  getPregameColorFillEffect(sectorKey) {
+    const normalizedSectorKey = normalizeBlockColorName(sectorKey);
+    if (!normalizedSectorKey) {
+      return null;
+    }
+    const effect = this.pregameColorFillEffects?.[normalizedSectorKey];
+    if (!effect) {
+      return null;
+    }
+    const duration = Math.max(0.001, Number(effect.duration) || PREGAME_COLOR_FILL_DURATION);
+    const progress = clamp((this.pregamePulseTime - (Number(effect.startTime) || 0)) / duration, 0, 1);
+    if (progress >= 0.999) {
+      return null;
+    }
+    return {
+      ...effect,
+      progress,
+    };
+  }
+
+  applyPregameColorPick(colorKey) {
+    const sectorKey = this.pregameSelectedSectorKey;
+    const normalizedColor = normalizeBlockColorName(colorKey);
+    if (!sectorKey || !normalizedColor) {
+      return false;
+    }
+    if (this.pregameSectorColorAssignments?.[sectorKey] === normalizedColor) {
+      return false;
+    }
+    const previousColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[sectorKey]) || "gray";
+    this.pregameSectorColorAssignments[sectorKey] = normalizedColor;
+    this.startPregameColorFillEffect(sectorKey, previousColor, normalizedColor);
+    this.applyPregameColoringToBlocks({ rebuildCards: true });
+    return true;
+  }
+
+  handlePregamePanelPointerDown(x, y) {
+    const panelRect = this.getPregameColorPanelRect();
+    if (!isInsideRect(x, y, panelRect)) {
+      return false;
+    }
+    for (const entry of this.preGameSectorButtons) {
+      if (!isInsideRect(x, y, entry.rect)) {
+        continue;
+      }
+      if (this.pregameSelectedSectorKey !== entry.sectorKey) {
+        this.pregameSelectedSectorKey = entry.sectorKey;
+        this.pregameAutoSelectPending = false;
+        this.invalidate(true);
+      }
+      return true;
+    }
+    for (const entry of this.preGameColorButtons) {
+      if (!isInsideRect(x, y, entry.rect)) {
+        continue;
+      }
+      this.applyPregameColorPick(entry.colorKey);
+      return true;
+    }
+    return true;
+  }
+
+  isPointOnPregamePanelControls(x, y) {
+    this.getPregameColorPanelRect();
+    for (const entry of this.preGameSectorButtons) {
+      if (isInsideRect(x, y, entry.rect)) {
+        return true;
+      }
+    }
+    for (const entry of this.preGameColorButtons) {
+      if (isInsideRect(x, y, entry.rect)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  isPregameStartAvailable() {
+    const sectors = Array.isArray(this.pregameSectorKeys) ? this.pregameSectorKeys : [];
+    if (sectors.length === 0) {
+      return false;
+    }
+    const assignments = this.pregameSectorColorAssignments || {};
+    for (const sectorKey of sectors) {
+      const assignedColor = normalizeBlockColorName(assignments[sectorKey]);
+      if (!assignedColor) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  drawPregameColorFillBlock(ctx, block, effect, options = {}) {
+    if (!effect) {
+      this.drawVolumetricBlock(ctx, block, block.x, block.y, options);
+      return;
+    }
+
+    const size = block.size;
+    const progress = clamp(Number(effect.progress) || 0, 0, 1);
+    const waveProgress = easeOutCubic(progress);
+    const centerX = Number.isFinite(effect.centerX) ? effect.centerX : block.x + size * 0.5;
+    const centerY = Number.isFinite(effect.centerY) ? effect.centerY : block.y + size * 0.5;
+    const maxRadius = Math.max(size, Number(effect.maxRadius) || size);
+    const revealRadius = lerp(size * 0.18, maxRadius + size * 0.18, waveProgress);
+    const edgeWidth = Math.max(7, lerp(size * 0.9, size * 0.34, progress));
+    const corner = Math.max(6, Math.round(size * 0.24));
+    const fromBlock = { ...block, color: effect.fromColor || "gray" };
+    const toBlock = { ...block, color: effect.toColor || block.color };
+    const blockCenterX = block.x + size * 0.5;
+    const blockCenterY = block.y + size * 0.5;
+    const distanceToWave = Math.hypot(blockCenterX - centerX, blockCenterY - centerY);
+    const seedBase = (block.col + 1) * 12.9898 + (block.row + 1) * 78.233;
+    const seed = seedBase - Math.floor(seedBase);
+    const edgeNoise = (
+      Math.sin(seedBase * 0.53 + progress * 1.8) * 0.55 +
+      Math.sin(seedBase * 1.17 - progress * 2.4) * 0.45
+    ) * edgeWidth * 0.16;
+    const localRevealRadius = revealRadius + edgeNoise;
+    const paintRadius = localRevealRadius + edgeWidth * (0.38 + seed * 0.2);
+    const waveFront = clamp(1 - Math.abs(distanceToWave - localRevealRadius) / Math.max(1, edgeWidth), 0, 1);
+    const paintWake = clamp(1 - Math.max(0, distanceToWave - paintRadius) / Math.max(1, edgeWidth), 0, 1);
+    const brushFront = clamp(1 - Math.abs(distanceToWave - paintRadius) / Math.max(1, edgeWidth * 0.9), 0, 1);
+    const sparklePulse = Math.sin(progress * Math.PI);
+    const paintSample = this.getColorSampleForColorKey(effect.toColor) || BLOCK_COLOR_TO_RGB.green || { r: 129, g: 195, b: 65 };
+    const paintColor = (alpha) => `rgba(${paintSample.r}, ${paintSample.g}, ${paintSample.b}, ${alpha})`;
+
+    this.drawVolumetricBlock(ctx, fromBlock, block.x, block.y, options);
+
+    if (paintWake > 0.001) {
+      ctx.save();
+      roundedRect(ctx, block.x, block.y, size, size, corner);
+      ctx.clip();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, paintRadius, 0, Math.PI * 2);
+      ctx.clip();
+      this.drawVolumetricBlock(ctx, toBlock, block.x, block.y, {
+        ...options,
+        alpha: (options.alpha ?? 1) * (0.16 + paintWake * 0.34),
+        shadowOpacity: 0,
+        bevelStrength: 0.1,
+      });
+      ctx.restore();
+    }
+
+    ctx.save();
+    roundedRect(ctx, block.x, block.y, size, size, corner);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, localRevealRadius, 0, Math.PI * 2);
+    ctx.clip();
+    this.drawVolumetricBlock(ctx, toBlock, block.x, block.y, {
+      ...options,
+      shadowOpacity: 0,
+    });
+    ctx.restore();
+
+    if (progress < 0.96) {
+      ctx.save();
+      roundedRect(ctx, block.x, block.y, size, size, corner);
+      ctx.clip();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.88 * (1 - easeInCubic(progress));
+      const glow = ctx.createRadialGradient(
+        centerX,
+        centerY,
+        Math.max(0, localRevealRadius - edgeWidth),
+        centerX,
+        centerY,
+        localRevealRadius + edgeWidth
+      );
+      glow.addColorStop(0, "rgba(255, 255, 255, 0)");
+      glow.addColorStop(0.5, "rgba(255, 255, 255, 0.34)");
+      glow.addColorStop(1, "rgba(255, 255, 255, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(block.x, block.y, size, size);
+      ctx.restore();
+    }
+
+    if (brushFront > 0.001) {
+      ctx.save();
+      roundedRect(ctx, block.x, block.y, size, size, corner);
+      ctx.clip();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, paintRadius, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.globalCompositeOperation = "source-over";
+      for (let i = 0; i < 3; i += 1) {
+        const dabSeed = seedBase + i * 31.37;
+        const dabPhase = clamp(brushFront - i * 0.12, 0, 1);
+        if (dabPhase <= 0.001) {
+          continue;
+        }
+        const dabX = block.x + size * (0.24 + 0.52 * (0.5 + 0.5 * Math.sin(dabSeed * 1.91)));
+        const dabY = block.y + size * (0.24 + 0.5 * (0.5 + 0.5 * Math.cos(dabSeed * 1.63)));
+        const dabW = size * (0.34 + 0.12 * Math.sin(dabSeed * 2.11));
+        const dabH = size * (0.13 + 0.06 * Math.cos(dabSeed * 1.47));
+        ctx.save();
+        ctx.translate(dabX, dabY);
+        ctx.rotate(Math.sin(dabSeed) * 0.9);
+        ctx.globalAlpha = 0.2 * Math.pow(dabPhase, 1.35) * (1 - progress * 0.28);
+        ctx.fillStyle = paintColor(1);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, Math.max(1, dabW), Math.max(1, dabH), 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    if (waveFront > 0.001) {
+      const twinkle = Math.pow(waveFront, 1.8) * sparklePulse;
+      const sparkleX = block.x + size * (0.36 + 0.28 * Math.sin(seed * 87.1));
+      const sparkleY = block.y + size * (0.34 + 0.26 * Math.cos(seed * 53.7));
+
+      ctx.save();
+      roundedRect(ctx, block.x, block.y, size, size, corner);
+      ctx.clip();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.58 * twinkle;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, Math.max(1.4, size * 0.065), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = Math.max(1, size * 0.035);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+      ctx.beginPath();
+      ctx.moveTo(sparkleX - size * 0.14, sparkleY);
+      ctx.lineTo(sparkleX + size * 0.14, sparkleY);
+      ctx.moveTo(sparkleX, sparkleY - size * 0.14);
+      ctx.lineTo(sparkleX, sparkleY + size * 0.14);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  drawPregameLevelImageOnField(ctx) {
+    const selectedSectorKey = this.pregameSelectedSectorKey;
+    const assignments = this.pregameSectorColorAssignments || {};
+    const pulseRaw = 0.5 + 0.5 * Math.sin(this.pregamePulseTime * 8.4);
+    const pulse = Math.pow(pulseRaw, 0.65);
+    const appearProgress = clamp(
+      this.pregameFigureAppearTime / Math.max(0.001, PREGAME_FIGURE_APPEAR_DURATION),
+      0,
+      1
+    );
+    const disappearProgress = clamp(
+      this.pregameFigureDisappearTime / Math.max(0.001, PREGAME_FIGURE_DISAPPEAR_DURATION),
+      0,
+      1
+    );
+    for (const block of this.blocks) {
+      const sectorKey = normalizeBlockColorName(block?.baseColor || block?.color);
+      const isSelectedSector = !!selectedSectorKey && sectorKey === selectedSectorKey;
+      const assignedColor = normalizeBlockColorName(assignments[sectorKey]);
+      const hasAssignedColor = !!assignedColor;
+      const shouldKeepFullAlpha = isSelectedSector && hasAssignedColor;
+      const shouldUseSelectionTint = isSelectedSector && !hasAssignedColor;
+      const fillEffect = this.getPregameColorFillEffect(sectorKey);
+      const selectionScale = isSelectedSector && !fillEffect ? 1 + 0.18 * pulse : 1;
+      const appearDisappearScale = this.getPreviewBlockScale(block, {
+        appearProgress,
+        disappearProgress,
+        appearCellFadeSpan: PREGAME_FIGURE_APPEAR_CELL_FADE_SPAN,
+        disappearCellFadeSpan: PREGAME_FIGURE_DISAPPEAR_CELL_FADE_SPAN,
+      });
+      const blockScale = selectionScale * appearDisappearScale;
+      if (blockScale <= 0.001) {
+        continue;
+      }
+      const centerX = block.x + block.size * 0.5;
+      const centerY = block.y + block.size * 0.5;
+
+      ctx.save();
+      if (Math.abs(blockScale - 1) > 0.001) {
+        ctx.translate(centerX, centerY);
+        ctx.scale(blockScale, blockScale);
+        ctx.translate(-centerX, -centerY);
+      }
+      const blockDrawOptions = {
+        alpha: shouldKeepFullAlpha ? 1 : (isSelectedSector ? 0.9 + pulse * 0.1 : 1),
+        shadowOpacity: shouldUseSelectionTint ? 0.1 : 0.2,
+        bevelStrength: shouldUseSelectionTint ? 0.56 : 0.24,
+        offsetY: 0,
+      };
+      this.drawPregameColorFillBlock(
+        ctx,
+        block,
+        fillEffect,
+        blockDrawOptions
+      );
+      if (shouldUseSelectionTint) {
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.14 + pulse * 0.26;
+        roundedRect(ctx, block.x, block.y, block.size, block.size, Math.max(6, Math.round(block.size * 0.24)));
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.restore();
+
+      }
+      ctx.restore();
+    }
+  }
+
+  getPregameStartButtonRect() {
+    const railsBottom = LAYOUT.track.y + LAYOUT.track.h;
+    const w = PREGAME_START_BUTTON_UI.w;
+    const h = PREGAME_START_BUTTON_UI.h;
+    const panelRect = this.getPregameColorPanelRect();
+    const baseTopY = panelRect.h > 0
+      ? panelRect.y + panelRect.h + PREGAME_START_BUTTON_UI.offsetFromColorPanel
+      : railsBottom + PREGAME_START_BUTTON_UI.offsetFromRails;
+    const y = Math.min(
+      this.height - h - PREGAME_START_BUTTON_UI.bottomSafeMargin,
+      baseTopY
+    );
+    const rect = {
+      x: Math.round((this.width - w) * 0.5),
+      y: Math.round(y),
+      w,
+      h,
+    };
+    this.preGameStartButtonRect = rect;
+    return rect;
+  }
+
+  getPregameStartButtonHitRect() {
+    const rect = this.preGameStartButtonRect || this.getPregameStartButtonRect();
+    const padding = 16;
+    return {
+      x: rect.x - padding,
+      y: rect.y - padding,
+      w: rect.w + padding * 2,
+      h: rect.h + padding * 2,
+    };
+  }
+
+  drawPregameStartButton(ctx) {
+    const rect = this.getPregameStartButtonRect();
+    const gradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+    gradient.addColorStop(0, "#67de67");
+    gradient.addColorStop(1, "#39b53d");
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.26)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 5;
+    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, PREGAME_START_BUTTON_UI.radius);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.48)";
+    roundedRect(ctx, rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4, PREGAME_START_BUTTON_UI.radius - 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.font = `900 52px ${TOP_PANEL_FONT_FAMILY}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(19, 88, 20, 0.45)";
+    ctx.lineWidth = 5;
+    const textX = rect.x + rect.w * 0.5;
+    const textY = rect.y + rect.h * 0.56;
+    ctx.strokeText(PREGAME_START_BUTTON_UI.label, textX, textY);
+    ctx.fillText(PREGAME_START_BUTTON_UI.label, textX, textY);
+    ctx.restore();
+  }
+
+  drawPregame(ctx) {
+    // The cached static scene includes bird slots. Keep pre-game cleaner by
+    // drawing only the world layer until the player presses START.
+    this.drawBackground(ctx);
+    this.drawWagonLayer(ctx);
+    this.drawPregameLevelImageOnField(ctx);
+    if (!this.pregameStartTransitionActive) {
+      this.drawPregameColorPanel(ctx);
+    }
+    if (!this.pregameStartTransitionActive && this.isPregameStartAvailable()) {
+      this.drawPregameStartButton(ctx);
+    }
   }
 
   drawVolumetricBlock(ctx, block, x, y, options = {}) {
@@ -9551,8 +10312,12 @@ class Game {
     }
   }
 
-  shouldShowTopActionButtons() {
+  shouldShowBackButton() {
     return this.gameState !== "loading" && this.gameState !== "preview" && this.gameState !== "victory";
+  }
+
+  shouldShowRestartButton() {
+    return this.shouldShowBackButton() && this.gameState !== "pregame";
   }
 
   shouldShowTopLevelPanel() {
@@ -10232,8 +10997,10 @@ class Game {
       if (this.shouldShowTopLevelPanel()) {
         this.drawTopTimerPanel(ctx);
       }
-      if (this.shouldShowTopActionButtons()) {
+      if (this.shouldShowRestartButton()) {
         this.drawTopCoinsPanel(ctx);
+      }
+      if (this.shouldShowBackButton()) {
         this.drawBackButton(ctx);
       }
       ctx.restore();
@@ -10246,8 +11013,20 @@ class Game {
       if (this.shouldShowTopLevelPanel()) {
         this.drawTopTimerPanel(ctx);
       }
-      if (this.shouldShowTopActionButtons()) {
-        this.drawTopCoinsPanel(ctx);
+      if (this.shouldShowBackButton()) {
+        this.drawBackButton(ctx);
+      }
+      ctx.restore();
+      this.needsRender = false;
+      return;
+    }
+
+    if (this.gameState === "pregame") {
+      this.drawPregame(ctx);
+      if (this.shouldShowTopLevelPanel()) {
+        this.drawTopTimerPanel(ctx);
+      }
+      if (this.shouldShowBackButton()) {
         this.drawBackButton(ctx);
       }
       ctx.restore();
@@ -10269,8 +11048,10 @@ class Game {
       if (this.shouldShowTopLevelPanel()) {
         this.drawTopTimerPanel(ctx);
       }
-      if (this.shouldShowTopActionButtons()) {
+      if (this.shouldShowRestartButton()) {
         this.drawTopCoinsPanel(ctx);
+      }
+      if (this.shouldShowBackButton()) {
         this.drawBackButton(ctx);
       }
       this.drawLevelStartFade(ctx);
@@ -10308,8 +11089,10 @@ class Game {
     if (this.shouldShowTopLevelPanel()) {
       this.drawTopTimerPanel(ctx);
     }
-    if (this.shouldShowTopActionButtons()) {
+    if (this.shouldShowRestartButton()) {
       this.drawTopCoinsPanel(ctx);
+    }
+    if (this.shouldShowBackButton()) {
       this.drawBackButton(ctx);
     }
     this.drawTutorialHand(ctx);
@@ -10363,6 +11146,17 @@ class Game {
   hasActiveAnimations() {
     if (this.gameState === "preview") {
       return true;
+    }
+    if (this.gameState === "pregame") {
+      if (this.pregameStartTransitionActive) {
+        return true;
+      }
+      if (this.pregameFigureAppearTime < PREGAME_FIGURE_APPEAR_DURATION - 0.001) {
+        return true;
+      }
+      if (this.pregameSelectedSectorKey) {
+        return true;
+      }
     }
     if (this.gameState === "lose") {
       return this.losePopupAppear < 0.999 || this.levelStartFade > 0.001 || this.hasAnimatingCards();
@@ -10451,12 +11245,21 @@ class Game {
       this.canvas.style.cursor = overClose || overContinue || overFree || overOfferPurchase ? "pointer" : "default";
       return;
     }
-    if (!this.shouldShowTopActionButtons()) {
+    if (this.gameState === "pregame") {
+      const overBack = this.shouldShowBackButton() && isInsideRect(x, y, this.backButtonRect);
+      const overStart = !this.pregameStartTransitionActive
+        && this.isPregameStartAvailable()
+        && isInsideRect(x, y, this.getPregameStartButtonHitRect());
+      const overPanelControl = !this.pregameStartTransitionActive && this.isPointOnPregamePanelControls(x, y);
+      this.canvas.style.cursor = overBack || overStart || overPanelControl ? "pointer" : "default";
+      return;
+    }
+    if (!this.shouldShowBackButton() && !this.shouldShowRestartButton()) {
       this.canvas.style.cursor = "default";
       return;
     }
-    const overBack = isInsideRect(x, y, this.backButtonRect);
-    const overRestart = isInsideRect(x, y, this.getRestartButtonHitRect());
+    const overBack = this.shouldShowBackButton() && isInsideRect(x, y, this.backButtonRect);
+    const overRestart = this.shouldShowRestartButton() && isInsideRect(x, y, this.getRestartButtonHitRect());
     this.canvas.style.cursor = overBack || overRestart ? "pointer" : "default";
   }
 
@@ -10496,11 +11299,30 @@ class Game {
       }
       return;
     }
-    const sideButtonsVisible = this.shouldShowTopActionButtons();
+    const backButtonVisible = this.shouldShowBackButton();
+    const restartButtonVisible = this.shouldShowRestartButton();
     const isTutorialPlaying = this.gameState === "playing" && this.tutorial?.active;
-    if (sideButtonsVisible && isInsideRect(x, y, this.getRestartButtonHitRect())) {
+    if (restartButtonVisible && isInsideRect(x, y, this.getRestartButtonHitRect())) {
       this.restart();
       dispatchUnityLevelTrackEvent("restart");
+      return;
+    }
+    if (this.gameState === "pregame") {
+      if (backButtonVisible && isInsideRect(x, y, this.backButtonRect)) {
+        this.showQuitScreen();
+        return;
+      }
+      if (this.pregameStartTransitionActive) {
+        return;
+      }
+      if (this.handlePregamePanelPointerDown(x, y)) {
+        return;
+      }
+      if (this.isPregameStartAvailable() && isInsideRect(x, y, this.getPregameStartButtonHitRect())) {
+        this.pregameStartTransitionActive = true;
+        this.pregameFigureDisappearTime = 0;
+        this.invalidate(true);
+      }
       return;
     }
     if (isTutorialPlaying) {
@@ -10549,7 +11371,7 @@ class Game {
       }
       return;
     }
-    if (!isTutorialPlaying && sideButtonsVisible && isInsideRect(x, y, this.backButtonRect)) {
+    if (!isTutorialPlaying && backButtonVisible && isInsideRect(x, y, this.backButtonRect)) {
       this.showQuitScreen();
       return;
     }
