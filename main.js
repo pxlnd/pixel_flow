@@ -9041,11 +9041,16 @@ class Game {
 
   drawPregameLevelImageOnField(ctx) {
     const selectedSectorKey = this.pregameSelectedSectorKey;
+    const assignments = this.pregameSectorColorAssignments || {};
     const pulseRaw = 0.5 + 0.5 * Math.sin(this.pregamePulseTime * 8.4);
     const pulse = Math.pow(pulseRaw, 0.65);
     for (const block of this.blocks) {
       const sectorKey = normalizeBlockColorName(block?.baseColor || block?.color);
       const isSelectedSector = !!selectedSectorKey && sectorKey === selectedSectorKey;
+      const assignedColor = normalizeBlockColorName(assignments[sectorKey]);
+      const hasAssignedColor = !!assignedColor;
+      const shouldKeepFullAlpha = isSelectedSector && hasAssignedColor;
+      const shouldUseSelectionTint = isSelectedSector && !hasAssignedColor;
       const blockScale = isSelectedSector ? 1 + 0.18 * pulse : 1;
       const centerX = block.x + block.size * 0.5;
       const centerY = block.y + block.size * 0.5;
@@ -9057,12 +9062,12 @@ class Game {
         ctx.translate(-centerX, -centerY);
       }
       this.drawVolumetricBlock(ctx, block, block.x, block.y, {
-        alpha: isSelectedSector ? 0.9 + pulse * 0.1 : 1,
-        shadowOpacity: isSelectedSector ? 0.1 : 0.2,
-        bevelStrength: isSelectedSector ? 0.56 : 0.24,
+        alpha: shouldKeepFullAlpha ? 1 : (isSelectedSector ? 0.9 + pulse * 0.1 : 1),
+        shadowOpacity: shouldUseSelectionTint ? 0.1 : 0.2,
+        bevelStrength: shouldUseSelectionTint ? 0.56 : 0.24,
         offsetY: 0,
       });
-      if (isSelectedSector) {
+      if (shouldUseSelectionTint) {
         ctx.save();
         ctx.globalCompositeOperation = "screen";
         ctx.globalAlpha = 0.14 + pulse * 0.26;
