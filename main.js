@@ -9024,6 +9024,21 @@ class Game {
     return false;
   }
 
+  isPregameStartAvailable() {
+    const sectors = Array.isArray(this.pregameSectorKeys) ? this.pregameSectorKeys : [];
+    if (sectors.length === 0) {
+      return false;
+    }
+    const assignments = this.pregameSectorColorAssignments || {};
+    for (const sectorKey of sectors) {
+      const assignedColor = normalizeBlockColorName(assignments[sectorKey]);
+      if (!assignedColor) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   drawPregameLevelImageOnField(ctx) {
     const selectedSectorKey = this.pregameSelectedSectorKey;
     const pulseRaw = 0.5 + 0.5 * Math.sin(this.pregamePulseTime * 8.4);
@@ -9144,7 +9159,9 @@ class Game {
     this.drawWagonLayer(ctx);
     this.drawPregameLevelImageOnField(ctx);
     this.drawPregameColorPanel(ctx);
-    this.drawPregameStartButton(ctx);
+    if (this.isPregameStartAvailable()) {
+      this.drawPregameStartButton(ctx);
+    }
   }
 
   drawVolumetricBlock(ctx, block, x, y, options = {}) {
@@ -10919,7 +10936,7 @@ class Game {
     }
     if (this.gameState === "pregame") {
       const overBack = this.shouldShowBackButton() && isInsideRect(x, y, this.backButtonRect);
-      const overStart = isInsideRect(x, y, this.getPregameStartButtonHitRect());
+      const overStart = this.isPregameStartAvailable() && isInsideRect(x, y, this.getPregameStartButtonHitRect());
       const overPanelControl = this.isPointOnPregamePanelControls(x, y);
       this.canvas.style.cursor = overBack || overStart || overPanelControl ? "pointer" : "default";
       return;
@@ -10985,7 +11002,7 @@ class Game {
       if (this.handlePregamePanelPointerDown(x, y)) {
         return;
       }
-      if (isInsideRect(x, y, this.getPregameStartButtonHitRect())) {
+      if (this.isPregameStartAvailable() && isInsideRect(x, y, this.getPregameStartButtonHitRect())) {
         this.setGameState("playing");
         this.levelStartFade = 1;
         this.invalidate(true);
