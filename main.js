@@ -9046,7 +9046,7 @@ class Game {
     for (const block of this.blocks) {
       const sectorKey = normalizeBlockColorName(block?.baseColor || block?.color);
       const isSelectedSector = !!selectedSectorKey && sectorKey === selectedSectorKey;
-      const blockScale = isSelectedSector ? 1 + 0.14 * pulse : 1;
+      const blockScale = isSelectedSector ? 1 + 0.18 * pulse : 1;
       const centerX = block.x + block.size * 0.5;
       const centerY = block.y + block.size * 0.5;
 
@@ -9057,9 +9057,9 @@ class Game {
         ctx.translate(-centerX, -centerY);
       }
       this.drawVolumetricBlock(ctx, block, block.x, block.y, {
-        alpha: isSelectedSector ? 0.92 + pulse * 0.08 : 1,
-        shadowOpacity: isSelectedSector ? 0.12 : 0.2,
-        bevelStrength: isSelectedSector ? 0.5 : 0.24,
+        alpha: isSelectedSector ? 0.9 + pulse * 0.1 : 1,
+        shadowOpacity: isSelectedSector ? 0.1 : 0.2,
+        bevelStrength: isSelectedSector ? 0.56 : 0.24,
         offsetY: 0,
       });
       if (isSelectedSector) {
@@ -9071,13 +9071,6 @@ class Game {
         ctx.fill();
         ctx.restore();
 
-        ctx.save();
-        ctx.globalAlpha = 0.42 + pulse * 0.34;
-        ctx.lineWidth = 3 + pulse * 3;
-        roundedRect(ctx, block.x + 1, block.y + 1, block.size - 2, block.size - 2, Math.max(5, Math.round(block.size * 0.2)));
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
-        ctx.stroke();
-        ctx.restore();
       }
       ctx.restore();
     }
