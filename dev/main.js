@@ -2945,6 +2945,7 @@ class Game {
     this.previewEnableFallbackTimer = null;
     this.previewEnableFallbackToken = 0;
     this.queueCompletionTrackPending = false;
+    this.queuedSpawnCardIndex = null;
     this.losePopupAppear = 1;
     this.debugPanel = document.getElementById("debugPanel");
     this.debugHotspotBottomLeft = document.getElementById("debugHotspotBottomLeft");
@@ -4510,6 +4511,9 @@ class Game {
       this.pregameStartTransitionActive = false;
       this.pregameFigureDisappearTime = 0;
     }
+    if (previousState === "playing" && normalizedNextState !== "playing") {
+      this.clearQueuedSpawnRequest();
+    }
     this.gameState = normalizedNextState;
     return this.gameState;
   }
@@ -4558,6 +4562,7 @@ class Game {
     this.pregameStartTransitionActive = false;
     this.losePopupAppear = 1;
     this.queueCompletionTrackPending = true;
+    this.clearQueuedSpawnRequest();
     this.idleAssistLastInteractionAt = performance.now() / 1000;
     this.idleAssistHandTime = 0;
     this.clearIdleAssistWakeTimer();
@@ -6314,6 +6319,74 @@ class Game {
     return null;
   }
 
+  getActiveUnitCount() {
+    return this.units.reduce((count, unit) => count + (unit.alive ? 1 : 0), 0);
+  }
+
+  clearQueuedSpawnRequest(cardIndex = null) {
+    if (cardIndex === null || cardIndex === undefined || this.queuedSpawnCardIndex === cardIndex) {
+      this.queuedSpawnCardIndex = null;
+      return true;
+    }
+    return false;
+  }
+
+  canQueueSpawnRequest(card) {
+    if (this.gameState !== "playing" || this.remainingBlocks <= 0) {
+      return false;
+    }
+    if (!card || !this.isFrontRowCard(card) || card.used || card.ammo <= 0) {
+      return false;
+    }
+    if (this.getActiveUnitCount() >= ACTIVE_UNITS_LIMIT) {
+      return false;
+    }
+    return !this.isSpawnAreaClear();
+  }
+
+  queueSpawnRequest(card) {
+    if (!this.canQueueSpawnRequest(card)) {
+      return false;
+    }
+    this.queuedSpawnCardIndex = card.index;
+    this.invalidate(true);
+    return true;
+  }
+
+  requestSpawnUnit(cardIndex) {
+    const didSpawn = this.spawnUnit(cardIndex);
+    if (didSpawn) {
+      this.clearQueuedSpawnRequest(cardIndex);
+      return "spawned";
+    }
+    const card = this.cards[cardIndex];
+    if (this.queueSpawnRequest(card)) {
+      return "queued";
+    }
+    return "blocked";
+  }
+
+  processQueuedSpawnRequest() {
+    if (!Number.isFinite(this.queuedSpawnCardIndex)) {
+      return false;
+    }
+    const cardIndex = this.queuedSpawnCardIndex;
+    const card = this.cards[cardIndex];
+    if (!card || card.used || card.ammo <= 0 || !this.isFrontRowCard(card) || this.remainingBlocks <= 0) {
+      this.clearQueuedSpawnRequest(cardIndex);
+      return false;
+    }
+    if (this.gameState !== "playing") {
+      this.clearQueuedSpawnRequest(cardIndex);
+      return false;
+    }
+    if (this.getActiveUnitCount() >= ACTIVE_UNITS_LIMIT || !this.isSpawnAreaClear()) {
+      return false;
+    }
+    this.clearQueuedSpawnRequest(cardIndex);
+    return this.spawnUnit(cardIndex);
+  }
+
   spawnUnit(cardIndex) {
     if (this.gameState !== "playing") {
       return false;
@@ -6325,7 +6398,7 @@ class Game {
     const tutorialSecondTapForcedSpawn =
       this.isTutorialGameplayPaused()
       && this.tutorial?.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard;
-    const activeUnitCount = this.units.reduce((count, unit) => count + (unit.alive ? 1 : 0), 0);
+    const activeUnitCount = this.getActiveUnitCount();
     if (!tutorialSecondTapForcedSpawn && activeUnitCount >= ACTIVE_UNITS_LIMIT) {
       return false;
     }
@@ -8502,6 +8575,9 @@ class Game {
       unit.update(dt, this);
     }
     this.units = this.units.filter((unit) => unit.alive);
+    if (this.processQueuedSpawnRequest()) {
+      this.needsRender = true;
+    }
 
     compactListInPlace(this.projectiles, (projectile) => {
       projectile.life -= dt;
@@ -11164,11 +11240,13 @@ class Game {
     const tutorialAnimating = this.tutorial?.active && this.getTutorialTapTarget() !== null;
     const idleAssistAnimating = this.getIdleAssistAction() !== null;
     const hasActiveUnits = this.hasActiveTrackUnits();
+    const hasQueuedSpawn = Number.isFinite(this.queuedSpawnCardIndex);
     const targetPulseAnimating = this.gameState === "playing" && this.getContourGhostTargets().length > 0;
     const cardsAnimating = this.hasAnimatingCards();
     const zoomAnimating = Math.abs(this.cameraZoomTarget - this.cameraZoom) > 0.001;
     if (
       (this.gameState === "playing" && hasActiveUnits) ||
+      (this.gameState === "playing" && hasQueuedSpawn) ||
       targetPulseAnimating ||
       cardsAnimating ||
       this.projectiles.length > 0 ||
@@ -11385,9 +11463,10 @@ class Game {
       visualLiftY: this.getQueueVisualLiftY(),
     });
     if (tapCard) {
-      const didSpawn = this.spawnUnit(tapCard.index);
-      this.trackChickenTap(tapCard, didSpawn ? "add" : "blocked_full");
-      this.playSound(didSpawn ? "tap" : "cant_select");
+      const spawnStatus = this.requestSpawnUnit(tapCard.index);
+      const accepted = spawnStatus === "spawned" || spawnStatus === "queued";
+      this.trackChickenTap(tapCard, accepted ? "add" : "blocked_full");
+      this.playSound(accepted ? "tap" : "cant_select");
       return;
     }
     const anyCard = this.cardManager.findAnyTapTarget(x, y, {
