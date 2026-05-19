@@ -10389,11 +10389,23 @@ class Game {
   }
 
   shouldShowBackButton() {
+    if (this.isCurrentLevelFirstPrimary()) {
+      return false;
+    }
     return this.gameState !== "loading" && this.gameState !== "preview" && this.gameState !== "victory";
   }
 
   shouldShowRestartButton() {
-    return this.shouldShowBackButton() && this.gameState !== "pregame";
+    return this.gameState !== "loading"
+      && this.gameState !== "preview"
+      && this.gameState !== "victory"
+      && this.gameState !== "pregame";
+  }
+
+  isCurrentLevelFirstPrimary() {
+    const currentLevelId = String(this.currentLevelId || "");
+    const firstPrimaryLevelId = String(this.primaryLevels?.[0]?.id || DEFAULT_LEVEL_ID);
+    return currentLevelId === firstPrimaryLevelId;
   }
 
   shouldShowTopLevelPanel() {
