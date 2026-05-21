@@ -488,6 +488,7 @@ const BACK_BUTTON_UI = {
 };
 const TOP_PANEL_FONT_WEIGHT = 800;
 const TOP_PANEL_FONT_FAMILY = "\"Baloo 2\", \"Arial Rounded MT Bold\", \"Trebuchet MS\", Arial, sans-serif";
+const OPEN_SANS_FONT_FAMILY = "\"Open Sans\", Arial, sans-serif";
 const TIMER_PANEL_UI = {
   y: 36,
   w: 256,
@@ -515,12 +516,21 @@ const COINS_UI = {
   plusOffsetY: 50,
 };
 const PREGAME_START_BUTTON_UI = {
-  w: 310,
-  h: 98,
+  width: 440,
+  height: 160,
   offsetFromRails: 42,
-  offsetFromColorPanel: 22,
-  bottomSafeMargin: 64,
-  radius: 26,
+  offsetFromColorPanel: 56,
+  radius: 56,
+  fillTop: "#95DE2D",
+  fillBottom: "#46C017",
+  borderTop: "#D1F579",
+  borderBottom: "#82E720",
+  borderWidth: 6,
+  fontSize: 92,
+  textStrokeWidth: 6,
+  textShadowColor: "rgba(0, 0, 0, 0.28)",
+  textShadowBlur: 4,
+  textShadowOffsetY: 4,
   label: "START",
 };
 const PREGAME_COLOR_PANEL_UI = {
@@ -528,17 +538,39 @@ const PREGAME_COLOR_PANEL_UI = {
   sideMargin: 22,
   offsetFromRails: 18,
   paddingX: 18,
-  paddingTop: 16,
-  paddingBottom: 18,
-  sectionGap: 14,
-  rowGap: 10,
-  radius: 24,
-  sectorButtonW: 136,
-  sectorButtonH: 52,
+  sectionGap: 54,
+  panelRadius: 28,
+  panelInset: 5,
+  panelBorder: 4,
+  sectorPaddingLeft: 32,
+  sectorPaddingRight: 32,
+  sectorPaddingTop: 18,
+  sectorPaddingBottom: 18,
+  sectorRowGap: 10,
+  itemGapMultiplier: 2,
+  sectorButtonW: 74,
+  sectorButtonH: 74,
   sectorButtonGap: 10,
-  colorButtonSize: 56,
-  colorButtonGap: 10,
+  colorPaddingTop: 12,
+  colorPaddingBottom: 14,
+  colorButtonGap: 12,
+  highlightColor: "#FFF93C",
+  highlightStrokeWidth: 6,
+  shellHighlightCornerRadius: 20,
+  colorHighlightCornerRadius: 26,
+  colorHighlightGlowSize: 14,
+  colorVisibleCount: 7,
+  colorTrackPaddingLeft: 48,
+  colorTrackPaddingRight: 48,
+  colorTrackPaddingTop: 28,
+  colorTrackPaddingBottom: 28,
+  colorTrackFill: "#272A34",
+  colorTrackBorder: "#575970",
+  colorTrackBorderWidth: 8,
 };
+const PREGAME_CHECKMARK_SIZE_SCALE = 0.7;
+const PREGAME_CHECKMARK_MIN_SIZE = 10;
+const PREGAME_COLOR_SCROLL_DRAG_THRESHOLD = 9;
 const PREGAME_EXTRA_COLOR_OPTIONS = [
   "red",
   "blue",
@@ -2819,6 +2851,9 @@ class Game {
     this.tutorHandImage = new Image();
     this.tutorHandImage.src = "ui/tutor_hand.png";
     this.tutorHandImage.decoding = "async";
+    this.checkmarkImage = new Image();
+    this.checkmarkImage.src = "ui/checkmark.png";
+    this.checkmarkImage.decoding = "async";
     this.blockTemplateImage = new Image();
     this.blockTemplateImage.src = "ui/block.png";
     this.blockTemplateImage.decoding = "async";
@@ -2890,8 +2925,20 @@ class Game {
     this.restartButtonRect = { x: 0, y: 0, w: COINS_UI.panelW, h: COINS_UI.panelH };
     this.preGameStartButtonRect = { x: 0, y: 0, w: 0, h: 0 };
     this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameSectorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGamePalettePanelRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameColorViewportRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameColorContentRect = { x: 0, y: 0, w: 0, h: 0 };
     this.preGameSectorButtons = [];
     this.preGameColorButtons = [];
+    this.preGameColorScrollOffset = 0;
+    this.preGameColorScrollMaxOffset = 0;
+    this.preGameColorDragState = {
+      active: false,
+      pointerId: null,
+      lastX: 0,
+      movedDistance: 0,
+    };
     this.pregameSectorKeys = [];
     this.pregameColorPalette = [];
     this.pregameSelectedSectorKey = null;
@@ -3154,6 +3201,9 @@ class Game {
     this.backdropImage.onload = () => {
       this.generatedBackdropCache = null;
       this.rebuildStaticSceneLayer();
+      this.invalidate(false);
+    };
+    this.checkmarkImage.onload = () => {
       this.invalidate(false);
     };
     this.blockTemplateImage.onload = () => {
@@ -8929,8 +8979,20 @@ class Game {
     this.pregameColorFillEffects = {};
     this.pregamePulseTime = 0;
     this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameSectorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGamePalettePanelRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameColorViewportRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.preGameColorContentRect = { x: 0, y: 0, w: 0, h: 0 };
     this.preGameSectorButtons = [];
     this.preGameColorButtons = [];
+    this.preGameColorScrollOffset = 0;
+    this.preGameColorScrollMaxOffset = 0;
+    this.preGameColorDragState = {
+      active: false,
+      pointerId: null,
+      lastX: 0,
+      movedDistance: 0,
+    };
     this.applyPregameColoringToBlocks({ rebuildCards: false });
   }
 
@@ -8951,13 +9013,26 @@ class Game {
     this.invalidate(true);
   }
 
+  clampPregameColorScrollOffset(nextOffset) {
+    const maxOffset = Math.max(0, Number(this.preGameColorScrollMaxOffset) || 0);
+    const clamped = clamp(Number(nextOffset) || 0, 0, maxOffset);
+    this.preGameColorScrollOffset = clamped;
+    return clamped;
+  }
+
   getPregameColorPanelRect() {
     const sectors = this.pregameSectorKeys;
     const palette = this.pregameColorPalette;
     if (!Array.isArray(sectors) || sectors.length === 0 || !Array.isArray(palette) || palette.length === 0) {
       this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+      this.preGameSectorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
+      this.preGamePalettePanelRect = { x: 0, y: 0, w: 0, h: 0 };
+      this.preGameColorViewportRect = { x: 0, y: 0, w: 0, h: 0 };
+      this.preGameColorContentRect = { x: 0, y: 0, w: 0, h: 0 };
       this.preGameSectorButtons = [];
       this.preGameColorButtons = [];
+      this.preGameColorScrollMaxOffset = 0;
+      this.preGameColorScrollOffset = 0;
       return this.preGameColorPanelRect;
     }
 
@@ -8969,67 +9044,300 @@ class Game {
     const panelX = Math.round((this.width - panelW) * 0.5);
     const innerX = panelX + ui.paddingX;
     const innerW = Math.max(120, panelW - ui.paddingX * 2);
+    const itemGapMultiplier = Math.max(0.1, Number(ui.itemGapMultiplier) || 1);
+    const sectorButtonGap = Math.max(0, (Number(ui.sectorButtonGap) || 0) * itemGapMultiplier);
+    const sectorRowGap = Math.max(0, (Number(ui.sectorRowGap) || 0) * itemGapMultiplier);
+    const colorButtonGap = Math.max(0, (Number(ui.colorButtonGap) || 0) * itemGapMultiplier);
+    const sectorAvailableInnerW = Math.max(
+      120,
+      panelW - ui.sectorPaddingLeft - ui.sectorPaddingRight
+    );
 
-    const sectorButtons = [];
-    const sectorButtonW = Math.max(92, Math.min(ui.sectorButtonW, innerW));
-    let cursorX = innerX;
-    let cursorY = Math.round(railsBottom + ui.offsetFromRails + ui.paddingTop);
-    let rowMaxH = 0;
-    for (const sectorKey of sectors) {
-      if (cursorX + sectorButtonW > innerX + innerW + 0.5 && sectorButtons.length > 0) {
-        cursorX = innerX;
-        cursorY += rowMaxH + ui.rowGap;
-        rowMaxH = 0;
-      }
-      const rect = {
-        x: Math.round(cursorX),
-        y: Math.round(cursorY),
-        w: Math.round(sectorButtonW),
-        h: ui.sectorButtonH,
-      };
-      sectorButtons.push({
-        sectorKey,
-        rect,
-      });
-      cursorX += sectorButtonW + ui.sectorButtonGap;
-      rowMaxH = Math.max(rowMaxH, ui.sectorButtonH);
+    const sectorRows = [];
+    const sectorColumns = Math.max(
+      1,
+      Math.floor((sectorAvailableInnerW + sectorButtonGap) / (ui.sectorButtonW + sectorButtonGap))
+    );
+    let sectorMaxRowW = 0;
+    for (let rowStart = 0; rowStart < sectors.length; rowStart += sectorColumns) {
+      const rowItems = sectors.slice(rowStart, rowStart + sectorColumns);
+      const rowW = (
+        rowItems.length * ui.sectorButtonW
+        + Math.max(0, rowItems.length - 1) * sectorButtonGap
+      );
+      sectorRows.push({ rowItems, rowW });
+      sectorMaxRowW = Math.max(sectorMaxRowW, rowW);
     }
+    const sectorPanelInnerW = Math.max(ui.sectorButtonW, Math.min(sectorAvailableInnerW, sectorMaxRowW));
+    const sectorPanelW = Math.round(Math.min(
+      panelW,
+      sectorPanelInnerW + ui.sectorPaddingLeft + ui.sectorPaddingRight
+    ));
+    const sectorPanelX = Math.round((this.width - sectorPanelW) * 0.5);
+    const sectorPanelY = Math.round(railsBottom + ui.offsetFromRails);
+    const sectorInnerX = Math.round(sectorPanelX + ui.sectorPaddingLeft);
+    const sectorButtons = [];
+    let sectorCursorY = Math.round(sectorPanelY + ui.sectorPaddingTop);
+    for (const row of sectorRows) {
+      let rowX = Math.round(sectorInnerX + Math.max(0, (sectorPanelInnerW - row.rowW) * 0.5));
+      for (const sectorKey of row.rowItems) {
+        sectorButtons.push({
+          sectorKey,
+          rect: {
+            x: rowX,
+            y: Math.round(sectorCursorY),
+            w: ui.sectorButtonW,
+            h: ui.sectorButtonH,
+          },
+        });
+        rowX += ui.sectorButtonW + sectorButtonGap;
+      }
+      sectorCursorY += ui.sectorButtonH + sectorRowGap;
+    }
+    if (sectorRows.length > 0) {
+      sectorCursorY -= sectorRowGap;
+    }
+    const sectorPanelH = Math.max(
+      ui.sectorPaddingTop + ui.sectorPaddingBottom + ui.sectorButtonH,
+      Math.round((sectorCursorY - sectorPanelY) + ui.sectorPaddingBottom)
+    );
+    const sectorPanelRect = {
+      x: sectorPanelX,
+      y: sectorPanelY,
+      w: sectorPanelW,
+      h: sectorPanelH,
+    };
 
-    const sectorRowsBottomY = cursorY + rowMaxH;
-    const colorTopY = Math.round(sectorRowsBottomY + ui.sectionGap);
-    const colorButtonSize = ui.colorButtonSize;
-    const colorGap = ui.colorButtonGap;
-    const columns = Math.max(1, Math.floor((innerW + colorGap) / (colorButtonSize + colorGap)));
+    const colorPanelY = Math.round(sectorPanelRect.y + sectorPanelRect.h + ui.sectionGap);
+    const visibleColorCount = Math.max(1, Math.round(Number(ui.colorVisibleCount) || 6));
+    const colorButtonSize = Math.max(
+      1,
+      Math.floor((innerW - colorButtonGap * (visibleColorCount - 1)) / visibleColorCount)
+    );
+    const colorViewportRect = {
+      x: Math.round(innerX),
+      y: Math.round(colorPanelY + ui.colorPaddingTop),
+      w: Math.round(innerW),
+      h: colorButtonSize,
+    };
+    const colorContentW = (
+      palette.length * colorButtonSize
+      + Math.max(0, palette.length - 1) * colorButtonGap
+    );
+    this.preGameColorScrollMaxOffset = Math.max(0, colorContentW - colorViewportRect.w);
+    this.clampPregameColorScrollOffset(this.preGameColorScrollOffset);
+    if (this.preGameColorScrollMaxOffset <= 0.5 && this.preGameColorDragState?.active) {
+      this.preGameColorDragState = {
+        active: false,
+        pointerId: null,
+        lastX: 0,
+        movedDistance: 0,
+      };
+    }
+    const scrollOffset = this.preGameColorScrollOffset;
+
     const colorButtons = [];
     for (let i = 0; i < palette.length; i += 1) {
-      const col = i % columns;
-      const row = Math.floor(i / columns);
-      const x = innerX + col * (colorButtonSize + colorGap);
-      const y = colorTopY + row * (colorButtonSize + colorGap);
+      const x = colorViewportRect.x + i * (colorButtonSize + colorButtonGap) - scrollOffset;
       colorButtons.push({
         colorKey: palette[i],
         rect: {
           x: Math.round(x),
-          y: Math.round(y),
+          y: colorViewportRect.y,
           w: colorButtonSize,
           h: colorButtonSize,
         },
       });
     }
-
-    const colorRows = Math.max(1, Math.ceil(palette.length / columns));
-    const colorRowsBottomY = colorTopY + colorRows * colorButtonSize + (colorRows - 1) * colorGap;
-    const panelH = Math.round(
-      (colorRowsBottomY - (railsBottom + ui.offsetFromRails))
-      + ui.paddingBottom
+    const colorTrackPaddingLeft = Math.max(
+      0,
+      Number.isFinite(ui.colorTrackPaddingLeft) ? ui.colorTrackPaddingLeft : (ui.colorTrackPaddingX || 0)
     );
-    const panelY = Math.round(railsBottom + ui.offsetFromRails);
-    const panelRect = { x: panelX, y: panelY, w: Math.round(panelW), h: panelH };
+    const colorTrackPaddingRight = Math.max(
+      0,
+      Number.isFinite(ui.colorTrackPaddingRight) ? ui.colorTrackPaddingRight : (ui.colorTrackPaddingX || 0)
+    );
+    const colorTrackPaddingTop = Math.max(
+      0,
+      Number.isFinite(ui.colorTrackPaddingTop) ? ui.colorTrackPaddingTop : (ui.colorTrackPaddingY || 0)
+    );
+    const colorTrackPaddingBottom = Math.max(
+      0,
+      Number.isFinite(ui.colorTrackPaddingBottom) ? ui.colorTrackPaddingBottom : (ui.colorTrackPaddingY || 0)
+    );
+    const colorContentRect = {
+      x: Math.round(colorViewportRect.x - scrollOffset - colorTrackPaddingLeft),
+      y: Math.round(colorViewportRect.y - colorTrackPaddingTop),
+      w: Math.round(colorContentW + colorTrackPaddingLeft + colorTrackPaddingRight),
+      h: Math.round(colorButtonSize + colorTrackPaddingTop + colorTrackPaddingBottom),
+    };
+
+    const colorPanelRect = {
+      x: panelX,
+      y: colorPanelY,
+      w: Math.round(panelW),
+      h: Math.round(ui.colorPaddingTop + colorButtonSize + ui.colorPaddingBottom),
+    };
+    const panelRect = {
+      x: panelX,
+      y: sectorPanelRect.y,
+      w: Math.round(panelW),
+      h: Math.round((colorPanelRect.y + colorPanelRect.h) - sectorPanelRect.y),
+    };
 
     this.preGameColorPanelRect = panelRect;
+    this.preGameSectorPanelRect = sectorPanelRect;
+    this.preGamePalettePanelRect = colorPanelRect;
+    this.preGameColorViewportRect = colorViewportRect;
+    this.preGameColorContentRect = colorContentRect;
     this.preGameSectorButtons = sectorButtons;
     this.preGameColorButtons = colorButtons;
     return panelRect;
+  }
+
+  drawPregamePanelShell(ctx, rect, options = {}) {
+    const ui = PREGAME_COLOR_PANEL_UI;
+    const outerRadius = ui.panelRadius;
+    const innerRadius = Math.max(outerRadius - ui.panelInset, 8);
+    const inset = ui.panelInset;
+    const outerFill = String(options.outerFill || "#545777");
+    const borderColor = String(options.borderColor || "rgba(128, 137, 181, 0.96)");
+    const innerShadowColor = String(options.innerShadowColor || "rgba(25, 29, 46, 0.75)");
+    const innerFillTop = options.innerFillTop;
+    const innerFillBottom = options.innerFillBottom;
+    const useFlatInnerFill = typeof options.innerFill === "string" && options.innerFill.length > 0;
+    const showInnerShadow = options.showInnerShadow !== false;
+    const shadowColor = options.shadowColor === null
+      ? null
+      : String(options.shadowColor || "rgba(5, 8, 20, 0.6)");
+    const shadowBlur = Number.isFinite(options.shadowBlur) ? options.shadowBlur : 22;
+    const shadowOffsetY = Number.isFinite(options.shadowOffsetY) ? options.shadowOffsetY : 7;
+
+    ctx.save();
+    if (shadowColor) {
+      ctx.shadowColor = shadowColor;
+      ctx.shadowBlur = shadowBlur;
+      ctx.shadowOffsetY = shadowOffsetY;
+    }
+    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, outerRadius);
+    ctx.fillStyle = outerFill;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    const gradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+    gradient.addColorStop(0, useFlatInnerFill ? options.innerFill : (innerFillTop || "#464a67"));
+    gradient.addColorStop(1, useFlatInnerFill ? options.innerFill : (innerFillBottom || "#3a3d53"));
+    roundedRect(
+      ctx,
+      rect.x + inset,
+      rect.y + inset,
+      rect.w - inset * 2,
+      rect.h - inset * 2,
+      innerRadius
+    );
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.lineWidth = ui.panelBorder;
+    ctx.strokeStyle = borderColor;
+    ctx.stroke();
+    ctx.restore();
+
+    if (showInnerShadow) {
+      ctx.save();
+      roundedRect(
+        ctx,
+        rect.x + inset + 1.5,
+        rect.y + inset + 1.5,
+        rect.w - inset * 2 - 3,
+        rect.h - inset * 2 - 3,
+        Math.max(6, innerRadius - 2)
+      );
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = innerShadowColor;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  drawPregameBlockTileInRect(ctx, colorKey, rect, options = {}) {
+    const normalizedColor = normalizeBlockColorName(colorKey);
+    const tileImage = this.getLoadedBlockTileImage(normalizedColor);
+    const sprite = this.sprites[`${normalizedColor}Tile`] || null;
+    const radius = Math.max(10, Math.round(Math.min(rect.w, rect.h) * 0.26));
+
+    ctx.save();
+    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, radius);
+    ctx.clip();
+    if (tileImage) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(tileImage, rect.x, rect.y, rect.w, rect.h);
+    } else if (sprite) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(sprite, rect.x, rect.y, rect.w, rect.h);
+    } else {
+      ctx.fillStyle = this.getBlockFaceColor(normalizedColor || "gray");
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    }
+    if (options.glossAlpha !== 0) {
+      const glossGrad = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h * 0.65);
+      glossGrad.addColorStop(0, `rgba(255, 255, 255, ${options.glossAlpha ?? 0.19})`);
+      glossGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+      ctx.fillStyle = glossGrad;
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    }
+    ctx.restore();
+
+    ctx.save();
+    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, radius);
+    ctx.lineWidth = options.strokeWidth ?? 2;
+    ctx.strokeStyle = options.strokeStyle ?? "rgba(245, 249, 255, 0.88)";
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawPregameSelectionCheck(ctx, rect, options = {}) {
+    const minSide = Math.min(rect.w, rect.h);
+    const scale = Number.isFinite(options.scale) ? options.scale : PREGAME_CHECKMARK_SIZE_SCALE;
+    const size = Math.max(PREGAME_CHECKMARK_MIN_SIZE, Math.round(minSide * scale));
+    const anchor = options.anchor || "center";
+    const margin = Number.isFinite(options.margin)
+      ? Math.max(0, options.margin)
+      : Math.max(3, Math.round(minSide * 0.08));
+    const drawX = anchor === "top-right"
+      ? Math.round(rect.x + rect.w - size - margin)
+      : Math.round(rect.x + (rect.w - size) * 0.5);
+    const drawY = anchor === "top-right"
+      ? Math.round(rect.y + margin)
+      : Math.round(rect.y + (rect.h - size) * 0.5);
+    const image = this.checkmarkImage;
+
+    if (image && image.complete && image.naturalWidth > 0) {
+      ctx.save();
+      ctx.shadowColor = options.shadowColor || "rgba(0, 0, 0, 0.34)";
+      ctx.shadowBlur = Number.isFinite(options.shadowBlur) ? options.shadowBlur : 4;
+      ctx.shadowOffsetY = Number.isFinite(options.shadowOffsetY) ? options.shadowOffsetY : 1.5;
+      ctx.drawImage(image, drawX, drawY, size, size);
+      ctx.restore();
+      return;
+    }
+
+    // Fallback if the checkmark image is not loaded yet.
+    const cx = drawX + size * 0.5;
+    const cy = drawY + size * 0.5;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.98)";
+    ctx.lineWidth = Math.max(2.5, size * 0.12);
+    ctx.beginPath();
+    ctx.moveTo(cx - size * 0.22, cy + size * 0.02);
+    ctx.lineTo(cx - size * 0.04, cy + size * 0.2);
+    ctx.lineTo(cx + size * 0.26, cy - size * 0.18);
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawPregameColorPanel(ctx) {
@@ -9037,70 +9345,150 @@ class Game {
     if (panelRect.w <= 0 || panelRect.h <= 0) {
       return;
     }
+    const ui = PREGAME_COLOR_PANEL_UI;
+    const highlightColor = String(ui.highlightColor || "#FFF93C");
+    const highlightStrokeWidth = Number.isFinite(ui.highlightStrokeWidth)
+      ? Math.max(1, ui.highlightStrokeWidth)
+      : 4.8;
+    const shellHighlightCornerRadius = Number.isFinite(ui.shellHighlightCornerRadius)
+      ? ui.shellHighlightCornerRadius
+      : 20;
+    const colorHighlightCornerRadius = Number.isFinite(ui.colorHighlightCornerRadius)
+      ? ui.colorHighlightCornerRadius
+      : 20;
+    const colorHighlightGlowSize = Number.isFinite(ui.colorHighlightGlowSize)
+      ? Math.max(0, ui.colorHighlightGlowSize)
+      : 14;
+    const highlightRgb = hexToRgb(highlightColor, { r: 255, g: 249, b: 60 });
+    const highlightShadowColor = `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, 0.62)`;
+    const assignments = this.pregameSectorColorAssignments || {};
+    const assignedColorSet = new Set();
+    for (const sectorKey of this.pregameSectorKeys || []) {
+      const assigned = normalizeBlockColorName(assignments[sectorKey]);
+      if (assigned) {
+        assignedColorSet.add(assigned);
+      }
+    }
 
-    ctx.save();
-    ctx.fillStyle = "rgba(12, 17, 26, 0.72)";
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.26)";
-    ctx.lineWidth = 2;
-    roundedRect(ctx, panelRect.x, panelRect.y, panelRect.w, panelRect.h, PREGAME_COLOR_PANEL_UI.radius);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    this.drawPregamePanelShell(ctx, this.preGameSectorPanelRect, {
+      outerFill: "#4D4E53",
+      innerFill: "#4D4E53",
+      borderColor: "#575970",
+      showInnerShadow: false,
+    });
 
     for (let index = 0; index < this.preGameSectorButtons.length; index += 1) {
       const entry = this.preGameSectorButtons[index];
       const rect = entry.rect;
       const isSelected = entry.sectorKey === this.pregameSelectedSectorKey;
-      const mappedColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[entry.sectorKey]) || "gray";
-      const chipColor = this.getBlockFaceColor(mappedColor);
+      const assignedColor = normalizeBlockColorName(assignments[entry.sectorKey]);
+      const hasAssignedColor = !!assignedColor;
 
-      ctx.save();
-      const grad = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
-      grad.addColorStop(0, isSelected ? "rgba(112, 194, 255, 0.92)" : "rgba(255, 255, 255, 0.2)");
-      grad.addColorStop(1, isSelected ? "rgba(60, 142, 235, 0.9)" : "rgba(255, 255, 255, 0.08)");
-      roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 16);
-      ctx.fillStyle = grad;
-      ctx.fill();
-      ctx.lineWidth = isSelected ? 3 : 2;
-      ctx.strokeStyle = isSelected ? "rgba(198, 235, 255, 0.95)" : "rgba(255, 255, 255, 0.3)";
-      ctx.stroke();
-      ctx.restore();
+      if (isSelected) {
+        ctx.save();
+        roundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, shellHighlightCornerRadius);
+        ctx.strokeStyle = highlightColor;
+        ctx.lineWidth = highlightStrokeWidth;
+        ctx.stroke();
+        ctx.restore();
+      }
 
-      ctx.save();
-      ctx.fillStyle = chipColor;
-      ctx.beginPath();
-      ctx.arc(rect.x + rect.w - 22, rect.y + rect.h * 0.5, 12, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
-      ctx.stroke();
-      ctx.restore();
+      if (hasAssignedColor) {
+        this.drawPregameBlockTileInRect(ctx, assignedColor, rect, {
+          strokeWidth: isSelected ? 2.6 : 2.1,
+          strokeStyle: "rgba(187, 193, 213, 0.92)",
+          glossAlpha: isSelected ? 0.2 : 0.12,
+        });
+      } else {
+        const emptyRadius = Math.max(10, Math.round(Math.min(rect.w, rect.h) * 0.26));
+        ctx.save();
+        roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, emptyRadius);
+        ctx.fillStyle = "#33343A";
+        ctx.fill();
+        ctx.lineWidth = isSelected ? 2.6 : 2.1;
+        ctx.strokeStyle = "rgba(129, 136, 162, 0.9)";
+        ctx.stroke();
+        ctx.restore();
+      }
 
+      const label = `${index + 1}`;
+      const fontSize = Math.max(
+        28,
+        Math.round(rect.h * (label.length > 1 ? 0.58 : 0.78))
+      );
       ctx.save();
-      ctx.font = `800 24px ${TOP_PANEL_FONT_FAMILY}`;
-      ctx.textAlign = "left";
+      ctx.font = `800 ${fontSize}px ${OPEN_SANS_FONT_FAMILY}`;
+      ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(`${index + 1}`, rect.x + 18, rect.y + rect.h * 0.54);
+      ctx.fillStyle = hasAssignedColor ? "#fff" : "#989AA3";
+      ctx.shadowColor = "rgba(0, 0, 0, 0.28)";
+      ctx.shadowBlur = 3;
+      ctx.shadowOffsetY = 2;
+      const textX = rect.x + rect.w * 0.5;
+      const textY = rect.y + rect.h * 0.56;
+      ctx.fillText(label, textX, textY);
       ctx.restore();
+
     }
 
     const activeSectorKey = this.pregameSelectedSectorKey;
-    const activeMappedColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[activeSectorKey]);
-    for (const entry of this.preGameColorButtons) {
-      const rect = entry.rect;
-      const colorKey = entry.colorKey;
-      const fill = this.getBlockFaceColor(colorKey);
-      const isSelectedColor = activeMappedColor === colorKey;
-
+    const activeMappedColor = normalizeBlockColorName(assignments[activeSectorKey]);
+    const colorContentRect = this.preGameColorContentRect;
+    if (colorContentRect.w > 0 && colorContentRect.h > 0) {
+      const trackRadius = Math.max(10, Math.round(colorContentRect.h * 0.32));
       ctx.save();
-      ctx.fillStyle = fill;
-      roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, 16);
+      roundedRect(
+        ctx,
+        colorContentRect.x,
+        colorContentRect.y,
+        colorContentRect.w,
+        colorContentRect.h,
+        trackRadius
+      );
+      ctx.fillStyle = String(PREGAME_COLOR_PANEL_UI.colorTrackFill || "#272A34");
       ctx.fill();
-      ctx.lineWidth = isSelectedColor ? 4 : 2;
-      ctx.strokeStyle = isSelectedColor ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.42)";
+      ctx.strokeStyle = String(PREGAME_COLOR_PANEL_UI.colorTrackBorder || "#575970");
+      ctx.lineWidth = Number.isFinite(PREGAME_COLOR_PANEL_UI.colorTrackBorderWidth)
+        ? PREGAME_COLOR_PANEL_UI.colorTrackBorderWidth
+        : 2;
       ctx.stroke();
       ctx.restore();
+    }
+
+    for (const entry of this.preGameColorButtons) {
+      const rect = entry.rect;
+      const isSelectedColor = activeMappedColor === entry.colorKey;
+      const isAssignedColor = assignedColorSet.has(entry.colorKey);
+      if (isAssignedColor) {
+        ctx.save();
+        roundedRect(
+          ctx,
+          rect.x - 3,
+          rect.y - 3,
+          rect.w + 6,
+          rect.h + 6,
+          colorHighlightCornerRadius
+        );
+        ctx.strokeStyle = highlightColor;
+        ctx.lineWidth = highlightStrokeWidth;
+        ctx.shadowColor = highlightShadowColor;
+        ctx.shadowBlur = colorHighlightGlowSize;
+        ctx.stroke();
+        ctx.restore();
+      }
+      this.drawPregameBlockTileInRect(ctx, entry.colorKey, rect, {
+        strokeWidth: isAssignedColor ? (isSelectedColor ? 2.8 : 2.4) : 2,
+        strokeStyle: "rgba(220, 232, 255, 0.9)",
+        glossAlpha: 0.18,
+      });
+      if (isAssignedColor) {
+        this.drawPregameSelectionCheck(ctx, rect, {
+          scale: PREGAME_CHECKMARK_SIZE_SCALE,
+          shadowBlur: 4.5,
+          shadowOffsetY: 1.5,
+          shadowColor: highlightShadowColor,
+        });
+      }
     }
   }
 
@@ -9181,13 +9569,115 @@ class Game {
     if (!sectorKey || !normalizedColor) {
       return false;
     }
-    if (this.pregameSectorColorAssignments?.[sectorKey] === normalizedColor) {
+    const assignments = this.pregameSectorColorAssignments || {};
+    if (normalizeBlockColorName(assignments[sectorKey]) === normalizedColor) {
       return false;
     }
-    const previousColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[sectorKey]) || "gray";
-    this.pregameSectorColorAssignments[sectorKey] = normalizedColor;
+    const previousColor = normalizeBlockColorName(assignments[sectorKey]) || "gray";
+    for (const [otherSectorKey, assignedColorKey] of Object.entries(assignments)) {
+      if (otherSectorKey === sectorKey) {
+        continue;
+      }
+      const otherAssignedColor = normalizeBlockColorName(assignedColorKey);
+      if (otherAssignedColor !== normalizedColor) {
+        continue;
+      }
+      assignments[otherSectorKey] = null;
+      this.startPregameColorFillEffect(otherSectorKey, normalizedColor, "gray");
+    }
+    assignments[sectorKey] = normalizedColor;
     this.startPregameColorFillEffect(sectorKey, previousColor, normalizedColor);
     this.applyPregameColoringToBlocks({ rebuildCards: true });
+    return true;
+  }
+
+  beginPregameColorPanelDrag(pointerId, x, y) {
+    if (this.gameState !== "pregame" || this.pregameStartTransitionActive) {
+      return false;
+    }
+    this.getPregameColorPanelRect();
+    if (this.preGameColorScrollMaxOffset <= 0.5) {
+      return false;
+    }
+    if (!isInsideRect(x, y, this.preGameColorViewportRect)) {
+      return false;
+    }
+    this.preGameColorDragState = {
+      active: true,
+      pointerId,
+      lastX: x,
+      movedDistance: 0,
+    };
+    return true;
+  }
+
+  updatePregameColorPanelDrag(pointerId, x) {
+    const drag = this.preGameColorDragState;
+    if (!drag?.active || drag.pointerId !== pointerId) {
+      return false;
+    }
+    if (this.gameState !== "pregame" || this.pregameStartTransitionActive) {
+      this.preGameColorDragState = {
+        active: false,
+        pointerId: null,
+        lastX: 0,
+        movedDistance: 0,
+      };
+      return false;
+    }
+    const deltaX = x - drag.lastX;
+    drag.lastX = x;
+    drag.movedDistance += Math.abs(deltaX);
+    if (Math.abs(deltaX) > 0.001) {
+      this.clampPregameColorScrollOffset(this.preGameColorScrollOffset - deltaX);
+      this.invalidate(false);
+    }
+    this.canvas.style.cursor = "grabbing";
+    return true;
+  }
+
+  endPregameColorPanelDrag(pointerId, x, y, options = {}) {
+    const drag = this.preGameColorDragState;
+    const isCancel = options.cancel === true;
+    if (!drag?.active || drag.pointerId !== pointerId) {
+      return false;
+    }
+    const movedDistance = drag.movedDistance;
+    this.preGameColorDragState = {
+      active: false,
+      pointerId: null,
+      lastX: 0,
+      movedDistance: 0,
+    };
+
+    if (isCancel) {
+      return true;
+    }
+    if (movedDistance <= PREGAME_COLOR_SCROLL_DRAG_THRESHOLD) {
+      this.handlePregamePanelPointerDown(x, y);
+    } else {
+      this.handlePointerMove(x, y);
+    }
+    return true;
+  }
+
+  handlePregameColorPanelWheel(x, y, deltaX, deltaY) {
+    if (this.gameState !== "pregame" || this.pregameStartTransitionActive) {
+      return false;
+    }
+    this.getPregameColorPanelRect();
+    if (this.preGameColorScrollMaxOffset <= 0.5) {
+      return false;
+    }
+    if (!isInsideRect(x, y, this.preGameColorViewportRect)) {
+      return false;
+    }
+    const primaryDelta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+    if (Math.abs(primaryDelta) < 0.01) {
+      return false;
+    }
+    this.clampPregameColorScrollOffset(this.preGameColorScrollOffset + primaryDelta);
+    this.invalidate(false);
     return true;
   }
 
@@ -9223,6 +9713,9 @@ class Game {
       if (isInsideRect(x, y, entry.rect)) {
         return true;
       }
+    }
+    if (isInsideRect(x, y, this.preGameColorViewportRect)) {
+      return true;
     }
     for (const entry of this.preGameColorButtons) {
       if (isInsideRect(x, y, entry.rect)) {
@@ -9462,19 +9955,19 @@ class Game {
 
   getPregameStartButtonRect() {
     const railsBottom = LAYOUT.track.y + LAYOUT.track.h;
-    const w = PREGAME_START_BUTTON_UI.w;
-    const h = PREGAME_START_BUTTON_UI.h;
+    const w = Number.isFinite(PREGAME_START_BUTTON_UI.width)
+      ? PREGAME_START_BUTTON_UI.width
+      : PREGAME_START_BUTTON_UI.w;
     const panelRect = this.getPregameColorPanelRect();
     const baseTopY = panelRect.h > 0
       ? panelRect.y + panelRect.h + PREGAME_START_BUTTON_UI.offsetFromColorPanel
       : railsBottom + PREGAME_START_BUTTON_UI.offsetFromRails;
-    const y = Math.min(
-      this.height - h - PREGAME_START_BUTTON_UI.bottomSafeMargin,
-      baseTopY
-    );
+    const h = Number.isFinite(PREGAME_START_BUTTON_UI.height)
+      ? PREGAME_START_BUTTON_UI.height
+      : PREGAME_START_BUTTON_UI.h;
     const rect = {
       x: Math.round((this.width - w) * 0.5),
-      y: Math.round(y),
+      y: Math.round(baseTopY),
       w,
       h,
     };
@@ -9495,33 +9988,59 @@ class Game {
 
   drawPregameStartButton(ctx) {
     const rect = this.getPregameStartButtonRect();
-    const gradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
-    gradient.addColorStop(0, "#67de67");
-    gradient.addColorStop(1, "#39b53d");
+    const fillGradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+    fillGradient.addColorStop(0, PREGAME_START_BUTTON_UI.fillTop || "#95DE2D");
+    fillGradient.addColorStop(1, PREGAME_START_BUTTON_UI.fillBottom || "#46C017");
 
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.26)";
     ctx.shadowBlur = 16;
     ctx.shadowOffsetY = 5;
     roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, PREGAME_START_BUTTON_UI.radius);
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = fillGradient;
     ctx.fill();
     ctx.restore();
 
+    const borderWidth = Number.isFinite(PREGAME_START_BUTTON_UI.borderWidth)
+      ? Math.max(1, PREGAME_START_BUTTON_UI.borderWidth)
+      : 4;
+    const borderInset = borderWidth * 0.5;
+    const borderGradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+    borderGradient.addColorStop(0, PREGAME_START_BUTTON_UI.borderTop || "#D1F579");
+    borderGradient.addColorStop(1, PREGAME_START_BUTTON_UI.borderBottom || "#82E720");
     ctx.save();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.48)";
-    roundedRect(ctx, rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4, PREGAME_START_BUTTON_UI.radius - 2);
+    ctx.lineWidth = borderWidth;
+    ctx.strokeStyle = borderGradient;
+    roundedRect(
+      ctx,
+      rect.x + borderInset,
+      rect.y + borderInset,
+      Math.max(1, rect.w - borderInset * 2),
+      Math.max(1, rect.h - borderInset * 2),
+      Math.max(4, PREGAME_START_BUTTON_UI.radius - borderInset)
+    );
     ctx.stroke();
     ctx.restore();
 
+    const fontSize = Number.isFinite(PREGAME_START_BUTTON_UI.fontSize)
+      ? Math.max(12, PREGAME_START_BUTTON_UI.fontSize)
+      : 52;
     ctx.save();
-    ctx.font = `900 52px ${TOP_PANEL_FONT_FAMILY}`;
+    ctx.font = `800 ${fontSize}px ${OPEN_SANS_FONT_FAMILY}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "rgba(19, 88, 20, 0.45)";
-    ctx.lineWidth = 5;
+    ctx.lineWidth = Number.isFinite(PREGAME_START_BUTTON_UI.textStrokeWidth)
+      ? Math.max(1, PREGAME_START_BUTTON_UI.textStrokeWidth)
+      : 8;
+    ctx.shadowColor = PREGAME_START_BUTTON_UI.textShadowColor || "rgba(0, 0, 0, 0.42)";
+    ctx.shadowBlur = Number.isFinite(PREGAME_START_BUTTON_UI.textShadowBlur)
+      ? Math.max(0, PREGAME_START_BUTTON_UI.textShadowBlur)
+      : 10;
+    ctx.shadowOffsetY = Number.isFinite(PREGAME_START_BUTTON_UI.textShadowOffsetY)
+      ? PREGAME_START_BUTTON_UI.textShadowOffsetY
+      : 5;
     const textX = rect.x + rect.w * 0.5;
     const textY = rect.y + rect.h * 0.56;
     ctx.strokeText(PREGAME_START_BUTTON_UI.label, textX, textY);
@@ -12976,6 +13495,10 @@ class Game {
         this.canvas.style.cursor = "default";
         return;
       }
+      if (this.updatePregameColorPanelDrag(event.pointerId, point.x)) {
+        event.preventDefault();
+        return;
+      }
       this.handlePointerMove(point.x, point.y);
     });
     this.canvas.addEventListener("pointerdown", (event) => {
@@ -12984,9 +13507,58 @@ class Game {
       if (!point) {
         return;
       }
+      if (this.beginPregameColorPanelDrag(event.pointerId, point.x, point.y)) {
+        if (typeof this.canvas.setPointerCapture === "function") {
+          try {
+            this.canvas.setPointerCapture(event.pointerId);
+          } catch {
+            // Ignore when pointer capture is unavailable.
+          }
+        }
+        this.canvas.style.cursor = "grabbing";
+        event.preventDefault();
+        return;
+      }
       this.handlePointerDown(point.x, point.y);
       event.preventDefault();
     });
+    this.canvas.addEventListener("pointerup", (event) => {
+      const point = this.getPointerPosition(event);
+      const fallbackX = this.preGameColorDragState?.lastX || 0;
+      const fallbackY = this.preGameColorViewportRect.y + this.preGameColorViewportRect.h * 0.5;
+      const x = point ? point.x : fallbackX;
+      const y = point ? point.y : fallbackY;
+      if (this.endPregameColorPanelDrag(event.pointerId, x, y)) {
+        if (typeof this.canvas.releasePointerCapture === "function") {
+          try {
+            this.canvas.releasePointerCapture(event.pointerId);
+          } catch {
+            // Ignore when pointer capture was not set.
+          }
+        }
+        event.preventDefault();
+      }
+    });
+    this.canvas.addEventListener("pointercancel", (event) => {
+      this.endPregameColorPanelDrag(event.pointerId, 0, 0, { cancel: true });
+      if (typeof this.canvas.releasePointerCapture === "function") {
+        try {
+          this.canvas.releasePointerCapture(event.pointerId);
+        } catch {
+          // Ignore when pointer capture was not set.
+        }
+      }
+      this.canvas.style.cursor = "default";
+    });
+    this.canvas.addEventListener("wheel", (event) => {
+      const point = this.getPointerPosition(event);
+      if (!point) {
+        return;
+      }
+      if (this.handlePregameColorPanelWheel(point.x, point.y, event.deltaX, event.deltaY)) {
+        event.preventDefault();
+      }
+    }, { passive: false });
     if (this.debugPanel) {
       // Keep scroll gestures inside the debug panel so the canvas doesn't steal them on mobile.
       const stopPropagation = (event) => {
