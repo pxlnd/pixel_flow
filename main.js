@@ -516,17 +516,21 @@ const COINS_UI = {
   plusOffsetY: 50,
 };
 const PREGAME_START_BUTTON_UI = {
-  width: 440,
-  height: 160,
-  offsetFromRails: 42,
-  offsetFromColorPanel: 56,
+  width: 480,
+  height: 180,
+  bottomAnchorOffset: 64,
+  hitPadding: 0,
+  appearDuration: 0.4,
+  bounceStartDelay: 0.0,
+  bounceLoopDuration: 1.3,
+  bounceScaleAmplitude: 0.06,
   radius: 56,
   fillTop: "#95DE2D",
   fillBottom: "#46C017",
   borderTop: "#D1F579",
   borderBottom: "#82E720",
   borderWidth: 6,
-  fontSize: 92,
+  fontSize: 96,
   textStrokeWidth: 6,
   textShadowColor: "rgba(0, 0, 0, 0.28)",
   textShadowBlur: 4,
@@ -537,6 +541,9 @@ const PREGAME_COLOR_PANEL_UI = {
   minW: 420,
   sideMargin: 22,
   offsetFromRails: 18,
+  minGapToStart: 54,
+  minLayoutScale: 0.8,
+  layoutScaleStep: 0.02,
   paddingX: 18,
   sectionGap: 54,
   panelRadius: 28,
@@ -547,9 +554,10 @@ const PREGAME_COLOR_PANEL_UI = {
   sectorPaddingTop: 18,
   sectorPaddingBottom: 18,
   sectorRowGap: 10,
+  sectionGapExtraIfSpace: 20,
   itemGapMultiplier: 2,
-  sectorButtonW: 74,
-  sectorButtonH: 74,
+  sectorButtonW: 82,
+  sectorButtonH: 82,
   sectorButtonGap: 10,
   colorPaddingTop: 12,
   colorPaddingBottom: 14,
@@ -557,9 +565,9 @@ const PREGAME_COLOR_PANEL_UI = {
   highlightColor: "#FFF93C",
   highlightStrokeWidth: 6,
   shellHighlightCornerRadius: 20,
-  colorHighlightCornerRadius: 26,
+  colorHighlightCornerRadius: 32,
   colorHighlightGlowSize: 14,
-  colorVisibleCount: 7,
+  colorVisibleCount: 6,
   colorTrackPaddingLeft: 48,
   colorTrackPaddingRight: 48,
   colorTrackPaddingTop: 28,
@@ -2933,6 +2941,10 @@ class Game {
     this.preGameColorButtons = [];
     this.preGameColorScrollOffset = 0;
     this.preGameColorScrollMaxOffset = 0;
+    this.preGameLayoutScale = 1;
+    this.preGameStartButtonAppearProgress = 0;
+    this.preGameStartButtonBounceTime = 0;
+    this.preGameStartButtonWasAvailable = false;
     this.preGameColorDragState = {
       active: false,
       pointerId: null,
@@ -4556,10 +4568,18 @@ class Game {
       this.pregameFigureAppearTime = 0;
       this.pregameFigureDisappearTime = 0;
       this.pregameStartTransitionActive = false;
+      this.preGameLayoutScale = 1;
+      this.preGameStartButtonAppearProgress = 0;
+      this.preGameStartButtonBounceTime = 0;
+      this.preGameStartButtonWasAvailable = false;
     }
     if (previousState === "pregame" && normalizedNextState !== "pregame") {
       this.pregameStartTransitionActive = false;
       this.pregameFigureDisappearTime = 0;
+      this.preGameLayoutScale = 1;
+      this.preGameStartButtonAppearProgress = 0;
+      this.preGameStartButtonBounceTime = 0;
+      this.preGameStartButtonWasAvailable = false;
     }
     if (previousState === "playing" && normalizedNextState !== "playing") {
       this.clearQueuedSpawnRequest();
@@ -4610,6 +4630,10 @@ class Game {
     this.pregameFigureAppearTime = 0;
     this.pregameFigureDisappearTime = 0;
     this.pregameStartTransitionActive = false;
+    this.preGameLayoutScale = 1;
+    this.preGameStartButtonAppearProgress = 0;
+    this.preGameStartButtonBounceTime = 0;
+    this.preGameStartButtonWasAvailable = false;
     this.losePopupAppear = 1;
     this.queueCompletionTrackPending = true;
     this.clearQueuedSpawnRequest();
@@ -8559,6 +8583,26 @@ class Game {
           this.pregameAutoSelectPending = false;
         }
       }
+      const canShowStartButton = this.isPregameStartAvailable() && !this.pregameStartTransitionActive;
+      if (!canShowStartButton) {
+        this.preGameStartButtonAppearProgress = 0;
+        this.preGameStartButtonBounceTime = 0;
+        this.preGameStartButtonWasAvailable = false;
+      } else {
+        if (!this.preGameStartButtonWasAvailable) {
+          this.preGameStartButtonAppearProgress = 0;
+          this.preGameStartButtonBounceTime = 0;
+          this.preGameStartButtonWasAvailable = true;
+        }
+        const appearDuration = Math.max(0.001, Number(PREGAME_START_BUTTON_UI.appearDuration) || 0.24);
+        this.preGameStartButtonAppearProgress = Math.min(
+          1,
+          this.preGameStartButtonAppearProgress + dt / appearDuration
+        );
+        if (this.preGameStartButtonAppearProgress >= 0.999) {
+          this.preGameStartButtonBounceTime += dt;
+        }
+      }
       this.cleanupPregameColorFillEffects();
       this.needsRender = true;
       this.updateIdleAssistState(dt);
@@ -8987,6 +9031,10 @@ class Game {
     this.preGameColorButtons = [];
     this.preGameColorScrollOffset = 0;
     this.preGameColorScrollMaxOffset = 0;
+    this.preGameLayoutScale = 1;
+    this.preGameStartButtonAppearProgress = 0;
+    this.preGameStartButtonBounceTime = 0;
+    this.preGameStartButtonWasAvailable = false;
     this.preGameColorDragState = {
       active: false,
       pointerId: null,
@@ -9045,84 +9093,203 @@ class Game {
     const innerX = panelX + ui.paddingX;
     const innerW = Math.max(120, panelW - ui.paddingX * 2);
     const itemGapMultiplier = Math.max(0.1, Number(ui.itemGapMultiplier) || 1);
-    const sectorButtonGap = Math.max(0, (Number(ui.sectorButtonGap) || 0) * itemGapMultiplier);
-    const sectorRowGap = Math.max(0, (Number(ui.sectorRowGap) || 0) * itemGapMultiplier);
-    const colorButtonGap = Math.max(0, (Number(ui.colorButtonGap) || 0) * itemGapMultiplier);
-    const sectorAvailableInnerW = Math.max(
-      120,
-      panelW - ui.sectorPaddingLeft - ui.sectorPaddingRight
-    );
+    const safeScale = Math.max(0.0001, this.viewportScale || 1);
+    const visibleWorldBottom = (this.screenHeight - this.viewportOffsetY) / safeScale;
+    const bottomAnchorOffset = Number.isFinite(PREGAME_START_BUTTON_UI.bottomAnchorOffset)
+      ? PREGAME_START_BUTTON_UI.bottomAnchorOffset
+      : 128;
+    const bottomOffsetInWorld = bottomAnchorOffset / safeScale;
+    const minGapToStart = Math.max(0, Number(ui.minGapToStart) || 0);
+    const absoluteMinLayoutScale = 0.55;
+    const minLayoutScale = clamp(Number(ui.minLayoutScale) || 0.8, absoluteMinLayoutScale, 1);
+    const layoutScaleStep = clamp(Number(ui.layoutScaleStep) || 0.02, 0.005, 0.1);
+    const baseStartW = Number.isFinite(PREGAME_START_BUTTON_UI.width)
+      ? PREGAME_START_BUTTON_UI.width
+      : PREGAME_START_BUTTON_UI.w;
+    const baseStartH = Number.isFinite(PREGAME_START_BUTTON_UI.height)
+      ? PREGAME_START_BUTTON_UI.height
+      : PREGAME_START_BUTTON_UI.h;
+    const visibleColorCount = Math.max(1, Math.round(Number(ui.colorVisibleCount) || 6));
+    const buildLayoutMetrics = (rawScale) => {
+      const layoutScale = clamp(rawScale, absoluteMinLayoutScale, 1);
+      const scaleInt = (value, min = 0) => Math.max(min, Math.round((Number(value) || 0) * layoutScale));
+      const scaleNum = (value, min = 0) => Math.max(min, (Number(value) || 0) * layoutScale);
 
-    const sectorRows = [];
-    const sectorColumns = Math.max(
-      1,
-      Math.floor((sectorAvailableInnerW + sectorButtonGap) / (ui.sectorButtonW + sectorButtonGap))
-    );
-    let sectorMaxRowW = 0;
-    for (let rowStart = 0; rowStart < sectors.length; rowStart += sectorColumns) {
-      const rowItems = sectors.slice(rowStart, rowStart + sectorColumns);
-      const rowW = (
-        rowItems.length * ui.sectorButtonW
-        + Math.max(0, rowItems.length - 1) * sectorButtonGap
+      const sectorPaddingLeft = scaleInt(ui.sectorPaddingLeft, 0);
+      const sectorPaddingRight = scaleInt(ui.sectorPaddingRight, 0);
+      const sectorPaddingTop = scaleInt(ui.sectorPaddingTop, 0);
+      const sectorPaddingBottom = scaleInt(ui.sectorPaddingBottom, 0);
+      const baseSectionGap = scaleInt(ui.sectionGap, 0);
+      const sectionGapExtraIfSpace = Math.max(0, Number(ui.sectionGapExtraIfSpace) || 0);
+      const sectorButtonW = scaleInt(ui.sectorButtonW, 22);
+      const sectorButtonH = scaleInt(ui.sectorButtonH, 22);
+      const sectorButtonGap = scaleNum((Number(ui.sectorButtonGap) || 0) * itemGapMultiplier, 0);
+      const sectorRowGap = scaleNum((Number(ui.sectorRowGap) || 0) * itemGapMultiplier, 0);
+      const colorPaddingTop = scaleInt(ui.colorPaddingTop, 0);
+      const colorPaddingBottom = scaleInt(ui.colorPaddingBottom, 0);
+      const colorButtonGap = scaleNum((Number(ui.colorButtonGap) || 0) * itemGapMultiplier, 0);
+      const colorTrackPaddingLeft = scaleInt(
+        Number.isFinite(ui.colorTrackPaddingLeft) ? ui.colorTrackPaddingLeft : (ui.colorTrackPaddingX || 0),
+        0
       );
-      sectorRows.push({ rowItems, rowW });
-      sectorMaxRowW = Math.max(sectorMaxRowW, rowW);
+      const colorTrackPaddingRight = scaleInt(
+        Number.isFinite(ui.colorTrackPaddingRight) ? ui.colorTrackPaddingRight : (ui.colorTrackPaddingX || 0),
+        0
+      );
+      const colorTrackPaddingTop = scaleInt(
+        Number.isFinite(ui.colorTrackPaddingTop) ? ui.colorTrackPaddingTop : (ui.colorTrackPaddingY || 0),
+        0
+      );
+      const colorTrackPaddingBottom = scaleInt(
+        Number.isFinite(ui.colorTrackPaddingBottom) ? ui.colorTrackPaddingBottom : (ui.colorTrackPaddingY || 0),
+        0
+      );
+      const sectorAvailableInnerW = Math.max(120, panelW - sectorPaddingLeft - sectorPaddingRight);
+      const sectorColumns = Math.max(
+        1,
+        Math.floor((sectorAvailableInnerW + sectorButtonGap) / (sectorButtonW + sectorButtonGap))
+      );
+      const sectorRows = [];
+      let sectorMaxRowW = 0;
+      for (let rowStart = 0; rowStart < sectors.length; rowStart += sectorColumns) {
+        const rowItems = sectors.slice(rowStart, rowStart + sectorColumns);
+        const rowW = (
+          rowItems.length * sectorButtonW
+          + Math.max(0, rowItems.length - 1) * sectorButtonGap
+        );
+        sectorRows.push({ rowItems, rowW });
+        sectorMaxRowW = Math.max(sectorMaxRowW, rowW);
+      }
+      const sectorPanelInnerW = Math.max(sectorButtonW, Math.min(sectorAvailableInnerW, sectorMaxRowW));
+      const sectorPanelW = Math.round(Math.min(
+        panelW,
+        sectorPanelInnerW + sectorPaddingLeft + sectorPaddingRight
+      ));
+      const sectorRowsHeight = sectorRows.length > 0
+        ? (
+          sectorRows.length * sectorButtonH
+          + Math.max(0, sectorRows.length - 1) * sectorRowGap
+        )
+        : sectorButtonH;
+      const sectorPanelH = Math.max(
+        sectorPaddingTop + sectorPaddingBottom + sectorButtonH,
+        Math.round(sectorPaddingTop + sectorRowsHeight + sectorPaddingBottom)
+      );
+      const rawColorButtonSize = Math.max(
+        1,
+        Math.floor((innerW - colorButtonGap * (visibleColorCount - 1)) / visibleColorCount)
+      );
+      const colorButtonSize = Math.max(1, Math.floor(rawColorButtonSize * layoutScale));
+      const colorPanelH = Math.round(colorPaddingTop + colorButtonSize + colorPaddingBottom);
+      const startW = Math.max(120, Math.round(baseStartW * layoutScale));
+      const startH = Math.max(56, Math.round(baseStartH * layoutScale));
+      const startY = visibleWorldBottom - startH - bottomOffsetInWorld;
+      const availableSpace = Math.max(0, startY - railsBottom);
+      const availableForPanels = Math.max(0, availableSpace - minGapToStart);
+      const basePanelClusterH = Math.round(sectorPanelH + baseSectionGap + colorPanelH);
+      const freeSpaceAfterBase = availableForPanels - basePanelClusterH;
+      const sectionGapExtra = freeSpaceAfterBase >= sectionGapExtraIfSpace ? sectionGapExtraIfSpace : 0;
+      const sectionGap = baseSectionGap + sectionGapExtra;
+      const panelClusterH = Math.round(basePanelClusterH + sectionGapExtra);
+      const fits = panelClusterH <= availableForPanels;
+      return {
+        layoutScale,
+        baseSectionGap,
+        sectionGapExtra,
+        sectionGap,
+        sectorPaddingLeft,
+        sectorPaddingRight,
+        sectorPaddingTop,
+        sectorPaddingBottom,
+        sectorButtonW,
+        sectorButtonH,
+        sectorButtonGap,
+        sectorRowGap,
+        sectorRows,
+        sectorPanelInnerW,
+        sectorPanelW,
+        sectorPanelH,
+        colorPaddingTop,
+        colorPaddingBottom,
+        colorButtonGap,
+        colorButtonSize,
+        colorPanelH,
+        panelClusterH,
+        colorTrackPaddingLeft,
+        colorTrackPaddingRight,
+        colorTrackPaddingTop,
+        colorTrackPaddingBottom,
+        startW,
+        startH,
+        startY,
+        availableSpace,
+        fits,
+      };
+    };
+
+    let metrics = buildLayoutMetrics(1);
+    if (!metrics.fits) {
+      for (let scale = 1 - layoutScaleStep; scale >= minLayoutScale - 0.0001; scale -= layoutScaleStep) {
+        const nextMetrics = buildLayoutMetrics(scale);
+        metrics = nextMetrics;
+        if (nextMetrics.fits) {
+          break;
+        }
+      }
+      if (!metrics.fits) {
+        for (let scale = minLayoutScale - layoutScaleStep; scale >= absoluteMinLayoutScale; scale -= layoutScaleStep) {
+          const nextMetrics = buildLayoutMetrics(scale);
+          metrics = nextMetrics;
+          if (nextMetrics.fits) {
+            break;
+          }
+        }
+      }
     }
-    const sectorPanelInnerW = Math.max(ui.sectorButtonW, Math.min(sectorAvailableInnerW, sectorMaxRowW));
-    const sectorPanelW = Math.round(Math.min(
-      panelW,
-      sectorPanelInnerW + ui.sectorPaddingLeft + ui.sectorPaddingRight
-    ));
-    const sectorPanelX = Math.round((this.width - sectorPanelW) * 0.5);
-    const sectorPanelY = Math.round(railsBottom + ui.offsetFromRails);
-    const sectorInnerX = Math.round(sectorPanelX + ui.sectorPaddingLeft);
+    this.preGameLayoutScale = metrics.layoutScale;
+
+    const centeredTop = railsBottom + Math.max(0, (metrics.availableSpace - metrics.panelClusterH) * 0.5);
+    const sectorPanelX = Math.round((this.width - metrics.sectorPanelW) * 0.5);
+    const sectorPanelY = Math.round(centeredTop);
+    const sectorInnerX = Math.round(sectorPanelX + metrics.sectorPaddingLeft);
     const sectorButtons = [];
-    let sectorCursorY = Math.round(sectorPanelY + ui.sectorPaddingTop);
-    for (const row of sectorRows) {
-      let rowX = Math.round(sectorInnerX + Math.max(0, (sectorPanelInnerW - row.rowW) * 0.5));
+    let sectorCursorY = Math.round(sectorPanelY + metrics.sectorPaddingTop);
+    for (const row of metrics.sectorRows) {
+      let rowX = Math.round(sectorInnerX + Math.max(0, (metrics.sectorPanelInnerW - row.rowW) * 0.5));
       for (const sectorKey of row.rowItems) {
         sectorButtons.push({
           sectorKey,
           rect: {
             x: rowX,
             y: Math.round(sectorCursorY),
-            w: ui.sectorButtonW,
-            h: ui.sectorButtonH,
+            w: metrics.sectorButtonW,
+            h: metrics.sectorButtonH,
           },
         });
-        rowX += ui.sectorButtonW + sectorButtonGap;
+        rowX += metrics.sectorButtonW + metrics.sectorButtonGap;
       }
-      sectorCursorY += ui.sectorButtonH + sectorRowGap;
+      sectorCursorY += metrics.sectorButtonH + metrics.sectorRowGap;
     }
-    if (sectorRows.length > 0) {
-      sectorCursorY -= sectorRowGap;
+    if (metrics.sectorRows.length > 0) {
+      sectorCursorY -= metrics.sectorRowGap;
     }
-    const sectorPanelH = Math.max(
-      ui.sectorPaddingTop + ui.sectorPaddingBottom + ui.sectorButtonH,
-      Math.round((sectorCursorY - sectorPanelY) + ui.sectorPaddingBottom)
-    );
     const sectorPanelRect = {
       x: sectorPanelX,
       y: sectorPanelY,
-      w: sectorPanelW,
-      h: sectorPanelH,
+      w: metrics.sectorPanelW,
+      h: metrics.sectorPanelH,
     };
 
-    const colorPanelY = Math.round(sectorPanelRect.y + sectorPanelRect.h + ui.sectionGap);
-    const visibleColorCount = Math.max(1, Math.round(Number(ui.colorVisibleCount) || 6));
-    const colorButtonSize = Math.max(
-      1,
-      Math.floor((innerW - colorButtonGap * (visibleColorCount - 1)) / visibleColorCount)
-    );
+    const colorPanelY = Math.round(sectorPanelRect.y + sectorPanelRect.h + metrics.sectionGap);
     const colorViewportRect = {
       x: Math.round(innerX),
-      y: Math.round(colorPanelY + ui.colorPaddingTop),
+      y: Math.round(colorPanelY + metrics.colorPaddingTop),
       w: Math.round(innerW),
-      h: colorButtonSize,
+      h: metrics.colorButtonSize,
     };
     const colorContentW = (
-      palette.length * colorButtonSize
-      + Math.max(0, palette.length - 1) * colorButtonGap
+      palette.length * metrics.colorButtonSize
+      + Math.max(0, palette.length - 1) * metrics.colorButtonGap
     );
     this.preGameColorScrollMaxOffset = Math.max(0, colorContentW - colorViewportRect.w);
     this.clampPregameColorScrollOffset(this.preGameColorScrollOffset);
@@ -9138,45 +9305,29 @@ class Game {
 
     const colorButtons = [];
     for (let i = 0; i < palette.length; i += 1) {
-      const x = colorViewportRect.x + i * (colorButtonSize + colorButtonGap) - scrollOffset;
+      const x = colorViewportRect.x + i * (metrics.colorButtonSize + metrics.colorButtonGap) - scrollOffset;
       colorButtons.push({
         colorKey: palette[i],
         rect: {
           x: Math.round(x),
           y: colorViewportRect.y,
-          w: colorButtonSize,
-          h: colorButtonSize,
+          w: metrics.colorButtonSize,
+          h: metrics.colorButtonSize,
         },
       });
     }
-    const colorTrackPaddingLeft = Math.max(
-      0,
-      Number.isFinite(ui.colorTrackPaddingLeft) ? ui.colorTrackPaddingLeft : (ui.colorTrackPaddingX || 0)
-    );
-    const colorTrackPaddingRight = Math.max(
-      0,
-      Number.isFinite(ui.colorTrackPaddingRight) ? ui.colorTrackPaddingRight : (ui.colorTrackPaddingX || 0)
-    );
-    const colorTrackPaddingTop = Math.max(
-      0,
-      Number.isFinite(ui.colorTrackPaddingTop) ? ui.colorTrackPaddingTop : (ui.colorTrackPaddingY || 0)
-    );
-    const colorTrackPaddingBottom = Math.max(
-      0,
-      Number.isFinite(ui.colorTrackPaddingBottom) ? ui.colorTrackPaddingBottom : (ui.colorTrackPaddingY || 0)
-    );
     const colorContentRect = {
-      x: Math.round(colorViewportRect.x - scrollOffset - colorTrackPaddingLeft),
-      y: Math.round(colorViewportRect.y - colorTrackPaddingTop),
-      w: Math.round(colorContentW + colorTrackPaddingLeft + colorTrackPaddingRight),
-      h: Math.round(colorButtonSize + colorTrackPaddingTop + colorTrackPaddingBottom),
+      x: Math.round(colorViewportRect.x - scrollOffset - metrics.colorTrackPaddingLeft),
+      y: Math.round(colorViewportRect.y - metrics.colorTrackPaddingTop),
+      w: Math.round(colorContentW + metrics.colorTrackPaddingLeft + metrics.colorTrackPaddingRight),
+      h: Math.round(metrics.colorButtonSize + metrics.colorTrackPaddingTop + metrics.colorTrackPaddingBottom),
     };
 
     const colorPanelRect = {
       x: panelX,
       y: colorPanelY,
       w: Math.round(panelW),
-      h: Math.round(ui.colorPaddingTop + colorButtonSize + ui.colorPaddingBottom),
+      h: Math.round(metrics.colorPaddingTop + metrics.colorButtonSize + metrics.colorPaddingBottom),
     };
     const panelRect = {
       x: panelX,
@@ -9954,20 +10105,24 @@ class Game {
   }
 
   getPregameStartButtonRect() {
-    const railsBottom = LAYOUT.track.y + LAYOUT.track.h;
-    const w = Number.isFinite(PREGAME_START_BUTTON_UI.width)
+    const baseW = Number.isFinite(PREGAME_START_BUTTON_UI.width)
       ? PREGAME_START_BUTTON_UI.width
       : PREGAME_START_BUTTON_UI.w;
-    const panelRect = this.getPregameColorPanelRect();
-    const baseTopY = panelRect.h > 0
-      ? panelRect.y + panelRect.h + PREGAME_START_BUTTON_UI.offsetFromColorPanel
-      : railsBottom + PREGAME_START_BUTTON_UI.offsetFromRails;
-    const h = Number.isFinite(PREGAME_START_BUTTON_UI.height)
+    const baseH = Number.isFinite(PREGAME_START_BUTTON_UI.height)
       ? PREGAME_START_BUTTON_UI.height
       : PREGAME_START_BUTTON_UI.h;
+    const layoutScale = clamp(Number(this.preGameLayoutScale) || 1, 0.55, 1);
+    const w = Math.max(120, Math.round(baseW * layoutScale));
+    const h = Math.max(56, Math.round(baseH * layoutScale));
+    const bottomAnchorOffset = Number.isFinite(PREGAME_START_BUTTON_UI.bottomAnchorOffset)
+      ? PREGAME_START_BUTTON_UI.bottomAnchorOffset
+      : 128;
+    const safeScale = Math.max(0.0001, this.viewportScale || 1);
+    const visibleWorldBottom = (this.screenHeight - this.viewportOffsetY) / safeScale;
+    const bottomOffsetInWorld = bottomAnchorOffset / safeScale;
     const rect = {
       x: Math.round((this.width - w) * 0.5),
-      y: Math.round(baseTopY),
+      y: Math.round(visibleWorldBottom - h - bottomOffsetInWorld),
       w,
       h,
     };
@@ -9975,19 +10130,65 @@ class Game {
     return rect;
   }
 
+  getPregameStartButtonScale() {
+    const t = clamp(Number(this.preGameStartButtonAppearProgress) || 0, 0, 1);
+    const appearScale = easeOutCubic(t);
+    if (t < 0.999) {
+      return appearScale;
+    }
+    const bounceDelay = Math.max(0, Number(PREGAME_START_BUTTON_UI.bounceStartDelay) || 0.0);
+    const bounceElapsed = Number(this.preGameStartButtonBounceTime) || 0;
+    if (bounceElapsed < bounceDelay) {
+      return appearScale;
+    }
+    const loopDuration = Math.max(0.001, Number(PREGAME_START_BUTTON_UI.bounceLoopDuration) || 0.5);
+    const amp = clamp(Number(PREGAME_START_BUTTON_UI.bounceScaleAmplitude) || 0.06, 0, 0.3);
+    const phase = (((bounceElapsed - bounceDelay) % loopDuration) / loopDuration) * Math.PI * 2;
+    const loopScale = 1 + Math.sin(phase + 0.5) * amp;
+    return appearScale * loopScale;
+  }
+
   getPregameStartButtonHitRect() {
     const rect = this.preGameStartButtonRect || this.getPregameStartButtonRect();
-    const padding = 16;
+    const scale = this.getPregameStartButtonScale();
+    if (scale <= 0.01) {
+      return { x: 0, y: 0, w: 0, h: 0 };
+    }
+    const scaledW = rect.w * scale;
+    const scaledH = rect.h * scale;
+    const scaledRect = {
+      x: rect.x + (rect.w - scaledW) * 0.5,
+      y: rect.y + (rect.h - scaledH) * 0.5,
+      w: scaledW,
+      h: scaledH,
+    };
+    const padding = Number.isFinite(PREGAME_START_BUTTON_UI.hitPadding)
+      ? Math.max(0, PREGAME_START_BUTTON_UI.hitPadding)
+      : 0;
     return {
-      x: rect.x - padding,
-      y: rect.y - padding,
-      w: rect.w + padding * 2,
-      h: rect.h + padding * 2,
+      x: scaledRect.x - padding,
+      y: scaledRect.y - padding,
+      w: scaledRect.w + padding * 2,
+      h: scaledRect.h + padding * 2,
     };
   }
 
   drawPregameStartButton(ctx) {
     const rect = this.getPregameStartButtonRect();
+    const scale = this.getPregameStartButtonScale();
+    if (scale <= 0.001) {
+      return;
+    }
+    const layoutScale = clamp(Number(this.preGameLayoutScale) || 1, 0.55, 1);
+    const buttonRadius = Math.max(6, Math.round((Number(PREGAME_START_BUTTON_UI.radius) || 56) * layoutScale));
+    const cx = rect.x + rect.w * 0.5;
+    const cy = rect.y + rect.h * 0.5;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.translate(-cx, -cy);
+
     const fillGradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
     fillGradient.addColorStop(0, PREGAME_START_BUTTON_UI.fillTop || "#95DE2D");
     fillGradient.addColorStop(1, PREGAME_START_BUTTON_UI.fillBottom || "#46C017");
@@ -9996,13 +10197,13 @@ class Game {
     ctx.shadowColor = "rgba(0, 0, 0, 0.26)";
     ctx.shadowBlur = 16;
     ctx.shadowOffsetY = 5;
-    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, PREGAME_START_BUTTON_UI.radius);
+    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, buttonRadius);
     ctx.fillStyle = fillGradient;
     ctx.fill();
     ctx.restore();
 
     const borderWidth = Number.isFinite(PREGAME_START_BUTTON_UI.borderWidth)
-      ? Math.max(1, PREGAME_START_BUTTON_UI.borderWidth)
+      ? Math.max(1, PREGAME_START_BUTTON_UI.borderWidth * layoutScale)
       : 4;
     const borderInset = borderWidth * 0.5;
     const borderGradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
@@ -10017,13 +10218,13 @@ class Game {
       rect.y + borderInset,
       Math.max(1, rect.w - borderInset * 2),
       Math.max(1, rect.h - borderInset * 2),
-      Math.max(4, PREGAME_START_BUTTON_UI.radius - borderInset)
+      Math.max(4, buttonRadius - borderInset)
     );
     ctx.stroke();
     ctx.restore();
 
     const fontSize = Number.isFinite(PREGAME_START_BUTTON_UI.fontSize)
-      ? Math.max(12, PREGAME_START_BUTTON_UI.fontSize)
+      ? Math.max(12, PREGAME_START_BUTTON_UI.fontSize * layoutScale)
       : 52;
     ctx.save();
     ctx.font = `800 ${fontSize}px ${OPEN_SANS_FONT_FAMILY}`;
@@ -10032,7 +10233,7 @@ class Game {
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "rgba(19, 88, 20, 0.45)";
     ctx.lineWidth = Number.isFinite(PREGAME_START_BUTTON_UI.textStrokeWidth)
-      ? Math.max(1, PREGAME_START_BUTTON_UI.textStrokeWidth)
+      ? Math.max(1, PREGAME_START_BUTTON_UI.textStrokeWidth * layoutScale)
       : 8;
     ctx.shadowColor = PREGAME_START_BUTTON_UI.textShadowColor || "rgba(0, 0, 0, 0.42)";
     ctx.shadowBlur = Number.isFinite(PREGAME_START_BUTTON_UI.textShadowBlur)
@@ -10042,9 +10243,11 @@ class Game {
       ? PREGAME_START_BUTTON_UI.textShadowOffsetY
       : 5;
     const textX = rect.x + rect.w * 0.5;
-    const textY = rect.y + rect.h * 0.56;
+    const textY = rect.y + rect.h * 0.56 - 4;
     ctx.strokeText(PREGAME_START_BUTTON_UI.label, textX, textY);
     ctx.fillText(PREGAME_START_BUTTON_UI.label, textX, textY);
+    ctx.restore();
+
     ctx.restore();
   }
 
@@ -11761,6 +11964,16 @@ class Game {
       if (this.pregameFigureAppearTime < PREGAME_FIGURE_APPEAR_DURATION - 0.001) {
         return true;
       }
+      if (this.isPregameStartAvailable() && this.preGameStartButtonAppearProgress < 0.999) {
+        return true;
+      }
+      if (
+        this.isPregameStartAvailable()
+        && !this.pregameStartTransitionActive
+        && clamp(Number(PREGAME_START_BUTTON_UI.bounceScaleAmplitude) || 0, 0, 0.3) > 0.0001
+      ) {
+        return true;
+      }
       if (this.pregameSelectedSectorKey) {
         return true;
       }
@@ -11856,10 +12069,10 @@ class Game {
     }
     if (this.gameState === "pregame") {
       const overBack = this.shouldShowBackButton() && isInsideRect(x, y, this.backButtonRect);
+      const overPanelControl = !this.pregameStartTransitionActive && this.isPointOnPregamePanelControls(x, y);
       const overStart = !this.pregameStartTransitionActive
         && this.isPregameStartAvailable()
         && isInsideRect(x, y, this.getPregameStartButtonHitRect());
-      const overPanelControl = !this.pregameStartTransitionActive && this.isPointOnPregamePanelControls(x, y);
       this.canvas.style.cursor = overBack || overStart || overPanelControl ? "pointer" : "default";
       return;
     }
