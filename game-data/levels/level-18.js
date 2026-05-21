@@ -1,6 +1,6 @@
 window.PIXELFLOW_LEVEL_18 = {
   "id": "18",
-  "name": "Level 18",
+  "name": "funny_monkey_meme",
   "fallbackFieldPattern": [
     "..........KKKKKKKKK.........",
     "........KKNNNNNNNNNK........",

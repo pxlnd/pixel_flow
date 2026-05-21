@@ -1,6 +1,6 @@
 window.PIXELFLOW_LEVEL_17 = {
   "id": "17",
-  "name": "Level 17",
+  "name": "spongebob",
   "fallbackFieldPattern": [
     "KKKKKKKKKKKKKKKKKKKKKKKKKKK",
     "KYYYYYYYYYYYYYYYYYYYYYYYYYK",
