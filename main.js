@@ -921,6 +921,9 @@ const BLOCK_CHAR_TO_COLOR = {
   T: "orchid",
   I: "light_beige",
   J: "dark_green",
+  Q: "yellow_biege",
+  U: "light_gray",
+  X: "brown_orange",
   ".": null,
   " ": null,
   "_": null,
@@ -948,6 +951,9 @@ const BLOCK_COLOR_TO_PATTERN_CHAR = {
   orchid: "T",
   light_beige: "I",
   dark_green: "J",
+  yellow_biege: "Q",
+  light_gray: "U",
+  brown_orange: "X",
 };
 
 const BLOCK_COLOR_TO_RGB = {
@@ -975,6 +981,9 @@ const BLOCK_COLOR_TO_RGB = {
   light_beige: { r: 234, g: 207, b: 169 },
   dark_green: { r: 70, g: 123, b: 66 },
   gray_alt: { r: 156, g: 156, b: 156 },
+  yellow_biege: { r: 240, g: 210, b: 146 },
+  light_gray: { r: 198, g: 198, b: 198 },
+  brown_orange: { r: 198, g: 124, b: 66 },
 };
 
 const DEBUG_IMAGE_GENERATOR_BASE_COLOR_TO_RGB = Object.freeze(
@@ -1010,6 +1019,9 @@ const BLOCK_COLOR_LABELS = {
   light_beige: "светло-бежевый",
   dark_green: "тёмно-зелёный",
   gray_alt: "серый",
+  yellow_biege: "жёлто-бежевый",
+  light_gray: "светло-серый",
+  brown_orange: "коричнево-оранжевый",
 };
 
 const CHICKEN_SPRITE_SOURCE_BY_COLOR = {
@@ -1032,6 +1044,9 @@ const CHICKEN_SPRITE_SOURCE_BY_COLOR = {
   light_beige: "ui/birds/light_beige_chicken.png",
   dark_green: "ui/birds/dark_green_chicken.png",
   gray: "ui/birds/grey.png",
+  yellow_biege: "ui/birds/chicken_yellow_beige.png",
+  light_gray: "ui/birds/chicken_light_gray.png",
+  brown_orange: "ui/birds/chicken_brown_orange.png",
   dark_dark_blue: "ui/birds/dark_dark_blue.png",
   very_dark_blue: "ui/birds/very_dark_blue.png",
   blue_alt: "ui/birds/blue_alt.png",
@@ -1065,6 +1080,9 @@ const BLOCK_TILE_SOURCE_BY_COLOR = {
   beige: "ui/blocks/beige.png",
   light_beige: "ui/blocks/light_beige.png",
   dark_green: "ui/blocks/dark_green.png",
+  yellow_biege: "ui/blocks/yellow_biege.png",
+  light_gray: "ui/blocks/light_gray.png",
+  brown_orange: "ui/blocks/brown_orange.png",
 };
 
 const BLOCK_TILE_COLOR_ALIASES = {
@@ -1078,8 +1096,10 @@ const BLOCK_TILE_COLOR_ALIASES = {
   crimson: "red_alt",
   малиновый: "red_alt",
   grey: "gray",
+  light_grey: "light_gray",
   lilac: "orchid",
   light_biege: "light_beige",
+  yellow_beige: "yellow_biege",
   biege: "beige",
 };
 
@@ -3445,9 +3465,10 @@ class Game {
         continue;
       }
       const baseName = fileName.slice(0, -4).trim().toLowerCase();
-      const colorKey = baseName
-        .replace(/[\s-]+/g, "_")
-        .replace(/_alt(?:_\d+)?$/, "");
+      const normalizedBaseName = this.normalizeDiscoveredChickenColorKey(baseName);
+      const colorKey = normalizedBaseName
+        ? normalizedBaseName.replace(/_alt(?:_\d+)?$/, "")
+        : null;
       if (!colorKey || !/^[a-z0-9_]+$/.test(colorKey)) {
         continue;
       }
@@ -5597,16 +5618,18 @@ class Game {
     requireFolderWrite = true,
     confirmOverwrite = false,
   } = {}) {
+    let shouldWriteToFolder = !!requireFolderWrite;
+    let usedDownloadFallback = false;
     let writtenToFolder = false;
-    if (requireFolderWrite) {
+    if (shouldWriteToFolder) {
       if (!this.debugLevelsDirHandle) {
         const picked = await this.pickDebugLevelsFolder();
         if (!picked) {
-          this.setDebugImageStatus("Сохранение отменено: папка уровней не выбрана.", "error");
-          return false;
+          shouldWriteToFolder = false;
+          usedDownloadFallback = true;
         }
       }
-      if (confirmOverwrite) {
+      if (shouldWriteToFolder && confirmOverwrite) {
         let fileExists = false;
         try {
           fileExists = await this.doesLevelFileExistInPickedFolder(payload.levelNumber);
@@ -5626,10 +5649,12 @@ class Game {
           }
         }
       }
-      writtenToFolder = await this.writeLevelPayloadToPickedFolder(payload);
-      if (!writtenToFolder) {
-        this.setDebugImageStatus("Не удалось записать файл в папку. Нажми 'папка уровней' и выбери её заново.", "error");
-        return false;
+      if (shouldWriteToFolder) {
+        writtenToFolder = await this.writeLevelPayloadToPickedFolder(payload);
+        if (!writtenToFolder) {
+          shouldWriteToFolder = false;
+          usedDownloadFallback = true;
+        }
       }
     }
 
@@ -5642,14 +5667,14 @@ class Game {
     this.syncDebugSaveTargetInputs(payload.level.id, { force: true });
 
     let copied = false;
-    if (!requireFolderWrite) {
+    if (!shouldWriteToFolder) {
       const result = await this.downloadLevelPayload(payload);
       copied = result.copied;
     }
 
     if (triggerButton) {
       const original = triggerButton.textContent;
-      triggerButton.textContent = requireFolderWrite
+      triggerButton.textContent = shouldWriteToFolder
         ? "сохранено в папку"
         : (copied ? "скачано+скопировано" : "скачано");
       setTimeout(() => {
@@ -5660,9 +5685,11 @@ class Game {
     }
 
     this.setDebugImageStatus(
-      requireFolderWrite
+      shouldWriteToFolder
         ? `Уровень ${payload.levelNumber} сохранён в папку '${this.debugLevelsDirName || "levels"}', обновлён в списке${persistedLocally ? " и закреплён после перезагрузки." : "."}`
-        : `Уровень ${payload.levelNumber} обновлён в списке${persistedLocally ? " и закреплён после перезагрузки." : "."} JSON скачан как ${payload.levelNumber}.json.`,
+        : usedDownloadFallback
+          ? `Папка уровней недоступна или не выбрана. Уровень ${payload.levelNumber} обновлён в списке${persistedLocally ? " и закреплён после перезагрузки." : "."} JSON скачан как ${payload.levelNumber}.json.`
+          : `Уровень ${payload.levelNumber} обновлён в списке${persistedLocally ? " и закреплён после перезагрузки." : "."} JSON скачан как ${payload.levelNumber}.json.`,
       "success"
     );
     return true;
