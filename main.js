@@ -8231,6 +8231,7 @@ class Game {
       return;
     }
     this.setGameState("victory");
+    dispatchUnityColoringCompletedEvent(this);
     this.playSound("win");
     this.cameraZoomTarget = VICTORY_ZOOM_TARGET;
     this.victoryConfettiTime = VICTORY_CONFETTI_DURATION;
@@ -8250,6 +8251,30 @@ class Game {
     this.spawnConfettiBurst(64);
     this.victoryCompleteEventPending = true;
     this.loseContinueSnapshot = [];
+  }
+
+  buildLevelColorData() {
+    const cells = [];
+    const sourceBlocks = Array.isArray(this.blocks) ? this.blocks : [];
+    for (const block of sourceBlocks) {
+      const colorId = normalizeBlockColorName(block?.color);
+      const x = Math.trunc(Number(block?.col));
+      const y = Math.trunc(Number(block?.row));
+      if (!colorId || !Number.isFinite(x) || !Number.isFinite(y)) {
+        continue;
+      }
+      cells.push({
+        Cell: { X: x, Y: y },
+        ColorID: colorId,
+      });
+    }
+
+    return {
+      LevelID: String(CURRENT_LEVEL?.name || this.currentLevelId || CURRENT_LEVEL?.id || ""),
+      Width: Math.max(0, Math.trunc(Number(LAYOUT?.fieldCols) || 0)),
+      Height: Math.max(0, Math.trunc(Number(LAYOUT?.fieldRows) || 0)),
+      Cells: cells,
+    };
   }
 
   buildLoseContinueSnapshotFromCurrentState() {
@@ -14013,6 +14038,14 @@ function dispatchUnityLevelTrackEvent(eventAction) {
   }
   const encodedAction = encodeURIComponent(normalizedAction);
   return enqueueUnityTrackEventUrl(`uniwebview://track?event=level&event_action=${encodedAction}&action=${encodedAction}`);
+}
+
+function dispatchUnityColoringCompletedEvent(gameInstance) {
+  const levelColorData = typeof gameInstance?.buildLevelColorData === "function"
+    ? gameInstance.buildLevelColorData()
+    : { LevelID: "", Width: 0, Height: 0, Cells: [] };
+  const encodedData = encodeURIComponent(JSON.stringify(levelColorData));
+  return dispatchUnityNavigationUrl(`uniwebview://coloring_completed?data=${encodedData}`);
 }
 
 function dispatchUnityTutorialBirdTrackEvent(stepNumber) {
