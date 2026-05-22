@@ -3,7 +3,7 @@
   "levelNumber": 2,
   "level": {
     "id": "2",
-    "name": "Level 2",
+    "name": "cactus",
     "fallbackFieldPattern": [
       ".....KK.....",
       ".K..KGGK....",

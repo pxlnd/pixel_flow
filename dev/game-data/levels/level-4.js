@@ -1,6 +1,6 @@
 window.PIXELFLOW_LEVEL_4 = {
   "id": "4",
-  "name": "Level 4",
+  "name": "dolphin",
   "fallbackFieldPattern": [
     ".......KK.....",
     "......KCK.....",

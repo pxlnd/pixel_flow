@@ -147,6 +147,12 @@ function normalizeLevelDefinition(levelConfig, options = {}) {
   const normalized = cloneData(levelConfig);
   normalized.id = String(normalized.id || "");
   normalized.name = canonicalizeLevelName(normalized);
+  const levelNumber = getPositiveIntegerFromLevelText(normalized.levelNumber)
+    ?? getPositiveIntegerFromLevelText(normalized.id)
+    ?? getPositiveIntegerFromLevelText(normalized.name);
+  if (levelNumber !== null) {
+    normalized.levelNumber = levelNumber;
+  }
   if (debugOnly === null) {
     normalized.debugOnly = normalized.debugOnly === true;
   } else {
@@ -183,7 +189,7 @@ function rebuildLevelRegistry(levelDefinitions) {
     : [];
   LEVEL_DEFINITIONS = mergeDebugOnlyLevelDefinitions(normalizedLevels);
   DEFAULT_LEVEL_ID = String(LEVEL_DEFINITIONS[0]?.id || BUILTIN_FALLBACK_LEVEL.id);
-  LEVEL_MAP = new Map(LEVEL_DEFINITIONS.map((level) => [String(level.id), level]));
+  LEVEL_MAP = buildLevelMap(LEVEL_DEFINITIONS);
 }
 
 function upsertLevelDefinition(levelConfig) {
@@ -196,13 +202,36 @@ function upsertLevelDefinition(levelConfig) {
   if (existingLevel?.debugOnly === true && normalized.debugOnly !== true) {
     normalized.debugOnly = true;
   }
-  const existingIndex = LEVEL_DEFINITIONS.findIndex((level) => String(level?.id || "") === levelId);
+  const existingIndex = LEVEL_DEFINITIONS.findIndex((level) => {
+    const existingId = String(level?.id || "");
+    const existingName = String(level?.name || "");
+    return existingId === levelId || existingName === levelId || existingId === normalized.name;
+  });
   if (existingIndex >= 0) {
     LEVEL_DEFINITIONS[existingIndex] = normalized;
   } else {
     LEVEL_DEFINITIONS.push(normalized);
   }
-  LEVEL_MAP.set(levelId, normalized);
+  LEVEL_MAP = buildLevelMap(LEVEL_DEFINITIONS);
+}
+
+function registerLevelInMap(map, level) {
+  const primaryId = String(level?.id || "").trim();
+  const nameId = String(level?.name || "").trim();
+  if (primaryId) {
+    map.set(primaryId, level);
+  }
+  if (nameId && !map.has(nameId)) {
+    map.set(nameId, level);
+  }
+}
+
+function buildLevelMap(levelDefinitions) {
+  const map = new Map();
+  for (const level of levelDefinitions) {
+    registerLevelInMap(map, level);
+  }
+  return map;
 }
 
 function getLevelOverridesStoragePayload() {
@@ -733,7 +762,7 @@ async function loadLevelJSONByNumber(levelNumber) {
       return null;
     }
     const normalizedLevel = cloneData(level);
-    normalizedLevel.id = String(levelNumber);
+    normalizedLevel.levelNumber = levelNumber;
     normalizedLevel.name = isPositiveIntegerString(normalizedLevel.name)
       ? `Level ${levelNumber}`
       : String(normalizedLevel.name || `Level ${levelNumber}`);
@@ -743,6 +772,7 @@ async function loadLevelJSONByNumber(levelNumber) {
     ) {
       normalizedLevel.name = `Level ${levelNumber}`;
     }
+    normalizedLevel.id = String(normalizedLevel.id || normalizedLevel.name);
     if (normalizedLevel.pixelArt && typeof normalizedLevel.pixelArt === "object" && !normalizedLevel.pixelArt.id) {
       normalizedLevel.pixelArt.id = `level-${levelNumber}-art`;
     }
@@ -1283,6 +1313,15 @@ function clampDebugImageOffsetY(value) {
 
 function isPositiveIntegerString(value) {
   return /^[1-9]\d*$/.test(String(value || "").trim());
+}
+
+function getPositiveIntegerFromLevelText(value) {
+  const normalized = String(value || "").trim();
+  if (isPositiveIntegerString(normalized)) {
+    return Number(normalized);
+  }
+  const match = normalized.match(/^level\s+([1-9]\d*)$/i);
+  return match ? Number(match[1]) : null;
 }
 
 function isGenericLevelName(value) {
@@ -5026,7 +5065,8 @@ class Game {
 
   getValidLevelId(levelId) {
     const normalized = String(levelId || "");
-    return this.availableLevels.some((level) => level.id === normalized) ? normalized : DEFAULT_LEVEL_ID;
+    const match = this.availableLevels.find((level) => level.id === normalized || level.name === normalized);
+    return match ? match.id : DEFAULT_LEVEL_ID;
   }
 
   getValidThemeId(themeId) {
@@ -5371,20 +5411,33 @@ class Game {
   }
 
   getSuggestedExportLevelNumber() {
-    if (isPositiveIntegerString(this.currentLevelId)) {
-      return Number(this.currentLevelId);
+    const currentLevelNumber = this.getDebugLevelNumber(this.currentLevelId);
+    if (currentLevelNumber !== null) {
+      return currentLevelNumber;
     }
     const used = new Set(
       this.availableLevels
-        .map((level) => String(level.id || ""))
-        .filter((id) => isPositiveIntegerString(id))
-        .map((id) => Number(id))
+        .map((level) => this.getDebugLevelNumber(level.id))
+        .filter((levelNumber) => levelNumber !== null)
     );
     let candidate = 1;
     while (used.has(candidate)) {
       candidate += 1;
     }
     return candidate;
+  }
+
+  getDebugLevelNumber(levelId) {
+    const normalized = String(levelId || "").trim();
+    const level = this.availableLevels.find((candidate) => (
+      candidate.id === normalized
+      || candidate.name === normalized
+    ));
+    return getPositiveIntegerFromLevelText(level?.levelNumber)
+      ?? getPositiveIntegerFromLevelText(level?.id)
+      ?? getPositiveIntegerFromLevelText(level?.name)
+      ?? getPositiveIntegerFromLevelText(CURRENT_LEVEL?.levelNumber)
+      ?? getPositiveIntegerFromLevelText(normalized);
   }
 
   normalizeDebugLevelNumber(value, fallback = this.getSuggestedExportLevelNumber()) {
@@ -5419,9 +5472,7 @@ class Game {
     }
     const isDebugGeneratedLevel = String(preferredLevelId || "") === DEBUG_IMAGE_LEVEL_ID;
     const effectiveId = isDebugGeneratedLevel ? this.debugGeneratedBaseLevelId : preferredLevelId;
-    const numericId = isDebugGeneratedLevel
-      ? this.getSuggestedExportLevelNumber()
-      : (isPositiveIntegerString(effectiveId) ? Number(effectiveId) : this.getSuggestedExportLevelNumber());
+    const numericId = this.getDebugLevelNumber(effectiveId) ?? this.getSuggestedExportLevelNumber();
     if (this.debugSaveLevelNumberInput) {
       this.debugSaveLevelNumberInput.value = String(numericId);
     }
@@ -5436,8 +5487,9 @@ class Game {
 
   buildCurrentLevelExport(levelNumber, levelName) {
     const level = cloneData(CURRENT_LEVEL);
-    level.id = String(levelNumber);
     level.name = String(levelName || `Level ${levelNumber}`);
+    level.id = level.name;
+    level.levelNumber = levelNumber;
     level.queueCardCount = clamp(
       Math.round(Number(this.cardManager?.queueCardCount ?? BOTTOM_QUEUE_CARD_COUNT)),
       MIN_QUEUE_CARDS,
@@ -5584,10 +5636,10 @@ class Game {
     const persistedLocally = persistLevelOverride(payload.level);
     upsertLevelDefinition(payload.level);
     this.fillDebugContentSelectors();
-    this.applyLevelConfig(String(payload.levelNumber), { restart: true });
+    this.applyLevelConfig(payload.level.id, { restart: true });
     this.syncDebugContentSelectors();
     this.debugSaveTargetDirty = false;
-    this.syncDebugSaveTargetInputs(String(payload.levelNumber), { force: true });
+    this.syncDebugSaveTargetInputs(payload.level.id, { force: true });
 
     let copied = false;
     if (!requireFolderWrite) {
@@ -8253,6 +8305,7 @@ class Game {
       return;
     }
     this.setGameState("victory");
+    dispatchUnityColoringCompletedEvent(this);
     this.playSound("win");
     this.cameraZoomTarget = VICTORY_ZOOM_TARGET;
     this.victoryConfettiTime = VICTORY_CONFETTI_DURATION;
@@ -8272,6 +8325,30 @@ class Game {
     this.spawnConfettiBurst(64);
     this.victoryCompleteEventPending = true;
     this.loseContinueSnapshot = [];
+  }
+
+  buildLevelColorData() {
+    const cells = [];
+    const sourceBlocks = Array.isArray(this.blocks) ? this.blocks : [];
+    for (const block of sourceBlocks) {
+      const colorId = normalizeBlockColorName(block?.color);
+      const x = Math.trunc(Number(block?.col));
+      const y = Math.trunc(Number(block?.row));
+      if (!colorId || !Number.isFinite(x) || !Number.isFinite(y)) {
+        continue;
+      }
+      cells.push({
+        Cell: { X: x, Y: y },
+        ColorID: colorId,
+      });
+    }
+
+    return {
+      LevelID: String(CURRENT_LEVEL?.name || this.currentLevelId || CURRENT_LEVEL?.id || ""),
+      Width: Math.max(0, Math.trunc(Number(LAYOUT?.fieldCols) || 0)),
+      Height: Math.max(0, Math.trunc(Number(LAYOUT?.fieldRows) || 0)),
+      Cells: cells,
+    };
   }
 
   buildLoseContinueSnapshotFromCurrentState() {
@@ -12258,6 +12335,7 @@ class Game {
     this.availableLevels = LEVEL_DEFINITIONS.map((level) => ({
       id: String(level.id),
       name: String(level.name || `Level ${level.id}`),
+      levelNumber: level.levelNumber ?? null,
       debugOnly: level.debugOnly === true,
     }));
     this.primaryLevels = this.availableLevels.filter((level) => !level.debugOnly);
@@ -12267,15 +12345,16 @@ class Game {
   getValidPrimaryLevelId(levelId) {
     const levels = Array.isArray(this.primaryLevels) ? this.primaryLevels : [];
     const normalized = String(levelId || "");
-    if (levels.some((level) => level.id === normalized)) {
-      return normalized;
+    const match = levels.find((level) => level.id === normalized || level.name === normalized);
+    if (match) {
+      return match.id;
     }
     return String(levels[0]?.id || DEFAULT_LEVEL_ID);
   }
 
   isDebugOnlyLevelId(levelId) {
     const normalized = String(levelId || "");
-    return Array.isArray(this.debugOnlyLevels) && this.debugOnlyLevels.some((level) => level.id === normalized);
+    return Array.isArray(this.debugOnlyLevels) && this.debugOnlyLevels.some((level) => level.id === normalized || level.name === normalized);
   }
 
   fillDebugOnlyLevelSelect(selectedId = "") {
@@ -12293,8 +12372,9 @@ class Game {
       option.textContent = optionData.name;
       this.debugOnlyLevelSelect.appendChild(option);
     }
-    const resolvedSelectedId = this.isDebugOnlyLevelId(selectedId) ? String(selectedId) : "";
-    this.debugOnlyLevelSelect.value = resolvedSelectedId;
+    const normalizedSelectedId = String(selectedId || "");
+    const selectedLevel = this.debugOnlyLevels.find((level) => level.id === normalizedSelectedId || level.name === normalizedSelectedId);
+    this.debugOnlyLevelSelect.value = selectedLevel ? selectedLevel.id : "";
   }
 
   fillDebugContentSelectors() {
@@ -12341,11 +12421,13 @@ class Game {
     }
 
     const updatedLevel = cloneData(CURRENT_LEVEL);
-    updatedLevel.id = levelId;
     updatedLevel.name = nextName;
+    updatedLevel.id = nextName;
+    updatedLevel.levelNumber = levelNumber;
 
     syncLevelGlobals(updatedLevel);
     upsertLevelDefinition(updatedLevel);
+    this.currentLevelId = updatedLevel.id;
     const persistedLocally = persistLevelOverride(updatedLevel);
 
     this.fillDebugContentSelectors();
@@ -12385,7 +12467,7 @@ class Game {
       return;
     }
     const currentId = this.getValidLevelId(this.currentLevelId);
-    const currentIndex = levels.findIndex((level) => String(level.id) === currentId);
+    const currentIndex = levels.findIndex((level) => String(level.id) === currentId || String(level.name) === currentId);
     const resolvedIndex = currentIndex >= 0 ? currentIndex : 0;
     const active = levels[resolvedIndex];
     const displayName = String(active?.name || `Level ${active?.id || ""}`).trim();
@@ -12405,7 +12487,7 @@ class Game {
       return;
     }
     const currentId = this.getValidLevelId(this.currentLevelId);
-    const currentIndex = levels.findIndex((level) => String(level.id) === currentId);
+    const currentIndex = levels.findIndex((level) => String(level.id) === currentId || String(level.name) === currentId);
     const from = currentIndex >= 0 ? currentIndex : 0;
     const nextIndex = (from + Math.sign(step) + levels.length) % levels.length;
     const nextLevel = levels[nextIndex];
@@ -12939,14 +13021,16 @@ class Game {
     const pattern = colorMatrix.map((row) => row.map((cell) => getPatternCellChar(cell)).join(""));
     const levelNumber = this.normalizeDebugLevelNumber(metadata.levelNumber, this.getSuggestedExportLevelNumber());
     const levelName = String(metadata.levelName || `Level ${levelNumber}`).trim() || `Level ${levelNumber}`;
+    const levelId = String(metadata.levelId || levelName).trim() || levelName;
     const birdCount = clamp(Math.round(Number(metadata.birdCount || BOTTOM_QUEUE_CARD_COUNT)), MIN_QUEUE_CARDS, MAX_QUEUE_CARDS);
 
-    level.id = DEBUG_IMAGE_LEVEL_ID;
+    level.id = levelId;
     level.name = levelName;
+    level.levelNumber = levelNumber;
     level.queueCardCount = birdCount;
     level.fallbackFieldPattern = pattern;
     level.pixelArt = {
-      id: DEBUG_IMAGE_LEVEL_ID,
+      id: levelId,
       name: metadata.fileName || "Generated image",
       sourceFileName: metadata.fileName || "",
       birdCount,
@@ -13021,6 +13105,7 @@ class Game {
       offsetY,
       levelNumber,
       levelName,
+      levelId: levelName,
       birdCount: birdCountConfig.effectiveBirdCount,
     });
     const colorSummary = Object.keys(colorCounts)
@@ -14225,6 +14310,7 @@ class Game {
 }
 
 let pendingExternalLevelSelection = null;
+let pendingExternalLevelId = null;
 let pendingExternalCoinsCount = null;
 let pendingExternalHeartsCount = null;
 let pendingExternalMaxLivesCount = null;
@@ -14739,6 +14825,14 @@ function dispatchUnityLevelTrackEvent(eventAction) {
   return enqueueUnityTrackEventUrl(`uniwebview://track?event=level&event_action=${encodedAction}&action=${encodedAction}`);
 }
 
+function dispatchUnityColoringCompletedEvent(gameInstance) {
+  const levelColorData = typeof gameInstance?.buildLevelColorData === "function"
+    ? gameInstance.buildLevelColorData()
+    : { LevelID: "", Width: 0, Height: 0, Cells: [] };
+  const encodedData = encodeURIComponent(JSON.stringify(levelColorData));
+  return dispatchUnityNavigationUrl(`uniwebview://coloring_completed?data=${encodedData}`);
+}
+
 function dispatchUnityTutorialBirdTrackEvent(stepNumber) {
   const normalizedStep = Math.max(1, Math.trunc(Number(stepNumber) || 0));
   if (!Number.isFinite(normalizedStep)) {
@@ -14779,6 +14873,10 @@ if (typeof window !== "undefined") {
   };
   window.setLevel = (indexOrId) => {
     pendingExternalLevelSelection = indexOrId;
+    return false;
+  };
+  window.setLevelID = (levelId) => {
+    pendingExternalLevelId = levelId;
     return false;
   };
   window.setCoins = (coinsCount) => {
@@ -14839,6 +14937,7 @@ async function bootstrapGame() {
   const game = new Game(canvas);
   game.levelDefinitionsHydrationPending = true;
   game.externalLevelSelectionDeferred = false;
+  game.externalLevelIdDeferred = false;
   game.externalMaxLivesCount = resolveExternalMaxLivesCount(game);
   game.externalLivesTimer = resolveExternalLivesTimer(game);
   game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
@@ -14871,10 +14970,11 @@ async function bootstrapGame() {
       return { deferUntilHydration: true };
     }
 
-    if (levels.some((level) => level.id === raw)) {
+    const matchedById = levels.find((level) => level.id === raw || level.name === raw);
+    if (matchedById) {
       const displayLevelNumber = isPositiveIntegerString(raw) ? Number(raw) : null;
       return {
-        targetLevelId: raw,
+        targetLevelId: matchedById.id,
         displayLevelNumber,
       };
     }
@@ -14894,6 +14994,32 @@ async function bootstrapGame() {
       displayLevelNumber: index > 0 ? index : 1,
     };
   };
+  const resolveExternalLevelId = (value) => {
+    const allLevels = Array.isArray(game.availableLevels) ? game.availableLevels : [];
+    const raw = String(value ?? "").trim();
+    if (raw.length === 0) {
+      return null;
+    }
+    const matchedLevel = allLevels.find((level) => level.id === raw || level.name === raw);
+    if (matchedLevel) {
+      return {
+        targetLevelId: matchedLevel.id,
+        displayLevelNumber: isPositiveIntegerString(matchedLevel.id) ? Number(matchedLevel.id) : null,
+      };
+    }
+    if (game.levelDefinitionsHydrationPending === true) {
+      return { deferUntilHydration: true };
+    }
+    return null;
+  };
+  const prepareExternalLevelSelection = () => {
+    game.previewEnableFallbackToken += 1;
+    if (game.previewEnableFallbackTimer !== null) {
+      clearTimeout(game.previewEnableFallbackTimer);
+      game.previewEnableFallbackTimer = null;
+    }
+    game.previewEnabledBySetLevel = true;
+  };
 
   window.game = game;
   window.setLevel = (indexOrId) => {
@@ -14909,16 +15035,7 @@ async function bootstrapGame() {
       return true;
     }
     try {
-      game.previewEnableFallbackToken += 1;
-      if (game.previewEnableFallbackTimer !== null) {
-        clearTimeout(game.previewEnableFallbackTimer);
-        game.previewEnableFallbackTimer = null;
-      }
-      game.previewEnabledBySetLevel = true;
-      game.applyLevelConfig(selection.targetLevelId, {
-        restart: true,
-        displayLevelNumber: selection.displayLevelNumber,
-      });
+      prepareExternalLevelSelection();
       game.externalLevelSelectionDeferred = false;
       game.syncDebugContentSelectors();
       game.saveDebugSettings();
@@ -14926,6 +15043,35 @@ async function bootstrapGame() {
       return true;
     } catch {
       game.externalLevelSelectionDeferred = false;
+      dispatchUnityLevelLoadedTrackEvent("failure");
+      return false;
+    }
+  };
+  window.setLevelID = (levelId) => {
+    pendingExternalLevelId = levelId;
+    const selection = resolveExternalLevelId(levelId);
+    if (!selection) {
+      game.externalLevelIdDeferred = false;
+      dispatchUnityLevelLoadedTrackEvent("failure");
+      return false;
+    }
+    if (selection.deferUntilHydration) {
+      game.externalLevelIdDeferred = true;
+      return true;
+    }
+    try {
+      prepareExternalLevelSelection();
+      game.applyLevelConfig(selection.targetLevelId, {
+        restart: true,
+        displayLevelNumber: selection.displayLevelNumber,
+      });
+      game.externalLevelIdDeferred = false;
+      game.syncDebugContentSelectors();
+      game.saveDebugSettings();
+      dispatchUnityLevelLoadedTrackEvent("success");
+      return true;
+    } catch {
+      game.externalLevelIdDeferred = false;
       dispatchUnityLevelLoadedTrackEvent("failure");
       return false;
     }
@@ -15016,6 +15162,9 @@ async function bootstrapGame() {
   if (pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined) {
     window.setLevel(pendingExternalLevelSelection);
   }
+  if (pendingExternalLevelId !== null && pendingExternalLevelId !== undefined) {
+    window.setLevelID(pendingExternalLevelId);
+  }
   if (pendingExternalCoinsCount !== null && pendingExternalCoinsCount !== undefined) {
     window.setCoins(pendingExternalCoinsCount);
   }
@@ -15064,9 +15213,14 @@ async function hydrateLevelDefinitionsInBackground(game) {
   }
 
   const hasPendingExternalLevelSelection = pendingExternalLevelSelection !== null && pendingExternalLevelSelection !== undefined;
+  const hasPendingExternalLevelId = pendingExternalLevelId !== null && pendingExternalLevelId !== undefined;
   const shouldReplayDeferredSelection = !!(game && game.externalLevelSelectionDeferred);
+  const shouldReplayDeferredLevelId = !!(game && game.externalLevelIdDeferred);
   if (hasPendingExternalLevelSelection && typeof window.setLevel === "function" && (loadedLevels.length > 0 || shouldReplayDeferredSelection)) {
     window.setLevel(pendingExternalLevelSelection);
+  }
+  if (hasPendingExternalLevelId && typeof window.setLevelID === "function" && (loadedLevels.length > 0 || shouldReplayDeferredLevelId)) {
+    window.setLevelID(pendingExternalLevelId);
   }
 }
 

@@ -1,6 +1,6 @@
 window.PIXELFLOW_LEVEL_20 = {
   "id": "20",
-  "name": "Level 20",
+  "name": "sigma_squidward",
   "fallbackFieldPattern": [
     "........KKKKKKKKKKKKK.......",
     ".......KKCCCCCCCCCCCKKK.....",
