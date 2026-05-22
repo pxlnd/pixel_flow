@@ -1,6 +1,6 @@
 window.PIXELFLOW_LEVEL_8 = {
   "id": "8",
-  "name": "Level 8",
+  "name": "earth",
   "fallbackFieldPattern": [
     "......KKKKKK......",
     "....KKGCCCCGKK....",

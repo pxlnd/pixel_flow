@@ -1,6 +1,6 @@
 window.PIXELFLOW_LEVEL_19 = {
   "id": "19",
-  "name": "Level 19",
+  "name": "harry_potter",
   "fallbackFieldPattern": [
     ".....KKKKKKKKKKKKKK.....",
     "...KKKNNNNNNNNNNNNKK....",
