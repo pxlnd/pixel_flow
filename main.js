@@ -370,8 +370,8 @@ const LOGICAL_WIDTH = 1024;
 const LOGICAL_HEIGHT = 1600;
 const FIXED_DT = 1 / 60;
 const MIN_ACTIVE_UNITS_LIMIT = 1;
-const MAX_ACTIVE_UNITS_LIMIT = 10;
-let ACTIVE_UNITS_LIMIT = 5;
+const MAX_ACTIVE_UNITS_LIMIT = 20;
+let ACTIVE_UNITS_LIMIT = 20;
 const FIRE_INTERVAL = 0.03;
 const MAX_BURST_SHOTS_PER_TICK = 24;
 const BULLET_RADIUS = 8;
@@ -706,7 +706,7 @@ const DEBUG_DEFAULTS = {
   shotBounceSpeed: 1,
   trackUnitSpeed: 980,
   queueCardCount: 7,
-  activeUnitsLimit: 5,
+  activeUnitsLimit: 20,
   chickenSizeScale: 1.22,
   topPanelFontSize: 67,
   topLevelPanelScale: 1.2,
