@@ -624,12 +624,14 @@ const PREGAME_EXTRA_COLOR_OPTIONS = [
   "light_beige_1",
   "light_blue",
   "light_blue_1",
+  "light_blue_2",
   "light_brown",
   "light_brown_1",
   "light_gray_1",
   "light_pink_1",
   "light_pink_2",
   "light_pink_3",
+  "medium_blue",
   "medium_brown",
   "medium_grey",
 ];
@@ -938,14 +940,20 @@ const BLOCK_CHAR_TO_COLOR = {
   "0": "medium_grey",
   "1": "light_blue_1",
   "2": "light_blue",
+  "!": "light_blue_2",
   "3": "light_brown_1",
   "4": "light_brown",
   "5": "light_gray_1",
   "6": "light_pink_1",
   "7": "light_pink_2",
   "8": "light_pink_3",
+  "@": "medium_blue",
   "9": "medium_brown",
   X: "brown_orange",
+  "#": "gray_alt",
+  "$": "magenta",
+  "%": "dirty_pink",
+  "&": "beige",
   ".": null,
   " ": null,
   "_": null,
@@ -979,14 +987,20 @@ const BLOCK_COLOR_TO_PATTERN_CHAR = {
   medium_grey: "0",
   light_blue_1: "1",
   light_blue: "2",
+  light_blue_2: "!",
   light_brown_1: "3",
   light_brown: "4",
   light_gray_1: "5",
   light_pink_1: "6",
   light_pink_2: "7",
   light_pink_3: "8",
+  medium_blue: "@",
   medium_brown: "9",
   brown_orange: "X",
+  gray_alt: "#",
+  magenta: "$",
+  dirty_pink: "%",
+  beige: "&",
 };
 
 const BLOCK_COLOR_TO_RGB = {
@@ -1015,6 +1029,7 @@ const BLOCK_COLOR_TO_RGB = {
   light_beige_1: { r: 228, g: 224, b: 206 },
   light_blue: { r: 205, g: 223, b: 233 },
   light_blue_1: { r: 153, g: 235, b: 226 },
+  light_blue_2: { r: 163, g: 182, b: 212 },
   light_brown: { r: 151, g: 113, b: 65 },
   light_brown_1: { r: 206, g: 162, b: 106 },
   dark_green: { r: 70, g: 123, b: 66 },
@@ -1025,18 +1040,11 @@ const BLOCK_COLOR_TO_RGB = {
   light_pink_1: { r: 233, g: 179, b: 188 },
   light_pink_2: { r: 229, g: 98, b: 151 },
   light_pink_3: { r: 177, g: 53, b: 101 },
+  medium_blue: { r: 56, g: 89, b: 120 },
   medium_brown: { r: 108, g: 78, b: 43 },
   medium_grey: { r: 108, g: 118, b: 148 },
   brown_orange: { r: 198, g: 124, b: 66 },
 };
-
-const DEBUG_IMAGE_GENERATOR_BASE_COLOR_TO_RGB = Object.freeze(
-  Object.fromEntries(
-    Object.entries(BLOCK_COLOR_TO_RGB)
-      .filter(([color]) => Object.prototype.hasOwnProperty.call(BLOCK_COLOR_TO_PATTERN_CHAR, color))
-      .map(([color, sample]) => [color, { r: sample.r, g: sample.g, b: sample.b }])
-  )
-);
 
 const BLOCK_COLOR_LABELS = {
   green: "зелёный",
@@ -1064,16 +1072,19 @@ const BLOCK_COLOR_LABELS = {
   light_beige_1: "light beige 1",
   light_blue: "light blue",
   light_blue_1: "light blue 1",
+  light_blue_2: "light blue 2",
   light_brown: "light brown",
   light_brown_1: "light brown 1",
   dark_green: "тёмно-зелёный",
   gray_alt: "серый",
+  magenta: "маджента",
   yellow_biege: "жёлто-бежевый",
   light_gray: "светло-серый",
   light_gray_1: "light gray 1",
   light_pink_1: "light pink 1",
   light_pink_2: "light pink 2",
   light_pink_3: "light pink 3",
+  medium_blue: "medium blue",
   medium_brown: "medium brown",
   medium_grey: "medium grey",
   brown_orange: "коричнево-оранжевый",
@@ -1100,6 +1111,7 @@ const CHICKEN_SPRITE_SOURCE_BY_COLOR = {
   light_beige_1: "ui/birds/light_beige-1_chicken.png",
   light_blue: "ui/birds/light_blue_chicken.png",
   light_blue_1: "ui/birds/light_blue-1_chicken.png",
+  light_blue_2: "ui/birds/light_blue-2_chicken.png",
   light_brown: "ui/birds/light_brown_chicken.png",
   light_brown_1: "ui/birds/light_brown-1_chicken.png",
   dark_green: "ui/birds/dark_green_chicken.png",
@@ -1110,6 +1122,7 @@ const CHICKEN_SPRITE_SOURCE_BY_COLOR = {
   light_pink_1: "ui/birds/light_pink-1_chicken.png",
   light_pink_2: "ui/birds/light_pink-2_chicken.png",
   light_pink_3: "ui/birds/light_pink-3_chicken.png",
+  medium_blue: "ui/birds/medium_blue_chicken.png",
   medium_brown: "ui/birds/medium_brown_chicken.png",
   medium_grey: "ui/birds/medium_grey_chicken.png",
   brown_orange: "ui/birds/chicken_brown_orange.png",
@@ -1148,6 +1161,7 @@ const BLOCK_TILE_SOURCE_BY_COLOR = {
   light_beige_1: "ui/blocks/light_beige-1.png",
   light_blue: "ui/blocks/light_blue.png",
   light_blue_1: "ui/blocks/light_blue-1.png",
+  light_blue_2: "ui/blocks/light_blue-2.png",
   light_brown: "ui/blocks/light_brown.png",
   light_brown_1: "ui/blocks/light_brown-1.png",
   dark_green: "ui/blocks/dark_green.png",
@@ -1157,6 +1171,7 @@ const BLOCK_TILE_SOURCE_BY_COLOR = {
   light_pink_1: "ui/blocks/light_pink-1.png",
   light_pink_2: "ui/blocks/light_pink-2.png",
   light_pink_3: "ui/blocks/light_pink-3.png",
+  medium_blue: "ui/blocks/medium_blue.png",
   medium_brown: "ui/blocks/medium_brown.png",
   medium_grey: "ui/blocks/medium_grey.png",
   brown_orange: "ui/blocks/brown_orange.png",
@@ -1174,6 +1189,8 @@ const BLOCK_TILE_COLOR_ALIASES = {
   малиновый: "red_alt",
   grey: "gray",
   medium_gray: "medium_grey",
+  "medium-blue": "medium_blue",
+  mediumblue: "medium_blue",
   light_grey: "light_gray",
   light_gray1: "light_gray_1",
   light_grey_1: "light_gray_1",
@@ -1182,6 +1199,8 @@ const BLOCK_TILE_COLOR_ALIASES = {
   light_pink2: "light_pink_2",
   light_pink3: "light_pink_3",
   light_blue1: "light_blue_1",
+  light_blue2: "light_blue_2",
+  "light_blue-2": "light_blue_2",
   light_brown1: "light_brown_1",
   light_beige1: "light_beige_1",
   lilac: "orchid",
@@ -3740,17 +3759,31 @@ class Game {
 
   rebuildBlockColorSamplerPalette() {
     this.debugImageBucketColorCache = new Map();
-    this.debugBlockColorPalette = Object.entries(DEBUG_IMAGE_GENERATOR_BASE_COLOR_TO_RGB).map(([color, sample]) => ({
-      color,
-      r: sample.r,
-      g: sample.g,
-      b: sample.b,
-      lab: rgbToLab(sample.r, sample.g, sample.b),
-      hue: getHueDegrees(sample.r, sample.g, sample.b),
-      saturation: getColorSaturationRatio(sample.r, sample.g, sample.b),
-      luma: getLuma(sample.r, sample.g, sample.b) / 255,
-      family: getDebugImageColorFamily(sample.r, sample.g, sample.b),
-    }));
+    const palette = [];
+    const seen = new Set();
+    for (const color of Object.keys(BLOCK_TILE_SOURCE_BY_COLOR)) {
+      const normalized = normalizeBlockColorName(color);
+      if (!normalized || seen.has(normalized)) {
+        continue;
+      }
+      const sample = this.getColorSampleForColorKey(normalized);
+      if (!sample) {
+        continue;
+      }
+      seen.add(normalized);
+      palette.push({
+        color: normalized,
+        r: sample.r,
+        g: sample.g,
+        b: sample.b,
+        lab: rgbToLab(sample.r, sample.g, sample.b),
+        hue: getHueDegrees(sample.r, sample.g, sample.b),
+        saturation: getColorSaturationRatio(sample.r, sample.g, sample.b),
+        luma: getLuma(sample.r, sample.g, sample.b) / 255,
+        family: getDebugImageColorFamily(sample.r, sample.g, sample.b),
+      });
+    }
+    this.debugBlockColorPalette = palette;
   }
 
   getNearestDebugPaletteColor(r, g, b) {
@@ -3890,41 +3923,19 @@ class Game {
   }
 
   sampleDebugImageCellColor(quantizedPixels, sourceWidth, sx0, sy0, sx1, sy1) {
-    const cellWidth = Math.max(1, sx1 - sx0);
-    const cellHeight = Math.max(1, sy1 - sy0);
-    const area = cellWidth * cellHeight;
-    const colorWeights = new Map();
-    let opaqueWeight = 0;
-
-    for (let sy = sy0; sy < sy1; sy++) {
-      let pixelIndex = sy * sourceWidth + sx0;
-      for (let sx = sx0; sx < sx1; sx++, pixelIndex += 1) {
-        const mappedColor = quantizedPixels[pixelIndex];
-        if (!mappedColor) {
-          continue;
-        }
-        colorWeights.set(mappedColor, (colorWeights.get(mappedColor) || 0) + 1);
-        opaqueWeight += 1;
-      }
-    }
-
-    if (opaqueWeight <= Math.max(1, area * 0.06)) {
-      return { color: null, purity: 0, weight: 0 };
-    }
-
-    let dominantColor = null;
-    let dominantWeight = -1;
-    for (const [color, weight] of colorWeights.entries()) {
-      if (weight > dominantWeight) {
-        dominantWeight = weight;
-        dominantColor = color;
-      }
-    }
-
+    const sourceHeight = Math.max(1, Math.floor(quantizedPixels.length / Math.max(1, sourceWidth)));
+    const clampedSx0 = clamp(Math.floor(sx0), 0, Math.max(0, sourceWidth - 1));
+    const clampedSx1 = clamp(Math.ceil(sx1), clampedSx0 + 1, sourceWidth);
+    const clampedSy0 = clamp(Math.floor(sy0), 0, Math.max(0, sourceHeight - 1));
+    const clampedSy1 = clamp(Math.ceil(sy1), clampedSy0 + 1, sourceHeight);
+    // Center sampling avoids edge bleed from neighboring pixels in generated cells.
+    const centerX = clamp(Math.floor((clampedSx0 + clampedSx1 - 1) * 0.5), clampedSx0, clampedSx1 - 1);
+    const centerY = clamp(Math.floor((clampedSy0 + clampedSy1 - 1) * 0.5), clampedSy0, clampedSy1 - 1);
+    const color = quantizedPixels[centerY * sourceWidth + centerX] || null;
     return {
-      color: dominantColor,
-      purity: dominantWeight / Math.max(1, opaqueWeight),
-      weight: opaqueWeight,
+      color,
+      purity: color ? 1 : 0,
+      weight: color ? 1 : 0,
     };
   }
 
@@ -13092,30 +13103,15 @@ class Game {
     ctx.drawImage(image, 0, 0, sourceWidth, sourceHeight);
     const { data } = ctx.getImageData(0, 0, sourceWidth, sourceHeight);
     const quantizedPixels = this.buildDebugImageQuantizedPixelMap(data, sourceWidth, sourceHeight);
-    const phaseCandidates = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875];
-    let bestResult = null;
-
-    for (const phaseY of phaseCandidates) {
-      for (const phaseX of phaseCandidates) {
-        const candidate = this.sampleDebugImageMatrixForPhase(
-          quantizedPixels,
-          sourceWidth,
-          sourceHeight,
-          cols,
-          rows,
-          phaseX,
-          phaseY
-        );
-        if (
-          !bestResult
-          || candidate.score > bestResult.score + 0.0001
-          || (Math.abs(candidate.score - bestResult.score) <= 0.0001 && candidate.filledCells > bestResult.filledCells)
-        ) {
-          bestResult = candidate;
-        }
-      }
-    }
-    return bestResult || { colorMatrix: [], colorCounts: {}, filledCells: 0 };
+    return this.sampleDebugImageMatrixForPhase(
+      quantizedPixels,
+      sourceWidth,
+      sourceHeight,
+      cols,
+      rows,
+      0,
+      0
+    );
   }
 
   buildDebugImageLevel(colorMatrix, metadata = {}) {
