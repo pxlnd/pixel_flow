@@ -370,8 +370,8 @@ const LOGICAL_WIDTH = 1024;
 const LOGICAL_HEIGHT = 1600;
 const FIXED_DT = 1 / 60;
 const MIN_ACTIVE_UNITS_LIMIT = 1;
-const MAX_ACTIVE_UNITS_LIMIT = 10;
-let ACTIVE_UNITS_LIMIT = 5;
+const MAX_ACTIVE_UNITS_LIMIT = 20;
+let ACTIVE_UNITS_LIMIT = 20;
 const FIRE_INTERVAL = 0.03;
 const MAX_BURST_SHOTS_PER_TICK = 24;
 const BULLET_RADIUS = 8;
@@ -621,6 +621,19 @@ const PREGAME_EXTRA_COLOR_OPTIONS = [
   "dark_blue",
   "dark_purple",
   "light_purple",
+  "light_beige_1",
+  "light_blue",
+  "light_blue_1",
+  "light_blue_2",
+  "light_brown",
+  "light_brown_1",
+  "light_gray_1",
+  "light_pink_1",
+  "light_pink_2",
+  "light_pink_3",
+  "medium_blue",
+  "medium_brown",
+  "medium_grey",
 ];
 const PREGAME_COLOR_FILL_DURATION = 0.86;
 const LOSE_POPUP_UI = {
@@ -695,7 +708,7 @@ const DEBUG_DEFAULTS = {
   shotBounceSpeed: 1,
   trackUnitSpeed: 980,
   queueCardCount: 7,
-  activeUnitsLimit: 5,
+  activeUnitsLimit: 20,
   chickenSizeScale: 1.22,
   topPanelFontSize: 67,
   topLevelPanelScale: 1.2,
@@ -920,7 +933,27 @@ const BLOCK_CHAR_TO_COLOR = {
   S: "rose",
   T: "orchid",
   I: "light_beige",
+  Z: "light_beige_1",
   J: "dark_green",
+  Q: "yellow_biege",
+  U: "light_gray",
+  "0": "medium_grey",
+  "1": "light_blue_1",
+  "2": "light_blue",
+  "!": "light_blue_2",
+  "3": "light_brown_1",
+  "4": "light_brown",
+  "5": "light_gray_1",
+  "6": "light_pink_1",
+  "7": "light_pink_2",
+  "8": "light_pink_3",
+  "@": "medium_blue",
+  "9": "medium_brown",
+  X: "brown_orange",
+  "#": "gray_alt",
+  "$": "magenta",
+  "%": "dirty_pink",
+  "&": "beige",
   ".": null,
   " ": null,
   "_": null,
@@ -947,7 +980,27 @@ const BLOCK_COLOR_TO_PATTERN_CHAR = {
   rose: "S",
   orchid: "T",
   light_beige: "I",
+  light_beige_1: "Z",
   dark_green: "J",
+  yellow_biege: "Q",
+  light_gray: "U",
+  medium_grey: "0",
+  light_blue_1: "1",
+  light_blue: "2",
+  light_blue_2: "!",
+  light_brown_1: "3",
+  light_brown: "4",
+  light_gray_1: "5",
+  light_pink_1: "6",
+  light_pink_2: "7",
+  light_pink_3: "8",
+  medium_blue: "@",
+  medium_brown: "9",
+  brown_orange: "X",
+  gray_alt: "#",
+  magenta: "$",
+  dirty_pink: "%",
+  beige: "&",
 };
 
 const BLOCK_COLOR_TO_RGB = {
@@ -973,17 +1026,25 @@ const BLOCK_COLOR_TO_RGB = {
   dirty_pink: { r: 214, g: 146, b: 167 },
   beige: { r: 223, g: 177, b: 128 },
   light_beige: { r: 234, g: 207, b: 169 },
+  light_beige_1: { r: 228, g: 224, b: 206 },
+  light_blue: { r: 205, g: 223, b: 233 },
+  light_blue_1: { r: 153, g: 235, b: 226 },
+  light_blue_2: { r: 163, g: 182, b: 212 },
+  light_brown: { r: 151, g: 113, b: 65 },
+  light_brown_1: { r: 206, g: 162, b: 106 },
   dark_green: { r: 70, g: 123, b: 66 },
   gray_alt: { r: 156, g: 156, b: 156 },
+  yellow_biege: { r: 240, g: 210, b: 146 },
+  light_gray: { r: 198, g: 198, b: 198 },
+  light_gray_1: { r: 154, g: 152, b: 149 },
+  light_pink_1: { r: 233, g: 179, b: 188 },
+  light_pink_2: { r: 229, g: 98, b: 151 },
+  light_pink_3: { r: 177, g: 53, b: 101 },
+  medium_blue: { r: 56, g: 89, b: 120 },
+  medium_brown: { r: 108, g: 78, b: 43 },
+  medium_grey: { r: 108, g: 118, b: 148 },
+  brown_orange: { r: 198, g: 124, b: 66 },
 };
-
-const DEBUG_IMAGE_GENERATOR_BASE_COLOR_TO_RGB = Object.freeze(
-  Object.fromEntries(
-    Object.entries(BLOCK_COLOR_TO_RGB)
-      .filter(([color]) => Object.prototype.hasOwnProperty.call(BLOCK_COLOR_TO_PATTERN_CHAR, color))
-      .map(([color, sample]) => [color, { r: sample.r, g: sample.g, b: sample.b }])
-  )
-);
 
 const BLOCK_COLOR_LABELS = {
   green: "зелёный",
@@ -1008,8 +1069,25 @@ const BLOCK_COLOR_LABELS = {
   dirty_pink: "припылённо-розовый",
   beige: "бежевый",
   light_beige: "светло-бежевый",
+  light_beige_1: "light beige 1",
+  light_blue: "light blue",
+  light_blue_1: "light blue 1",
+  light_blue_2: "light blue 2",
+  light_brown: "light brown",
+  light_brown_1: "light brown 1",
   dark_green: "тёмно-зелёный",
   gray_alt: "серый",
+  magenta: "маджента",
+  yellow_biege: "жёлто-бежевый",
+  light_gray: "светло-серый",
+  light_gray_1: "light gray 1",
+  light_pink_1: "light pink 1",
+  light_pink_2: "light pink 2",
+  light_pink_3: "light pink 3",
+  medium_blue: "medium blue",
+  medium_brown: "medium brown",
+  medium_grey: "medium grey",
+  brown_orange: "коричнево-оранжевый",
 };
 
 const CHICKEN_SPRITE_SOURCE_BY_COLOR = {
@@ -1030,8 +1108,24 @@ const CHICKEN_SPRITE_SOURCE_BY_COLOR = {
   dirty_pink: "ui/birds/dirty_pink.png",
   beige: "ui/birds/beige.png",
   light_beige: "ui/birds/light_beige_chicken.png",
+  light_beige_1: "ui/birds/light_beige-1_chicken.png",
+  light_blue: "ui/birds/light_blue_chicken.png",
+  light_blue_1: "ui/birds/light_blue-1_chicken.png",
+  light_blue_2: "ui/birds/light_blue-2_chicken.png",
+  light_brown: "ui/birds/light_brown_chicken.png",
+  light_brown_1: "ui/birds/light_brown-1_chicken.png",
   dark_green: "ui/birds/dark_green_chicken.png",
   gray: "ui/birds/grey.png",
+  yellow_biege: "ui/birds/chicken_yellow_beige.png",
+  light_gray: "ui/birds/chicken_light_gray.png",
+  light_gray_1: "ui/birds/light_gray-1_chicken.png",
+  light_pink_1: "ui/birds/light_pink-1_chicken.png",
+  light_pink_2: "ui/birds/light_pink-2_chicken.png",
+  light_pink_3: "ui/birds/light_pink-3_chicken.png",
+  medium_blue: "ui/birds/medium_blue_chicken.png",
+  medium_brown: "ui/birds/medium_brown_chicken.png",
+  medium_grey: "ui/birds/medium_grey_chicken.png",
+  brown_orange: "ui/birds/chicken_brown_orange.png",
   dark_dark_blue: "ui/birds/dark_dark_blue.png",
   very_dark_blue: "ui/birds/very_dark_blue.png",
   blue_alt: "ui/birds/blue_alt.png",
@@ -1064,7 +1158,23 @@ const BLOCK_TILE_SOURCE_BY_COLOR = {
   dirty_pink: "ui/blocks/dirty_pink.png",
   beige: "ui/blocks/beige.png",
   light_beige: "ui/blocks/light_beige.png",
+  light_beige_1: "ui/blocks/light_beige-1.png",
+  light_blue: "ui/blocks/light_blue.png",
+  light_blue_1: "ui/blocks/light_blue-1.png",
+  light_blue_2: "ui/blocks/light_blue-2.png",
+  light_brown: "ui/blocks/light_brown.png",
+  light_brown_1: "ui/blocks/light_brown-1.png",
   dark_green: "ui/blocks/dark_green.png",
+  yellow_biege: "ui/blocks/yellow_biege.png",
+  light_gray: "ui/blocks/light_gray.png",
+  light_gray_1: "ui/blocks/light_gray-1.png",
+  light_pink_1: "ui/blocks/light_pink-1.png",
+  light_pink_2: "ui/blocks/light_pink-2.png",
+  light_pink_3: "ui/blocks/light_pink-3.png",
+  medium_blue: "ui/blocks/medium_blue.png",
+  medium_brown: "ui/blocks/medium_brown.png",
+  medium_grey: "ui/blocks/medium_grey.png",
+  brown_orange: "ui/blocks/brown_orange.png",
 };
 
 const BLOCK_TILE_COLOR_ALIASES = {
@@ -1078,8 +1188,24 @@ const BLOCK_TILE_COLOR_ALIASES = {
   crimson: "red_alt",
   малиновый: "red_alt",
   grey: "gray",
+  medium_gray: "medium_grey",
+  "medium-blue": "medium_blue",
+  mediumblue: "medium_blue",
+  light_grey: "light_gray",
+  light_gray1: "light_gray_1",
+  light_grey_1: "light_gray_1",
+  light_grey1: "light_gray_1",
+  light_pink1: "light_pink_1",
+  light_pink2: "light_pink_2",
+  light_pink3: "light_pink_3",
+  light_blue1: "light_blue_1",
+  light_blue2: "light_blue_2",
+  "light_blue-2": "light_blue_2",
+  light_brown1: "light_brown_1",
+  light_beige1: "light_beige_1",
   lilac: "orchid",
   light_biege: "light_beige",
+  yellow_beige: "yellow_biege",
   biege: "beige",
 };
 
@@ -3445,9 +3571,10 @@ class Game {
         continue;
       }
       const baseName = fileName.slice(0, -4).trim().toLowerCase();
-      const colorKey = baseName
-        .replace(/[\s-]+/g, "_")
-        .replace(/_alt(?:_\d+)?$/, "");
+      const normalizedBaseName = this.normalizeDiscoveredChickenColorKey(baseName);
+      const colorKey = normalizedBaseName
+        ? normalizedBaseName.replace(/_alt(?:_\d+)?$/, "")
+        : null;
       if (!colorKey || !/^[a-z0-9_]+$/.test(colorKey)) {
         continue;
       }
@@ -3632,17 +3759,31 @@ class Game {
 
   rebuildBlockColorSamplerPalette() {
     this.debugImageBucketColorCache = new Map();
-    this.debugBlockColorPalette = Object.entries(DEBUG_IMAGE_GENERATOR_BASE_COLOR_TO_RGB).map(([color, sample]) => ({
-      color,
-      r: sample.r,
-      g: sample.g,
-      b: sample.b,
-      lab: rgbToLab(sample.r, sample.g, sample.b),
-      hue: getHueDegrees(sample.r, sample.g, sample.b),
-      saturation: getColorSaturationRatio(sample.r, sample.g, sample.b),
-      luma: getLuma(sample.r, sample.g, sample.b) / 255,
-      family: getDebugImageColorFamily(sample.r, sample.g, sample.b),
-    }));
+    const palette = [];
+    const seen = new Set();
+    for (const color of Object.keys(BLOCK_TILE_SOURCE_BY_COLOR)) {
+      const normalized = normalizeBlockColorName(color);
+      if (!normalized || seen.has(normalized)) {
+        continue;
+      }
+      const sample = this.getColorSampleForColorKey(normalized);
+      if (!sample) {
+        continue;
+      }
+      seen.add(normalized);
+      palette.push({
+        color: normalized,
+        r: sample.r,
+        g: sample.g,
+        b: sample.b,
+        lab: rgbToLab(sample.r, sample.g, sample.b),
+        hue: getHueDegrees(sample.r, sample.g, sample.b),
+        saturation: getColorSaturationRatio(sample.r, sample.g, sample.b),
+        luma: getLuma(sample.r, sample.g, sample.b) / 255,
+        family: getDebugImageColorFamily(sample.r, sample.g, sample.b),
+      });
+    }
+    this.debugBlockColorPalette = palette;
   }
 
   getNearestDebugPaletteColor(r, g, b) {
@@ -3782,41 +3923,19 @@ class Game {
   }
 
   sampleDebugImageCellColor(quantizedPixels, sourceWidth, sx0, sy0, sx1, sy1) {
-    const cellWidth = Math.max(1, sx1 - sx0);
-    const cellHeight = Math.max(1, sy1 - sy0);
-    const area = cellWidth * cellHeight;
-    const colorWeights = new Map();
-    let opaqueWeight = 0;
-
-    for (let sy = sy0; sy < sy1; sy++) {
-      let pixelIndex = sy * sourceWidth + sx0;
-      for (let sx = sx0; sx < sx1; sx++, pixelIndex += 1) {
-        const mappedColor = quantizedPixels[pixelIndex];
-        if (!mappedColor) {
-          continue;
-        }
-        colorWeights.set(mappedColor, (colorWeights.get(mappedColor) || 0) + 1);
-        opaqueWeight += 1;
-      }
-    }
-
-    if (opaqueWeight <= Math.max(1, area * 0.06)) {
-      return { color: null, purity: 0, weight: 0 };
-    }
-
-    let dominantColor = null;
-    let dominantWeight = -1;
-    for (const [color, weight] of colorWeights.entries()) {
-      if (weight > dominantWeight) {
-        dominantWeight = weight;
-        dominantColor = color;
-      }
-    }
-
+    const sourceHeight = Math.max(1, Math.floor(quantizedPixels.length / Math.max(1, sourceWidth)));
+    const clampedSx0 = clamp(Math.floor(sx0), 0, Math.max(0, sourceWidth - 1));
+    const clampedSx1 = clamp(Math.ceil(sx1), clampedSx0 + 1, sourceWidth);
+    const clampedSy0 = clamp(Math.floor(sy0), 0, Math.max(0, sourceHeight - 1));
+    const clampedSy1 = clamp(Math.ceil(sy1), clampedSy0 + 1, sourceHeight);
+    // Center sampling avoids edge bleed from neighboring pixels in generated cells.
+    const centerX = clamp(Math.floor((clampedSx0 + clampedSx1 - 1) * 0.5), clampedSx0, clampedSx1 - 1);
+    const centerY = clamp(Math.floor((clampedSy0 + clampedSy1 - 1) * 0.5), clampedSy0, clampedSy1 - 1);
+    const color = quantizedPixels[centerY * sourceWidth + centerX] || null;
     return {
-      color: dominantColor,
-      purity: dominantWeight / Math.max(1, opaqueWeight),
-      weight: opaqueWeight,
+      color,
+      purity: color ? 1 : 0,
+      weight: color ? 1 : 0,
     };
   }
 
@@ -5597,16 +5716,18 @@ class Game {
     requireFolderWrite = true,
     confirmOverwrite = false,
   } = {}) {
+    let shouldWriteToFolder = !!requireFolderWrite;
+    let usedDownloadFallback = false;
     let writtenToFolder = false;
-    if (requireFolderWrite) {
+    if (shouldWriteToFolder) {
       if (!this.debugLevelsDirHandle) {
         const picked = await this.pickDebugLevelsFolder();
         if (!picked) {
-          this.setDebugImageStatus("Сохранение отменено: папка уровней не выбрана.", "error");
-          return false;
+          shouldWriteToFolder = false;
+          usedDownloadFallback = true;
         }
       }
-      if (confirmOverwrite) {
+      if (shouldWriteToFolder && confirmOverwrite) {
         let fileExists = false;
         try {
           fileExists = await this.doesLevelFileExistInPickedFolder(payload.levelNumber);
@@ -5626,10 +5747,12 @@ class Game {
           }
         }
       }
-      writtenToFolder = await this.writeLevelPayloadToPickedFolder(payload);
-      if (!writtenToFolder) {
-        this.setDebugImageStatus("Не удалось записать файл в папку. Нажми 'папка уровней' и выбери её заново.", "error");
-        return false;
+      if (shouldWriteToFolder) {
+        writtenToFolder = await this.writeLevelPayloadToPickedFolder(payload);
+        if (!writtenToFolder) {
+          shouldWriteToFolder = false;
+          usedDownloadFallback = true;
+        }
       }
     }
 
@@ -5642,14 +5765,14 @@ class Game {
     this.syncDebugSaveTargetInputs(payload.level.id, { force: true });
 
     let copied = false;
-    if (!requireFolderWrite) {
+    if (!shouldWriteToFolder) {
       const result = await this.downloadLevelPayload(payload);
       copied = result.copied;
     }
 
     if (triggerButton) {
       const original = triggerButton.textContent;
-      triggerButton.textContent = requireFolderWrite
+      triggerButton.textContent = shouldWriteToFolder
         ? "сохранено в папку"
         : (copied ? "скачано+скопировано" : "скачано");
       setTimeout(() => {
@@ -5660,9 +5783,11 @@ class Game {
     }
 
     this.setDebugImageStatus(
-      requireFolderWrite
+      shouldWriteToFolder
         ? `Уровень ${payload.levelNumber} сохранён в папку '${this.debugLevelsDirName || "levels"}', обновлён в списке${persistedLocally ? " и закреплён после перезагрузки." : "."}`
-        : `Уровень ${payload.levelNumber} обновлён в списке${persistedLocally ? " и закреплён после перезагрузки." : "."} JSON скачан как ${payload.levelNumber}.json.`,
+        : usedDownloadFallback
+          ? `Папка уровней недоступна или не выбрана. Уровень ${payload.levelNumber} обновлён в списке${persistedLocally ? " и закреплён после перезагрузки." : "."} JSON скачан как ${payload.levelNumber}.json.`
+          : `Уровень ${payload.levelNumber} обновлён в списке${persistedLocally ? " и закреплён после перезагрузки." : "."} JSON скачан как ${payload.levelNumber}.json.`,
       "success"
     );
     return true;
@@ -9084,7 +9209,12 @@ class Game {
     }
     for (const color of PREGAME_EXTRA_COLOR_OPTIONS) {
       const normalized = normalizeBlockColorName(color);
-      if (normalized && Object.prototype.hasOwnProperty.call(BLOCK_COLOR_CONFIG, normalized)) {
+      const isKnownColor = normalized && (
+        Object.prototype.hasOwnProperty.call(BLOCK_COLOR_CONFIG, normalized)
+        || Object.prototype.hasOwnProperty.call(BLOCK_COLOR_TO_RGB, normalized)
+        || Object.prototype.hasOwnProperty.call(BLOCK_TILE_SOURCE_BY_COLOR, normalized)
+      );
+      if (isKnownColor) {
         paletteSet.add(normalized);
       }
     }
@@ -12973,30 +13103,15 @@ class Game {
     ctx.drawImage(image, 0, 0, sourceWidth, sourceHeight);
     const { data } = ctx.getImageData(0, 0, sourceWidth, sourceHeight);
     const quantizedPixels = this.buildDebugImageQuantizedPixelMap(data, sourceWidth, sourceHeight);
-    const phaseCandidates = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875];
-    let bestResult = null;
-
-    for (const phaseY of phaseCandidates) {
-      for (const phaseX of phaseCandidates) {
-        const candidate = this.sampleDebugImageMatrixForPhase(
-          quantizedPixels,
-          sourceWidth,
-          sourceHeight,
-          cols,
-          rows,
-          phaseX,
-          phaseY
-        );
-        if (
-          !bestResult
-          || candidate.score > bestResult.score + 0.0001
-          || (Math.abs(candidate.score - bestResult.score) <= 0.0001 && candidate.filledCells > bestResult.filledCells)
-        ) {
-          bestResult = candidate;
-        }
-      }
-    }
-    return bestResult || { colorMatrix: [], colorCounts: {}, filledCells: 0 };
+    return this.sampleDebugImageMatrixForPhase(
+      quantizedPixels,
+      sourceWidth,
+      sourceHeight,
+      cols,
+      rows,
+      0,
+      0
+    );
   }
 
   buildDebugImageLevel(colorMatrix, metadata = {}) {
