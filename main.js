@@ -583,7 +583,7 @@ const PREGAME_COLOR_PANEL_UI = {
   sectorPaddingTop: 18,
   sectorPaddingBottom: 18,
   sectorRowGap: 10,
-  sectionGapExtraIfSpace: 20,
+  sectionGapExtraIfSpace: 60,
   itemGapMultiplier: 2,
   sectorButtonW: 82,
   sectorButtonH: 82,
@@ -9783,7 +9783,7 @@ class Game {
       ctx.shadowBlur = 3;
       ctx.shadowOffsetY = 2;
       const textX = rect.x + rect.w * 0.5;
-      const textY = rect.y + rect.h * 0.56;
+      const textY = rect.y + rect.h * 0.5;
       ctx.fillText(label, textX, textY);
       ctx.restore();
 
@@ -10450,7 +10450,7 @@ class Game {
       ? PREGAME_START_BUTTON_UI.textShadowOffsetY
       : 5;
     const textX = rect.x + rect.w * 0.5;
-    const textY = rect.y + rect.h * 0.56 - 4;
+    const textY = rect.y + rect.h * 0.5;
     ctx.strokeText(PREGAME_START_BUTTON_UI.label, textX, textY);
     ctx.fillText(PREGAME_START_BUTTON_UI.label, textX, textY);
     ctx.restore();
