@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_20 = {
   "id": "20",
   "name": "sigma_squidward",
+  "displayName": "Squid Meme",
   "fallbackFieldPattern": [
     "........KKKKKKKKKKKKK.......",
     ".......KKCCCCCCCCCCCKKK.....",

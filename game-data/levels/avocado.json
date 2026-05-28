@@ -4,6 +4,7 @@
   "level": {
     "id": "avocado",
     "name": "Level 21",
+    "displayName": "Level 21",
     "debugOnly": true,
     "fallbackFieldPattern": [
       "IIIIIIIIIIIIIIIIIIIIIIIIII",

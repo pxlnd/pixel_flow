@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_12 = {
   "id": "12",
   "name": "gary_snail",
+  "displayName": "Snail",
   "fallbackFieldPattern": [
     "....KKKKK.............",
     "..KKSSSSSKK...........",

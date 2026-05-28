@@ -4,6 +4,7 @@
   "level": {
     "id": "11",
     "name": "proposal",
+    "displayName": "Proposal",
     "fallbackFieldPattern": [
       "....KKKKKKKKK....",
       "...KRRRRRRRRRK...",

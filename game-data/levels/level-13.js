@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_13 = {
   "id": "13",
   "name": "cat_in_bread",
+  "displayName": "Toast",
   "fallbackFieldPattern": [
     "......OOOOOOOOOOO......",
     "....OOEEEEEEEEEEEOO....",

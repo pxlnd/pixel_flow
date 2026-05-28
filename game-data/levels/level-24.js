@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_24 = {
   "id": "orange cat",
   "name": "orange cat",
+  "displayName": "Orange Cat",
   "fallbackFieldPattern": [
     ".................",
     "..KK.......KK....",

@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_DEBUG_AVOCADO = {
   "id": "avocado",
   "name": "Level 21",
+  "displayName": "Level 21",
   "debugOnly": true,
   "fallbackFieldPattern": [
     "IIIIIIIIIIIIIIIIIIIIIIIIII",

@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_43 = {
   "id": "window",
   "name": "window",
+  "displayName": "Window",
   "fallbackFieldPattern": [
     "..................KKK...................",
     ".........KK......K666KK.....K...........",

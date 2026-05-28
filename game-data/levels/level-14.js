@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_14 = {
   "id": "14",
   "name": "white_cat_meme",
+  "displayName": "Cat Meme",
   "fallbackFieldPattern": [
     ".....KKK......KKK.....",
     ".....KSWK....KWSK.....",

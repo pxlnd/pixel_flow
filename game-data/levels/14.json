@@ -4,6 +4,7 @@
   "level": {
     "id": "14",
     "name": "white_cat_meme",
+    "displayName": "Cat Meme",
     "fallbackFieldPattern": [
       ".....KKK......KKK.....",
       ".....KSWK....KWSK.....",

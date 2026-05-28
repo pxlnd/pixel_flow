@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_21 = {
   "id": "21",
   "name": "hamster",
+  "displayName": "Hamster",
   "fallbackFieldPattern": [
     "....KKK...............KKK....",
     "...KOOOK...KKKKKKK...KOOOK...",

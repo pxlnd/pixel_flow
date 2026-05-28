@@ -4,6 +4,7 @@
   "level": {
     "id": "6",
     "name": "pizza",
+    "displayName": "Pizza",
     "fallbackFieldPattern": [
       "KKKK............",
       "KOKRKKKK........",
