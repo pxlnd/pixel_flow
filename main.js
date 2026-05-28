@@ -422,6 +422,15 @@ const LEVEL_ONE_TUTORIAL_STEPS = {
   tapBlackCard: "tap-black-card",
   done: "done",
 };
+const LEVEL_ONE_TUTORIAL_TRACK_EVENTS = {
+  pointerGreenBird: "tutor_pointer_greenbird",
+  launchGreenBird: "tutor_launch_greenbird",
+  halfwayPause: "tutor_halfwaypause",
+  pointerBlackBird: "tutor_pointer_blackbird",
+  launchBlackBird: "tutor_launch_blackbird",
+  freeTutorial: "tutor_freetutorial",
+  levelComplete: "tutor_levelcomplete",
+};
 const LEVEL_ONE_GREEN_PAUSE_TRACK_PROGRESS = 0.7;
 const CACTUS_PREGAME_TUTORIAL_STEPS = {
   tapBlackColor: "tap-black-color",
@@ -6014,6 +6023,7 @@ class Game {
       firstTutorialUnitId: null,
       gameplayPaused: false,
       lastShownPointerStepTracked: null,
+      trackedEvents: new Set(),
       travelHintMode: "hidden",
       travelHintTime: 0,
     };
@@ -6093,6 +6103,32 @@ class Game {
       return false;
     }
     return this.trackCactusPregameTutorialEventOnce(pointerEvent, "completed");
+  }
+
+  trackLevelOneTutorialEventOnce(eventName, eventAction = "completed") {
+    if (!this.isLevelOneTutorialEnabled()) {
+      return false;
+    }
+    const normalizedEvent = String(eventName || "").trim();
+    const normalizedAction = String(eventAction || "").trim();
+    if (!normalizedEvent || !normalizedAction) {
+      return false;
+    }
+    if (!(this.tutorial?.trackedEvents instanceof Set)) {
+      if (!this.tutorial) {
+        return false;
+      }
+      this.tutorial.trackedEvents = new Set();
+    }
+    const eventKey = `${normalizedEvent}:${normalizedAction}`;
+    if (this.tutorial.trackedEvents.has(eventKey)) {
+      return false;
+    }
+    const tracked = dispatchUnityTutorialTrackEvent(normalizedEvent, normalizedAction);
+    if (tracked) {
+      this.tutorial.trackedEvents.add(eventKey);
+    }
+    return tracked;
   }
 
   advanceCactusPregameTutorial() {
@@ -6377,12 +6413,14 @@ class Game {
     this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard;
     this.tutorial.gameplayPaused = true;
     this.tutorial.handTime = 0;
+    this.trackLevelOneTutorialEventOnce(LEVEL_ONE_TUTORIAL_TRACK_EVENTS.halfwayPause, "completed");
     this.enforceLevelOneTutorialQueue();
     this.invalidate(true);
     return true;
   }
 
   finishTutorial() {
+    this.trackLevelOneTutorialEventOnce(LEVEL_ONE_TUTORIAL_TRACK_EVENTS.freeTutorial, "completed");
     this.tutorial.gameplayPaused = false;
     this.tutorial.active = false;
     this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.done;
@@ -6433,11 +6471,16 @@ class Game {
   }
 
   trackTutorialBirdTap() {
-    const stepNumber = this.getTutorialBirdStepNumber();
-    if (!Number.isFinite(stepNumber)) {
+    if (!this.tutorial?.active) {
       return false;
     }
-    return dispatchUnityTutorialBirdTrackEvent(stepNumber);
+    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
+      return this.trackLevelOneTutorialEventOnce(LEVEL_ONE_TUTORIAL_TRACK_EVENTS.launchGreenBird, "completed");
+    }
+    if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard) {
+      return this.trackLevelOneTutorialEventOnce(LEVEL_ONE_TUTORIAL_TRACK_EVENTS.launchBlackBird, "completed");
+    }
+    return false;
   }
 
   getQueueChickenTapId(card) {
@@ -6503,7 +6546,10 @@ class Game {
     if (this.tutorial.lastShownPointerStepTracked === stepNumber) {
       return false;
     }
-    const tracked = dispatchUnityTutorialPointerShowTrackEvent(stepNumber);
+    const eventName = stepNumber === 1
+      ? LEVEL_ONE_TUTORIAL_TRACK_EVENTS.pointerGreenBird
+      : LEVEL_ONE_TUTORIAL_TRACK_EVENTS.pointerBlackBird;
+    const tracked = this.trackLevelOneTutorialEventOnce(eventName, "completed");
     if (tracked) {
       this.tutorial.lastShownPointerStepTracked = stepNumber;
     }
@@ -8676,6 +8722,7 @@ class Game {
       return;
     }
     this.setGameState("victory");
+    this.trackLevelOneTutorialEventOnce(LEVEL_ONE_TUTORIAL_TRACK_EVENTS.levelComplete, "completed");
     dispatchUnityColoringCompletedEvent(this);
     this.playSound("win");
     this.cameraZoomTarget = VICTORY_ZOOM_TARGET;
@@ -15252,23 +15299,6 @@ function dispatchUnityColoringCompletedEvent(gameInstance) {
     : { LevelID: "", Width: 0, Height: 0, Cells: [] };
   const encodedData = encodeURIComponent(JSON.stringify(levelColorData));
   return dispatchUnityNavigationUrl(`uniwebview://coloring_completed?data=${encodedData}`);
-}
-
-function dispatchUnityTutorialBirdTrackEvent(stepNumber) {
-  const normalizedStep = Math.max(1, Math.trunc(Number(stepNumber) || 0));
-  if (!Number.isFinite(normalizedStep)) {
-    return false;
-  }
-  return enqueueUnityTrackEventUrl(`uniwebview://track?event=tutorial_bird&event_action=${encodeURIComponent(String(normalizedStep))}`);
-}
-
-function dispatchUnityTutorialPointerShowTrackEvent(stepNumber) {
-  const normalizedStep = Math.max(1, Math.trunc(Number(stepNumber) || 0));
-  if (!Number.isFinite(normalizedStep)) {
-    return false;
-  }
-  const encodedStep = encodeURIComponent(String(normalizedStep));
-  return enqueueUnityTrackEventUrl(`uniwebview://track?event=tutorial_pointer_show&event_action=${encodedStep}&action=${encodedStep}`);
 }
 
 function dispatchUnityTutorialTrackEvent(eventName, eventAction) {
