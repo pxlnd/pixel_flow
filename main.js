@@ -413,13 +413,32 @@ const CARD_HITBOX_PADDING_X = 26;
 const CARD_HITBOX_PADDING_TOP = 26;
 const CARD_HITBOX_PADDING_BOTTOM = 22;
 const PARKED_UNIT_TAP_RADIUS = 86;
-const LEVEL_ONE_TUTORIAL_ID = "1";
+const MAIN_TUTORIAL_LEVEL_ID = "2";
+const CACTUS_PREGAME_TUTORIAL_LEVEL_ID = "2";
+const CACTUS_PREGAME_TUTORIAL_LEVEL_NAME = "cactus";
 const LEVEL_ONE_TUTORIAL_STEPS = {
   tapBlackCard: "tap-black-card",
   waitBlackLapComplete: "wait-black-lap-complete",
   tapGreenCard: "tap-green-card",
   done: "done",
 };
+const CACTUS_PREGAME_TUTORIAL_STEPS = {
+  tapBlackColor: "tap-black-color",
+  tapSecondSector: "tap-second-sector",
+  tapGreenColor: "tap-green-color",
+  tapThirdSector: "tap-third-sector",
+  tapOrangeColor: "tap-orange-color",
+  tapStart: "tap-start",
+  done: "done",
+};
+const CACTUS_PREGAME_TUTORIAL_SEQUENCE = [
+  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapBlackColor, type: "color", sectorIndex: 0, colorKey: "black" },
+  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapSecondSector, type: "sector", sectorIndex: 1 },
+  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapGreenColor, type: "color", sectorIndex: 1, colorKey: "green" },
+  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapThirdSector, type: "sector", sectorIndex: 2 },
+  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapOrangeColor, type: "color", sectorIndex: 2, colorKey: "orange" },
+  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapStart, type: "start" },
+];
 const LEVEL_ONE_TRAVEL_HINT_TEXT = "Wait for shooter to travel";
 const LEVEL_ONE_TRAVEL_HINT_LETTER_ANIM_DURATION = 0.6;
 const LEVEL_ONE_TRAVEL_HINT_LETTER_STAGGER = 0.018;
@@ -3141,6 +3160,7 @@ class Game {
       moving: false,
     };
     this.tutorial = this.createTutorialState();
+    this.pregameTutorial = this.createPregameTutorialState();
 
     this.gameState = "loading";
     this.remainingBlocks = 0;
@@ -4738,6 +4758,11 @@ class Game {
       this.preGameStartButtonAppearProgress = 0;
       this.preGameStartButtonBounceTime = 0;
       this.preGameStartButtonWasAvailable = false;
+      if (this.pregameTutorial) {
+        this.pregameTutorial.active = false;
+        this.pregameTutorial.step = CACTUS_PREGAME_TUTORIAL_STEPS.done;
+        this.pregameTutorial.handTime = 0;
+      }
     }
     if (previousState === "playing" && normalizedNextState !== "playing") {
       this.clearQueuedSpawnRequest();
@@ -5951,9 +5976,139 @@ class Game {
     };
   }
 
-  isLevelOneTutorialEnabled() {
-    return String(this.currentLevelId || "") === LEVEL_ONE_TUTORIAL_ID;
+  createPregameTutorialState() {
+    return {
+      active: false,
+      step: CACTUS_PREGAME_TUTORIAL_STEPS.done,
+      handTime: 0,
+    };
   }
+
+  isLevelOneTutorialEnabled() {
+    return String(this.currentLevelId || "") === MAIN_TUTORIAL_LEVEL_ID;
+  }
+
+  isCactusPregameTutorialEnabled() {
+    const levelId = String(this.currentLevelId || CURRENT_LEVEL?.id || "").trim();
+    const levelName = String(CURRENT_LEVEL?.name || "").trim().toLowerCase();
+    return levelId === CACTUS_PREGAME_TUTORIAL_LEVEL_ID
+      || levelName === CACTUS_PREGAME_TUTORIAL_LEVEL_NAME;
+  }
+
+  hasCactusPregameTutorialLayout() {
+    const sectorKeys = Array.isArray(this.pregameSectorKeys) ? this.pregameSectorKeys : [];
+    return sectorKeys[0] === "black" && sectorKeys[1] === "green" && sectorKeys[2] === "orange";
+  }
+
+  setupCactusPregameTutorial() {
+    this.pregameTutorial = this.createPregameTutorialState();
+    if (!this.isCactusPregameTutorialEnabled() || !this.hasCactusPregameTutorialLayout()) {
+      return false;
+    }
+    this.pregameTutorial.active = true;
+    this.pregameTutorial.step = CACTUS_PREGAME_TUTORIAL_STEPS.tapBlackColor;
+    this.pregameSelectedSectorKey = this.pregameSectorKeys[0] || null;
+    this.pregameAutoSelectPending = false;
+    return true;
+  }
+
+  isCactusPregameTutorialActive() {
+    return this.gameState === "pregame" && this.pregameTutorial?.active === true;
+  }
+
+  getCactusPregameTutorialStepConfig() {
+    if (!this.pregameTutorial?.active) {
+      return null;
+    }
+    const step = this.pregameTutorial.step;
+    return CACTUS_PREGAME_TUTORIAL_SEQUENCE.find((entry) => entry.step === step) || null;
+  }
+
+  advanceCactusPregameTutorial() {
+    if (!this.pregameTutorial?.active) {
+      return;
+    }
+    const currentIndex = CACTUS_PREGAME_TUTORIAL_SEQUENCE.findIndex(
+      (entry) => entry.step === this.pregameTutorial.step
+    );
+    const nextStep = CACTUS_PREGAME_TUTORIAL_SEQUENCE[currentIndex + 1]?.step
+      || CACTUS_PREGAME_TUTORIAL_STEPS.done;
+    this.pregameTutorial.step = nextStep;
+    this.pregameTutorial.handTime = 0;
+    if (nextStep === CACTUS_PREGAME_TUTORIAL_STEPS.done) {
+      this.pregameTutorial.active = false;
+    }
+    this.invalidate(true);
+  }
+
+  getCactusPregameTutorialTapTarget() {
+    if (!this.isCactusPregameTutorialActive()) {
+      return null;
+    }
+    const config = this.getCactusPregameTutorialStepConfig();
+    if (!config) {
+      return null;
+    }
+    this.getPregameColorPanelRect();
+    if (config.type === "sector") {
+      const entry = this.preGameSectorButtons[config.sectorIndex] || null;
+      return entry ? { ...config, rect: entry.rect, sectorKey: entry.sectorKey } : null;
+    }
+    if (config.type === "color") {
+      const entry = this.preGameColorButtons.find((button) => button.colorKey === config.colorKey) || null;
+      return entry ? { ...config, rect: entry.rect } : null;
+    }
+    if (config.type === "start") {
+      if (!this.isPregameStartAvailable()) {
+        return null;
+      }
+      return { ...config, rect: this.getPregameStartButtonHitRect() };
+    }
+    return null;
+  }
+
+  isPointOnCactusPregameTutorialTarget(target, x, y) {
+    return !!target?.rect && isInsideRect(x, y, target.rect);
+  }
+
+  handleCactusPregameTutorialPointerDown(x, y) {
+    const target = this.getCactusPregameTutorialTapTarget();
+    if (!target || !this.isPointOnCactusPregameTutorialTarget(target, x, y)) {
+      return true;
+    }
+
+    if (target.type === "sector") {
+      const sectorKey = this.pregameSectorKeys[target.sectorIndex] || target.sectorKey || null;
+      if (sectorKey) {
+        this.pregameSelectedSectorKey = sectorKey;
+        this.pregameAutoSelectPending = false;
+        this.advanceCactusPregameTutorial();
+      }
+      return true;
+    }
+
+    if (target.type === "color") {
+      const sectorKey = this.pregameSectorKeys[target.sectorIndex] || null;
+      if (sectorKey && this.pregameSelectedSectorKey !== sectorKey) {
+        this.pregameSelectedSectorKey = sectorKey;
+        this.pregameAutoSelectPending = false;
+      }
+      this.applyPregameColorPick(target.colorKey);
+      this.advanceCactusPregameTutorial();
+      return true;
+    }
+
+    if (target.type === "start") {
+      this.pregameStartTransitionActive = true;
+      this.pregameFigureDisappearTime = 0;
+      this.finishTutorial();
+      this.advanceCactusPregameTutorial();
+      return true;
+    }
+
+    return true;
+  }
+
 
   clearIdleAssistWakeTimer() {
     if (this.idleAssistWakeTimerId !== null) {
@@ -8757,6 +8912,9 @@ class Game {
     }
     if (this.gameState === "pregame") {
       this.pregamePulseTime += dt;
+      if (this.pregameTutorial?.active) {
+        this.pregameTutorial.handTime += dt;
+      }
       if (this.pregameStartTransitionActive) {
         this.pregameFigureAppearTime = PREGAME_FIGURE_APPEAR_DURATION;
         this.pregameFigureDisappearTime = Math.min(
@@ -9248,6 +9406,7 @@ class Game {
       lastX: 0,
       movedDistance: 0,
     };
+    this.setupCactusPregameTutorial();
     this.applyPregameColoringToBlocks({ rebuildCards: false });
   }
 
@@ -9953,6 +10112,9 @@ class Game {
     if (this.gameState !== "pregame" || this.pregameStartTransitionActive) {
       return false;
     }
+    if (this.isCactusPregameTutorialActive()) {
+      return false;
+    }
     this.getPregameColorPanelRect();
     if (this.preGameColorScrollMaxOffset <= 0.5) {
       return false;
@@ -10022,6 +10184,9 @@ class Game {
   handlePregameColorPanelWheel(x, y, deltaX, deltaY) {
     if (this.gameState !== "pregame" || this.pregameStartTransitionActive) {
       return false;
+    }
+    if (this.isCactusPregameTutorialActive()) {
+      return true;
     }
     this.getPregameColorPanelRect();
     if (this.preGameColorScrollMaxOffset <= 0.5) {
@@ -10458,6 +10623,37 @@ class Game {
     ctx.restore();
   }
 
+  drawCactusPregameTutorialHand(ctx) {
+    const target = this.getCactusPregameTutorialTapTarget();
+    if (!target?.rect) {
+      return;
+    }
+    const hand = this.tutorHandImage;
+    if (!hand || !hand.complete || hand.naturalWidth <= 0 || hand.naturalHeight <= 0) {
+      return;
+    }
+
+    const rect = target.rect;
+    const targetX = rect.x + rect.w * 0.5;
+    const targetY = rect.y + rect.h * 0.5;
+    const handTime = Number(this.pregameTutorial?.handTime) || 0;
+    const floatY = Math.sin(handTime * 6.2) * 10;
+    const handW = 157;
+    const handH = handW * (hand.naturalHeight / hand.naturalWidth);
+    const handX = targetX;
+    const handY = targetY + 78 + floatY;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    if ("imageSmoothingQuality" in ctx) {
+      ctx.imageSmoothingQuality = "high";
+    }
+    ctx.translate(handX, handY);
+    ctx.rotate(Math.PI * 0.2);
+    ctx.drawImage(hand, -handW * 0.5, -handH * 0.5, handW, handH);
+    ctx.restore();
+  }
+
   drawPregame(ctx) {
     // The cached static scene includes bird slots. Keep pre-game cleaner by
     // drawing only the world layer until the player presses START.
@@ -10469,6 +10665,9 @@ class Game {
     }
     if (!this.pregameStartTransitionActive && this.isPregameStartAvailable()) {
       this.drawPregameStartButton(ctx);
+    }
+    if (!this.pregameStartTransitionActive) {
+      this.drawCactusPregameTutorialHand(ctx);
     }
   }
 
@@ -12275,6 +12474,13 @@ class Game {
       return;
     }
     if (this.gameState === "pregame") {
+      if (this.isCactusPregameTutorialActive()) {
+        const target = this.getCactusPregameTutorialTapTarget();
+        this.canvas.style.cursor = target && this.isPointOnCactusPregameTutorialTarget(target, x, y)
+          ? "pointer"
+          : "default";
+        return;
+      }
       const overBack = this.shouldShowBackButton() && isInsideRect(x, y, this.backButtonRect);
       const overPanelControl = !this.pregameStartTransitionActive && this.isPointOnPregamePanelControls(x, y);
       const overStart = !this.pregameStartTransitionActive
@@ -12337,6 +12543,10 @@ class Game {
       return;
     }
     if (this.gameState === "pregame") {
+      if (this.isCactusPregameTutorialActive()) {
+        this.handleCactusPregameTutorialPointerDown(x, y);
+        return;
+      }
       if (backButtonVisible && isInsideRect(x, y, this.backButtonRect)) {
         this.showQuitScreen();
         return;
