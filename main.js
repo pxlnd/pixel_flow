@@ -4818,6 +4818,7 @@ class Game {
       dispatchUnityPreviewTrackEvent("show");
     }
     if (normalizedNextState === "pregame" && previousState !== "pregame") {
+      dispatchUnityColoringScreenTrackEvent("coloring_screen", "shown");
       this.pregameFigureAppearTime = 0;
       this.pregameFigureDisappearTime = 0;
       this.pregameStartTransitionActive = false;
@@ -6213,6 +6214,7 @@ class Game {
       if (sectorKey) {
         this.pregameSelectedSectorKey = sectorKey;
         this.pregameAutoSelectPending = false;
+        this.trackPregameSectionSelected(sectorKey);
         this.trackCactusPregameTutorialEventOnce(target.completedEvent, "completed");
         this.advanceCactusPregameTutorial();
       }
@@ -6225,6 +6227,7 @@ class Game {
         this.pregameSelectedSectorKey = sectorKey;
         this.pregameAutoSelectPending = false;
       }
+      this.trackPregameColorSelected(target.colorKey);
       this.applyPregameColorPick(target.colorKey);
       this.trackCactusPregameTutorialEventOnce(target.completedEvent, "completed");
       this.advanceCactusPregameTutorial();
@@ -6232,6 +6235,7 @@ class Game {
     }
 
     if (target.type === "start") {
+      dispatchUnityColoringScreenTrackEvent("coloring_screen_start_button", "clicked");
       this.pregameStartTransitionActive = true;
       this.pregameFigureDisappearTime = 0;
       this.trackCactusPregameTutorialEventOnce(target.completedEvent, "completed");
@@ -10274,6 +10278,41 @@ class Game {
     return true;
   }
 
+  getPregameSectionNumber(sectorKey) {
+    const normalizedSectorKey = normalizeBlockColorName(sectorKey);
+    if (!normalizedSectorKey) {
+      return null;
+    }
+    const sectors = Array.isArray(this.pregameSectorKeys) ? this.pregameSectorKeys : [];
+    const sectorIndex = sectors.findIndex((key) => normalizeBlockColorName(key) === normalizedSectorKey);
+    if (sectorIndex < 0) {
+      return null;
+    }
+    return sectorIndex + 1;
+  }
+
+  trackPregameSectionSelected(sectorKey) {
+    const sectionNumber = this.getPregameSectionNumber(sectorKey);
+    if (!Number.isFinite(sectionNumber)) {
+      return false;
+    }
+    return dispatchUnityColoringScreenTrackEvent(
+      "coloring_screen_section_selected",
+      String(sectionNumber)
+    );
+  }
+
+  trackPregameColorSelected(colorKey) {
+    const normalizedColor = normalizeBlockColorName(colorKey);
+    if (!normalizedColor) {
+      return false;
+    }
+    return dispatchUnityColoringScreenTrackEvent(
+      "coloring_screen_color_selected",
+      normalizedColor
+    );
+  }
+
   beginPregameColorPanelDrag(pointerId, x, y) {
     if (this.gameState !== "pregame" || this.pregameStartTransitionActive) {
       return false;
@@ -10379,6 +10418,7 @@ class Game {
       if (!isInsideRect(x, y, entry.rect)) {
         continue;
       }
+      this.trackPregameSectionSelected(entry.sectorKey);
       if (this.pregameSelectedSectorKey !== entry.sectorKey) {
         this.pregameSelectedSectorKey = entry.sectorKey;
         this.pregameAutoSelectPending = false;
@@ -10390,6 +10430,7 @@ class Game {
       if (!isInsideRect(x, y, entry.rect)) {
         continue;
       }
+      this.trackPregameColorSelected(entry.colorKey);
       this.applyPregameColorPick(entry.colorKey);
       return true;
     }
@@ -12742,6 +12783,7 @@ class Game {
         return;
       }
       if (backButtonVisible && isInsideRect(x, y, this.backButtonRect)) {
+        dispatchUnityColoringScreenTrackEvent("coloring_screen_back_button", "clicked");
         this.showQuitScreen();
         return;
       }
@@ -12752,6 +12794,7 @@ class Game {
         return;
       }
       if (this.isPregameStartAvailable() && isInsideRect(x, y, this.getPregameStartButtonHitRect())) {
+        dispatchUnityColoringScreenTrackEvent("coloring_screen_start_button", "clicked");
         this.pregameStartTransitionActive = true;
         this.pregameFigureDisappearTime = 0;
         this.invalidate(true);
@@ -15344,6 +15387,17 @@ function dispatchUnityLevelTrackEvent(eventAction) {
   }
   const encodedAction = encodeURIComponent(normalizedAction);
   return enqueueUnityTrackEventUrl(`uniwebview://track?event=level&event_action=${encodedAction}&action=${encodedAction}`);
+}
+
+function dispatchUnityColoringScreenTrackEvent(eventName, eventAction) {
+  const normalizedEvent = String(eventName || "").trim();
+  const normalizedAction = String(eventAction || "").trim();
+  if (!normalizedEvent || !normalizedAction) {
+    return false;
+  }
+  const encodedEvent = encodeURIComponent(normalizedEvent);
+  const encodedAction = encodeURIComponent(normalizedAction);
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=${encodedEvent}&event_action=${encodedAction}&action=${encodedAction}`);
 }
 
 function dispatchUnityColoringCompletedEvent(gameInstance) {
