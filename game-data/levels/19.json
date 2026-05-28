@@ -4,6 +4,7 @@
   "level": {
     "id": "19",
     "name": "harry_potter",
+    "displayName": "Harry",
     "fallbackFieldPattern": [
       ".....KKKKKKKKKKKKKK.....",
       "...KKKNNNNNNNNNNNNKK....",

@@ -4,6 +4,7 @@
   "level": {
     "id": "8",
     "name": "earth",
+    "displayName": "Earth",
     "fallbackFieldPattern": [
       "......KKKKKK......",
       "....KKGCCCCGKK....",

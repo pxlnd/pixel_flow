@@ -4,6 +4,7 @@
   "level": {
     "id": "cat swim",
     "name": "cat swim",
+    "displayName": "Cat Swim",
     "fallbackFieldPattern": [
       "....................................",
       "..............99....................",

@@ -14,6 +14,7 @@ const LEVEL_REGISTRY = window.PIXELFLOW_LEVELS || {
 const BUILTIN_FALLBACK_LEVEL = {
   id: "1",
   name: "Level 1",
+  displayName: "Level 1",
   queueCardCount: 7,
   fallbackFieldPattern: [
     "GGGGGGGGGGGGGGGGGG",
@@ -142,11 +143,29 @@ function canonicalizeLevelName(levelConfig) {
   return isPositiveIntegerString(levelId) ? `Level ${levelId}` : "Level";
 }
 
+function capitalizeLevelDisplayName(value) {
+  const raw = String(value || "").trim();
+  if (raw.length === 0) {
+    return "";
+  }
+  return raw.charAt(0).toLocaleUpperCase() + raw.slice(1);
+}
+
+function canonicalizeLevelDisplayName(levelConfig) {
+  const rawDisplayName = String(levelConfig?.displayName || "").trim();
+  if (rawDisplayName.length > 0) {
+    return rawDisplayName;
+  }
+  const fallbackName = canonicalizeLevelName(levelConfig);
+  return capitalizeLevelDisplayName(fallbackName) || "Level";
+}
+
 function normalizeLevelDefinition(levelConfig, options = {}) {
   const { debugOnly = null } = options;
   const normalized = cloneData(levelConfig);
   normalized.id = String(normalized.id || "");
   normalized.name = canonicalizeLevelName(normalized);
+  normalized.displayName = canonicalizeLevelDisplayName(normalized);
   const levelNumber = getPositiveIntegerFromLevelText(normalized.levelNumber)
     ?? getPositiveIntegerFromLevelText(normalized.id)
     ?? getPositiveIntegerFromLevelText(normalized.name);
@@ -311,6 +330,7 @@ function persistLevelOverride(levelConfig) {
   const normalized = cloneData(levelConfig);
   normalized.id = String(normalized.id || "");
   normalized.name = canonicalizeLevelName(normalized);
+  normalized.displayName = canonicalizeLevelDisplayName(normalized);
   LEVEL_OVERRIDES_MAP.set(normalized.id, normalized);
   return saveLevelOverridesToStorage();
 }
@@ -785,6 +805,7 @@ async function loadLevelJSONByNumber(levelNumber) {
     ) {
       normalizedLevel.name = `Level ${levelNumber}`;
     }
+    normalizedLevel.displayName = canonicalizeLevelDisplayName(normalizedLevel);
     normalizedLevel.id = String(normalizedLevel.id || normalizedLevel.name);
     if (normalizedLevel.pixelArt && typeof normalizedLevel.pixelArt === "object" && !normalizedLevel.pixelArt.id) {
       normalizedLevel.pixelArt.id = `level-${levelNumber}-art`;
@@ -1635,6 +1656,7 @@ function createBaseLayout(layout) {
 function syncLevelGlobals(levelConfig, options = {}) {
   const { displayLevelNumber = null } = options;
   CURRENT_LEVEL = cloneData(levelConfig);
+  CURRENT_LEVEL.displayName = canonicalizeLevelDisplayName(CURRENT_LEVEL);
   BOTTOM_QUEUE_CARD_COUNT = clamp(
     Math.round(Number(CURRENT_LEVEL?.queueCardCount ?? BOTTOM_QUEUE_CARD_COUNT)),
     MIN_QUEUE_CARDS,
@@ -1647,9 +1669,10 @@ function syncLevelGlobals(levelConfig, options = {}) {
   const normalizedDisplayLevelNumber = Number.isFinite(displayLevelNumber)
     ? Math.max(1, Math.trunc(displayLevelNumber))
     : null;
+  const levelHeaderLabel = String(CURRENT_LEVEL?.displayName || CURRENT_LEVEL?.name || "Level").trim() || "Level";
   TIMER_PANEL_UI.label = normalizedDisplayLevelNumber !== null
     ? `Level ${normalizedDisplayLevelNumber}`
-    : (CURRENT_LEVEL.name || "Level");
+    : levelHeaderLabel;
   if (typeof document !== "undefined") {
     document.title = `PixelFlow - ${TIMER_PANEL_UI.label}`;
   }
@@ -5607,6 +5630,7 @@ class Game {
   buildCurrentLevelExport(levelNumber, levelName) {
     const level = cloneData(CURRENT_LEVEL);
     level.name = String(levelName || `Level ${levelNumber}`);
+    level.displayName = canonicalizeLevelDisplayName(level);
     level.id = level.name;
     level.levelNumber = levelNumber;
     level.queueCardCount = clamp(
@@ -11364,8 +11388,29 @@ class Game {
       return;
     }
 
-    const panelW = TIMER_PANEL_UI.w;
+    const label = String(TIMER_PANEL_UI.label || "Level").trim() || "Level";
     const panelH = TIMER_PANEL_UI.h;
+    const sideGap = Math.max(14, Math.round(panelH * 0.14));
+    const viewportMaxPanelW = Math.max(160, Math.round(this.width - sideGap * 2));
+    const rightButtonRect = this.getRestartButtonRect();
+    const leftLimit = this.backButtonRect.x + this.backButtonRect.w + sideGap;
+    const rightLimit = rightButtonRect.x - sideGap;
+    const betweenButtonsW = Math.round(rightLimit - leftLimit);
+    const maxPanelW = Math.max(
+      160,
+      Math.min(
+        viewportMaxPanelW,
+        betweenButtonsW > 0 ? betweenButtonsW : viewportMaxPanelW
+      )
+    );
+    const minPanelW = Math.max(140, Math.min(TIMER_PANEL_UI.w, maxPanelW));
+    const textPaddingX = Math.max(34, Math.round(panelH * 0.34));
+    ctx.save();
+    ctx.font = getTopPanelFont();
+    const measuredTextW = ctx.measureText(label).width;
+    ctx.restore();
+    const preferredPanelW = Math.round(measuredTextW + textPaddingX * 2);
+    const panelW = clamp(preferredPanelW, minPanelW, maxPanelW);
     const panelX = (this.width - panelW) * 0.5;
     const panelY = TIMER_PANEL_UI.y;
     const textX = panelX + panelW * 0.5;
@@ -11383,14 +11428,20 @@ class Game {
     ctx.restore();
 
     ctx.save();
-    ctx.font = getTopPanelFont();
+    const maxTextWidth = Math.max(40, panelW - textPaddingX * 2);
+    let textFontSize = TOP_PANEL_FONT_SIZE;
+    if (measuredTextW > maxTextWidth) {
+      const fontScale = clamp(maxTextWidth / Math.max(1, measuredTextW), 0.55, 1);
+      textFontSize = Math.max(24, Math.round(TOP_PANEL_FONT_SIZE * fontScale));
+    }
+    ctx.font = `${TOP_PANEL_FONT_WEIGHT} ${textFontSize}px ${TOP_PANEL_FONT_FAMILY}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.lineWidth = 6;
     ctx.strokeStyle = TIMER_PANEL_UI.textStroke;
     ctx.fillStyle = TIMER_PANEL_UI.textColor;
-    ctx.strokeText(TIMER_PANEL_UI.label, textX, textY);
-    ctx.fillText(TIMER_PANEL_UI.label, textX, textY);
+    ctx.strokeText(label, textX, textY);
+    ctx.fillText(label, textX, textY);
     ctx.restore();
   }
 
@@ -12552,6 +12603,7 @@ class Game {
 
     const updatedLevel = cloneData(CURRENT_LEVEL);
     updatedLevel.name = nextName;
+    updatedLevel.displayName = capitalizeLevelDisplayName(nextName);
     updatedLevel.id = nextName;
     updatedLevel.levelNumber = levelNumber;
 
@@ -13141,6 +13193,7 @@ class Game {
 
     level.id = levelId;
     level.name = levelName;
+    level.displayName = canonicalizeLevelDisplayName(level);
     level.levelNumber = levelNumber;
     level.queueCardCount = birdCount;
     level.fallbackFieldPattern = pattern;
@@ -15087,10 +15140,8 @@ async function bootstrapGame() {
 
     const matchedById = levels.find((level) => level.id === raw || level.name === raw);
     if (matchedById) {
-      const displayLevelNumber = isPositiveIntegerString(raw) ? Number(raw) : null;
       return {
         targetLevelId: matchedById.id,
-        displayLevelNumber,
       };
     }
 
@@ -15106,7 +15157,6 @@ async function bootstrapGame() {
     const normalizedIndex = index % levels.length;
     return {
       targetLevelId: levels[normalizedIndex].id,
-      displayLevelNumber: index > 0 ? index : 1,
     };
   };
   const resolveExternalLevelId = (value) => {
@@ -15119,7 +15169,6 @@ async function bootstrapGame() {
     if (matchedLevel) {
       return {
         targetLevelId: matchedLevel.id,
-        displayLevelNumber: isPositiveIntegerString(matchedLevel.id) ? Number(matchedLevel.id) : null,
       };
     }
     if (game.levelDefinitionsHydrationPending === true) {
@@ -15151,6 +15200,7 @@ async function bootstrapGame() {
     }
     try {
       prepareExternalLevelSelection();
+      game.applyLevelConfig(selection.targetLevelId, { restart: true });
       game.externalLevelSelectionDeferred = false;
       game.syncDebugContentSelectors();
       game.saveDebugSettings();
@@ -15176,10 +15226,7 @@ async function bootstrapGame() {
     }
     try {
       prepareExternalLevelSelection();
-      game.applyLevelConfig(selection.targetLevelId, {
-        restart: true,
-        displayLevelNumber: selection.displayLevelNumber,
-      });
+      game.applyLevelConfig(selection.targetLevelId, { restart: true });
       game.externalLevelIdDeferred = false;
       game.syncDebugContentSelectors();
       game.saveDebugSettings();

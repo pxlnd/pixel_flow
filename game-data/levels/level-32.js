@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_32 = {
   "id": "sakura",
   "name": "sakura",
+  "displayName": "Sakura",
   "fallbackFieldPattern": [
     "..............................",
     "...........77.77..............",

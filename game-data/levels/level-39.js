@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_39 = {
   "id": "panda sleep",
   "name": "panda sleep",
+  "displayName": "Panda Sleep",
   "fallbackFieldPattern": [
     "...................................",
     "...................................",

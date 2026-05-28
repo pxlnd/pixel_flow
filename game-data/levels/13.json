@@ -4,6 +4,7 @@
   "level": {
     "id": "13",
     "name": "cat_in_bread",
+    "displayName": "Toast",
     "fallbackFieldPattern": [
       "......OOOOOOOOOOO......",
       "....OOEEEEEEEEEEEOO....",

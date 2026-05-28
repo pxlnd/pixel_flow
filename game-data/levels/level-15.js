@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_15 = {
   "id": "15",
   "name": "anime_blonde_girl",
+  "displayName": "Anime Girl",
   "fallbackFieldPattern": [
     "......KK.........KK......",
     ".....KYYK.......KYYK.....",

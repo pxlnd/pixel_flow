@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_40 = {
   "id": "house",
   "name": "house",
+  "displayName": "House",
   "fallbackFieldPattern": [
     "......................................",
     "77.77............8888............77.77",

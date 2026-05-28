@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_2 = {
   "id": "2",
   "name": "cactus",
+  "displayName": "Cactus",
   "fallbackFieldPattern": [
     ".....KK.....",
     ".K..KGGK....",

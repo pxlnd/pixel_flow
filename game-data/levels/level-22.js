@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_22 = {
   "id": "22",
   "name": "stitch",
+  "displayName": "Stitch",
   "fallbackFieldPattern": [
     ".......KK.................",
     ".......KDK................",
