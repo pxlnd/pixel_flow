@@ -4,6 +4,7 @@
   "level": {
     "id": "night",
     "name": "night",
+    "displayName": "Night",
     "fallbackFieldPattern": [
       ".....KK......................KK....",
       "....KKKKKKKKKKKKKKKKKKKKKKKKKKKK...",

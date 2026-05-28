@@ -4,6 +4,7 @@
   "level": {
     "id": "20",
     "name": "sigma_squidward",
+    "displayName": "Squid Meme",
     "fallbackFieldPattern": [
       "........KKKKKKKKKKKKK.......",
       ".......KKCCCCCCCCCCCKKK.....",

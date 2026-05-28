@@ -4,6 +4,7 @@
   "level": {
     "id": "girl",
     "name": "girl",
+    "displayName": "Girl",
     "fallbackFieldPattern": [
       ".............KKKKK...............",
       "............K99999K..............",

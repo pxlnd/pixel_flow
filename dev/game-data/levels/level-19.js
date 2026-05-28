@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_19 = {
   "id": "19",
   "name": "harry_potter",
+  "displayName": "Harry",
   "fallbackFieldPattern": [
     ".....KKKKKKKKKKKKKK.....",
     "...KKKNNNNNNNNNNNNKK....",

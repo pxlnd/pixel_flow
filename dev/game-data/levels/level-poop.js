@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_DEBUG_POOP = {
   "id": "poop",
   "name": "Level 20",
+  "displayName": "Level 20",
   "debugOnly": true,
   "fallbackFieldPattern": [
     "HHHHHHHHHHHHHHHHHHHHHHHHHHHH",

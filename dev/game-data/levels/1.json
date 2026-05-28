@@ -4,6 +4,7 @@
   "level": {
     "id": "1",
     "name": "star",
+    "displayName": "Star",
     "fallbackFieldPattern": [
       ".............",
       "......K......",

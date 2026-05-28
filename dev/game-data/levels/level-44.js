@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_44 = {
   "id": "anime",
   "name": "anime",
+  "displayName": "Anime",
   "fallbackFieldPattern": [
     ".................KKKKKKK................",
     "..............KKKTTTTTTTKKK.............",

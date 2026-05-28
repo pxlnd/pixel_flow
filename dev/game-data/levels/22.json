@@ -4,6 +4,7 @@
   "level": {
     "id": "22",
     "name": "stitch",
+    "displayName": "Stitch",
     "fallbackFieldPattern": [
       ".......KK.................",
       ".......KDK................",

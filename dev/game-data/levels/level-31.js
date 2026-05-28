@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_31 = {
   "id": "panda",
   "name": "panda",
+  "displayName": "Panda",
   "fallbackFieldPattern": [
     "....KKKKK....KKKKKK....KKKK....",
     "..KK000KKKKKK555555KKKKK000K...",

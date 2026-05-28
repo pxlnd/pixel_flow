@@ -4,6 +4,7 @@
   "level": {
     "id": "17",
     "name": "spongebob",
+    "displayName": "Bob",
     "fallbackFieldPattern": [
       "KKKKKKKKKKKKKKKKKKKKKKKKKKK",
       "KYYYYYYYYYYYYYYYYYYYYYYYYYK",

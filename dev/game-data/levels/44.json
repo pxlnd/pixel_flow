@@ -4,6 +4,7 @@
   "level": {
     "id": "anime",
     "name": "anime",
+    "displayName": "Anime",
     "fallbackFieldPattern": [
       ".................KKKKKKK................",
       "..............KKKTTTTTTTKKK.............",

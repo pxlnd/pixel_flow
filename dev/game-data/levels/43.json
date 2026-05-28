@@ -4,6 +4,7 @@
   "level": {
     "id": "window",
     "name": "window",
+    "displayName": "Window",
     "fallbackFieldPattern": [
       "..................KKK...................",
       ".........KK......K666KK.....K...........",

@@ -4,6 +4,7 @@
   "level": {
     "id": "poop",
     "name": "Level 20",
+    "displayName": "Level 20",
     "debugOnly": true,
     "fallbackFieldPattern": [
       "HHHHHHHHHHHHHHHHHHHHHHHHHHHH",

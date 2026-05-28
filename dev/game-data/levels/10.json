@@ -4,6 +4,7 @@
   "level": {
     "id": "10",
     "name": "rainbow",
+    "displayName": "Rainbow",
     "fallbackFieldPattern": [
       ".......RRRRRR.......",
       ".....RRROOOORRR.....",

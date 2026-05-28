@@ -4,6 +4,7 @@
   "level": {
     "id": "9",
     "name": "squidward",
+    "displayName": "Squid",
     "fallbackFieldPattern": [
       ".....KKKKKKK.....",
       "...KKCCCCCCCKK...",

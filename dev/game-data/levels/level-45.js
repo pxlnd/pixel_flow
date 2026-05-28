@@ -1,6 +1,7 @@
 window.PIXELFLOW_LEVEL_45 = {
   "id": "night",
   "name": "night",
+  "displayName": "Night",
   "fallbackFieldPattern": [
     ".....KK......................KK....",
     "....KKKKKKKKKKKKKKKKKKKKKKKKKKKK...",

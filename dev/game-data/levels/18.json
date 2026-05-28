@@ -4,6 +4,7 @@
   "level": {
     "id": "18",
     "name": "funny_monkey_meme",
+    "displayName": "Monkey",
     "fallbackFieldPattern": [
       "..........KKKKKKKKK.........",
       "........KKNNNNNNNNNK........",
