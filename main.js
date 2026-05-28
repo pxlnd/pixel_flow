@@ -433,12 +433,50 @@ const CACTUS_PREGAME_TUTORIAL_STEPS = {
   done: "done",
 };
 const CACTUS_PREGAME_TUTORIAL_SEQUENCE = [
-  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapBlackColor, type: "color", sectorIndex: 0, colorKey: "black" },
-  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapSecondSector, type: "sector", sectorIndex: 1 },
-  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapGreenColor, type: "color", sectorIndex: 1, colorKey: "green" },
-  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapThirdSector, type: "sector", sectorIndex: 2 },
-  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapOrangeColor, type: "color", sectorIndex: 2, colorKey: "orange" },
-  { step: CACTUS_PREGAME_TUTORIAL_STEPS.tapStart, type: "start" },
+  {
+    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapBlackColor,
+    type: "color",
+    sectorIndex: 0,
+    colorKey: "black",
+    pointerEvent: "tutor_pointer_blackcolor",
+    completedEvent: "tutor_paint_blackcolor",
+  },
+  {
+    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapSecondSector,
+    type: "sector",
+    sectorIndex: 1,
+    pointerEvent: "tutor_pointer_number2",
+    completedEvent: "tutor_select_number2",
+  },
+  {
+    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapGreenColor,
+    type: "color",
+    sectorIndex: 1,
+    colorKey: "green",
+    pointerEvent: "tutor_pointer_greencolor",
+    completedEvent: "tutor_paint_greencolor",
+  },
+  {
+    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapThirdSector,
+    type: "sector",
+    sectorIndex: 2,
+    pointerEvent: "tutor_pointer_number3",
+    completedEvent: "tutor_select_number3",
+  },
+  {
+    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapOrangeColor,
+    type: "color",
+    sectorIndex: 2,
+    colorKey: "orange",
+    pointerEvent: "tutor_pointer_orangecolor",
+    completedEvent: "tutor_paint_orangecolor",
+  },
+  {
+    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapStart,
+    type: "start",
+    pointerEvent: "tutor_pointer_startbutton",
+    completedEvent: "tutor_press_startbutton",
+  },
 ];
 const LEVEL_ONE_TRAVEL_HINT_TEXT = "Wait for shooter to travel";
 const LEVEL_ONE_TRAVEL_HINT_LETTER_ANIM_DURATION = 0.6;
@@ -5986,6 +6024,7 @@ class Game {
       active: false,
       step: CACTUS_PREGAME_TUTORIAL_STEPS.done,
       handTime: 0,
+      trackedEvents: new Set(),
     };
   }
 
@@ -6014,6 +6053,7 @@ class Game {
     this.pregameTutorial.step = CACTUS_PREGAME_TUTORIAL_STEPS.tapBlackColor;
     this.pregameSelectedSectorKey = this.pregameSectorKeys[0] || null;
     this.pregameAutoSelectPending = false;
+    this.trackCactusPregameTutorialEventOnce("tutor_level_intro", "completed");
     return true;
   }
 
@@ -6027,6 +6067,32 @@ class Game {
     }
     const step = this.pregameTutorial.step;
     return CACTUS_PREGAME_TUTORIAL_SEQUENCE.find((entry) => entry.step === step) || null;
+  }
+
+  trackCactusPregameTutorialEventOnce(eventName, eventAction = "completed") {
+    const normalizedEvent = String(eventName || "").trim();
+    const normalizedAction = String(eventAction || "").trim();
+    if (!normalizedEvent || !normalizedAction) {
+      return false;
+    }
+    const trackedEvents = this.pregameTutorial?.trackedEvents;
+    const eventKey = `${normalizedEvent}:${normalizedAction}`;
+    if (trackedEvents instanceof Set && trackedEvents.has(eventKey)) {
+      return false;
+    }
+    const tracked = dispatchUnityTutorialTrackEvent(normalizedEvent, normalizedAction);
+    if (tracked && trackedEvents instanceof Set) {
+      trackedEvents.add(eventKey);
+    }
+    return tracked;
+  }
+
+  trackCactusPregameTutorialPointerShow(target) {
+    const pointerEvent = String(target?.pointerEvent || "").trim();
+    if (!pointerEvent) {
+      return false;
+    }
+    return this.trackCactusPregameTutorialEventOnce(pointerEvent, "completed");
   }
 
   advanceCactusPregameTutorial() {
@@ -6087,6 +6153,7 @@ class Game {
       if (sectorKey) {
         this.pregameSelectedSectorKey = sectorKey;
         this.pregameAutoSelectPending = false;
+        this.trackCactusPregameTutorialEventOnce(target.completedEvent, "completed");
         this.advanceCactusPregameTutorial();
       }
       return true;
@@ -6099,6 +6166,7 @@ class Game {
         this.pregameAutoSelectPending = false;
       }
       this.applyPregameColorPick(target.colorKey);
+      this.trackCactusPregameTutorialEventOnce(target.completedEvent, "completed");
       this.advanceCactusPregameTutorial();
       return true;
     }
@@ -6106,6 +6174,7 @@ class Game {
     if (target.type === "start") {
       this.pregameStartTransitionActive = true;
       this.pregameFigureDisappearTime = 0;
+      this.trackCactusPregameTutorialEventOnce(target.completedEvent, "completed");
       this.advanceCactusPregameTutorial();
       return true;
     }
@@ -8946,6 +9015,7 @@ class Game {
         if (this.pregameFigureDisappearTime >= PREGAME_FIGURE_DISAPPEAR_DURATION) {
           this.pregameStartTransitionActive = false;
           this.setGameState("playing");
+          this.trackCactusPregameTutorialEventOnce("tutor_state", "tutor_completed_state");
           this.levelStartFade = 1;
           this.invalidate(true);
           return;
@@ -8975,6 +9045,9 @@ class Game {
           this.preGameStartButtonAppearProgress = 0;
           this.preGameStartButtonBounceTime = 0;
           this.preGameStartButtonWasAvailable = true;
+          if (this.isCactusPregameTutorialEnabled()) {
+            this.trackCactusPregameTutorialEventOnce("tutor_show_startbutton", "completed");
+          }
         }
         const appearDuration = Math.max(0.001, Number(PREGAME_START_BUTTON_UI.appearDuration) || 0.24);
         this.preGameStartButtonAppearProgress = Math.min(
@@ -10654,6 +10727,7 @@ class Game {
     if (!hand || !hand.complete || hand.naturalWidth <= 0 || hand.naturalHeight <= 0) {
       return;
     }
+    this.trackCactusPregameTutorialPointerShow(target);
 
     const rect = target.rect;
     const targetX = rect.x + rect.w * 0.5;
@@ -15195,6 +15269,17 @@ function dispatchUnityTutorialPointerShowTrackEvent(stepNumber) {
   }
   const encodedStep = encodeURIComponent(String(normalizedStep));
   return enqueueUnityTrackEventUrl(`uniwebview://track?event=tutorial_pointer_show&event_action=${encodedStep}&action=${encodedStep}`);
+}
+
+function dispatchUnityTutorialTrackEvent(eventName, eventAction) {
+  const normalizedEvent = String(eventName || "").trim();
+  const normalizedAction = String(eventAction || "").trim();
+  if (!normalizedEvent || !normalizedAction) {
+    return false;
+  }
+  const encodedEvent = encodeURIComponent(normalizedEvent);
+  const encodedAction = encodeURIComponent(normalizedAction);
+  return enqueueUnityTrackEventUrl(`uniwebview://track?event=${encodedEvent}&event_action=${encodedAction}&action=${encodedAction}`);
 }
 
 function dispatchUnityLosePopupTrackEvent(eventAction) {
