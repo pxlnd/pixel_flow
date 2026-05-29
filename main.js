@@ -699,6 +699,7 @@ const PREGAME_COLOR_PANEL_UI = {
 const PREGAME_CHECKMARK_SIZE_SCALE = 0.7;
 const PREGAME_CHECKMARK_MIN_SIZE = 10;
 const PREGAME_COLOR_SCROLL_DRAG_THRESHOLD = 9;
+const PREGAME_TUTORIAL_HAND_EXTRA_OFFSET_Y = 28;
 const PREGAME_EXTRA_COLOR_OPTIONS = [
   "red",
   "blue",
@@ -6794,8 +6795,24 @@ class Game {
     return null;
   }
 
+  getCactusPregameTutorialTargetHitRect(target) {
+    if (!target?.rect) {
+      return null;
+    }
+    const safeScale = Math.max(0.0001, Number(this.viewportScale) || 1);
+    const screenPadding = target.type === "start" ? 18 : 44;
+    const padding = Math.max(14, screenPadding / safeScale);
+    return {
+      x: target.rect.x - padding,
+      y: target.rect.y - padding,
+      w: target.rect.w + padding * 2,
+      h: target.rect.h + padding * 2,
+    };
+  }
+
   isPointOnCactusPregameTutorialTarget(target, x, y) {
-    return !!target?.rect && isInsideRect(x, y, target.rect);
+    const hitRect = this.getCactusPregameTutorialTargetHitRect(target);
+    return !!hitRect && isInsideRect(x, y, hitRect);
   }
 
   handleCactusPregameTutorialPointerDown(x, y) {
@@ -11471,7 +11488,7 @@ class Game {
     const handW = 157;
     const handH = handW * (hand.naturalHeight / hand.naturalWidth);
     const handX = targetX;
-    const handY = targetY + 78 + floatY;
+    const handY = targetY + 78 + PREGAME_TUTORIAL_HAND_EXTRA_OFFSET_Y + floatY;
 
     ctx.save();
     ctx.imageSmoothingEnabled = true;
