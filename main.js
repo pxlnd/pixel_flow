@@ -699,6 +699,7 @@ const PREGAME_COLOR_PANEL_UI = {
 const PREGAME_CHECKMARK_SIZE_SCALE = 0.7;
 const PREGAME_CHECKMARK_MIN_SIZE = 10;
 const PREGAME_COLOR_SCROLL_DRAG_THRESHOLD = 9;
+const PREGAME_TUTORIAL_HAND_EXTRA_OFFSET_Y = 28;
 const PREGAME_EXTRA_COLOR_OPTIONS = [
   "red",
   "blue",
@@ -6794,8 +6795,24 @@ class Game {
     return null;
   }
 
+  getCactusPregameTutorialTargetHitRect(target) {
+    if (!target?.rect) {
+      return null;
+    }
+    const safeScale = Math.max(0.0001, Number(this.viewportScale) || 1);
+    const screenPadding = target.type === "start" ? 18 : 44;
+    const padding = Math.max(14, screenPadding / safeScale);
+    return {
+      x: target.rect.x - padding,
+      y: target.rect.y - padding,
+      w: target.rect.w + padding * 2,
+      h: target.rect.h + padding * 2,
+    };
+  }
+
   isPointOnCactusPregameTutorialTarget(target, x, y) {
-    return !!target?.rect && isInsideRect(x, y, target.rect);
+    const hitRect = this.getCactusPregameTutorialTargetHitRect(target);
+    return !!hitRect && isInsideRect(x, y, hitRect);
   }
 
   handleCactusPregameTutorialPointerDown(x, y) {
@@ -6818,12 +6835,20 @@ class Game {
 
     if (target.type === "color") {
       const sectorKey = this.pregameSectorKeys[target.sectorIndex] || null;
+      const targetColor = normalizeBlockColorName(target.colorKey);
+      if (!sectorKey || !targetColor) {
+        return true;
+      }
       if (sectorKey && this.pregameSelectedSectorKey !== sectorKey) {
         this.pregameSelectedSectorKey = sectorKey;
         this.pregameAutoSelectPending = false;
       }
-      this.trackPregameColorSelected(target.colorKey);
-      this.applyPregameColorPick(target.colorKey);
+      const applied = this.applyPregameColorPick(targetColor);
+      const assignedColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[sectorKey]);
+      if (!applied && assignedColor !== targetColor) {
+        return true;
+      }
+      this.trackPregameColorSelected(targetColor);
       this.trackCactusPregameTutorialEventOnce(target.completedEvent, "completed");
       this.advanceCactusPregameTutorial();
       return true;
@@ -10178,7 +10203,22 @@ class Game {
       movedDistance: 0,
     };
     this.setupCactusPregameTutorial();
+    this.ensurePregameSelectedSector();
     this.applyPregameColoringToBlocks({ rebuildCards: false });
+  }
+
+  ensurePregameSelectedSector() {
+    if (this.pregameSelectedSectorKey) {
+      return this.pregameSelectedSectorKey;
+    }
+    const sectors = Array.isArray(this.pregameSectorKeys) ? this.pregameSectorKeys : [];
+    const sectorKey = sectors[0] || null;
+    if (!sectorKey) {
+      return null;
+    }
+    this.pregameSelectedSectorKey = sectorKey;
+    this.pregameAutoSelectPending = false;
+    return sectorKey;
   }
 
   applyPregameColoringToBlocks(options = {}) {
@@ -10203,6 +10243,11 @@ class Game {
     const clamped = clamp(Number(nextOffset) || 0, 0, maxOffset);
     this.preGameColorScrollOffset = clamped;
     return clamped;
+  }
+
+  getPregameColorDragThresholdWorld() {
+    const safeScale = Math.max(0.0001, Number(this.viewportScale) || 1);
+    return PREGAME_COLOR_SCROLL_DRAG_THRESHOLD / safeScale;
   }
 
   getPregameColorPanelRect() {
@@ -10979,7 +11024,7 @@ class Game {
     if (isCancel) {
       return true;
     }
-    if (movedDistance <= PREGAME_COLOR_SCROLL_DRAG_THRESHOLD) {
+    if (movedDistance <= this.getPregameColorDragThresholdWorld()) {
       this.handlePregamePanelPointerDown(x, y);
     } else {
       this.handlePointerMove(x, y);
@@ -11031,6 +11076,7 @@ class Game {
       if (!isInsideRect(x, y, entry.rect)) {
         continue;
       }
+      this.ensurePregameSelectedSector();
       this.trackPregameColorSelected(entry.colorKey);
       this.applyPregameColorPick(entry.colorKey);
       return true;
@@ -11450,7 +11496,7 @@ class Game {
     const handW = 157;
     const handH = handW * (hand.naturalHeight / hand.naturalWidth);
     const handX = targetX;
-    const handY = targetY + 78 + floatY;
+    const handY = targetY + 78 + PREGAME_TUTORIAL_HAND_EXTRA_OFFSET_Y + floatY;
 
     ctx.save();
     ctx.imageSmoothingEnabled = true;
