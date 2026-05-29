@@ -434,6 +434,8 @@ const CARD_HITBOX_PADDING_TOP = 26;
 const CARD_HITBOX_PADDING_BOTTOM = 22;
 const PARKED_UNIT_TAP_RADIUS = 86;
 const MAIN_TUTORIAL_LEVEL_ID = "2";
+const STAR_LEVEL_ID = "1";
+const STAR_LEVEL_NAME = "star";
 const CACTUS_PREGAME_TUTORIAL_LEVEL_ID = "2";
 const CACTUS_PREGAME_TUTORIAL_LEVEL_NAME = "cactus";
 const LEVEL_ONE_TUTORIAL_STEPS = {
@@ -12322,10 +12324,16 @@ class Game {
   }
 
   shouldShowBackButton() {
-    if (this.isCurrentLevelFirstPrimary()) {
+    if (this.gameState === "loading" || this.gameState === "preview" || this.gameState === "victory") {
       return false;
     }
-    return this.gameState !== "loading" && this.gameState !== "preview" && this.gameState !== "victory";
+    if (this.gameState === "pregame" && this.isCactusPregameTutorialEnabled()) {
+      return false;
+    }
+    if (this.isCurrentLevelFirstPrimary() && !(this.gameState === "pregame" && this.isCurrentStarLevel())) {
+      return false;
+    }
+    return true;
   }
 
   shouldShowRestartButton() {
@@ -12339,6 +12347,13 @@ class Game {
     const currentLevelId = String(this.currentLevelId || "");
     const firstPrimaryLevelId = String(this.primaryLevels?.[0]?.id || DEFAULT_LEVEL_ID);
     return currentLevelId === firstPrimaryLevelId;
+  }
+
+  isCurrentStarLevel() {
+    const levelId = String(this.currentLevelId || CURRENT_LEVEL?.id || "").trim();
+    const levelName = String(CURRENT_LEVEL?.name || "").trim().toLowerCase();
+    const displayName = String(CURRENT_LEVEL?.displayName || "").trim().toLowerCase();
+    return levelId === STAR_LEVEL_ID || levelName === STAR_LEVEL_NAME || displayName === STAR_LEVEL_NAME;
   }
 
   shouldShowTopLevelPanel() {
