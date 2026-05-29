@@ -402,7 +402,7 @@ let SHOT_BOUNCE_SPEED = 1;
 let TRACK_UNIT_SPEED = 980;
 let BOTTOM_QUEUE_CARD_COUNT = 7;
 let CHICKEN_SIZE_SCALE = 1.6;
-let TOP_PANEL_FONT_SIZE = 67;
+let TOP_PANEL_FONT_SIZE = 55;
 let TOP_LEVEL_PANEL_SCALE = 1.2;
 let TOP_COINS_PANEL_SCALE = 1.2;
 let BACK_BUTTON_SCALE = 1.2;
@@ -434,6 +434,8 @@ const CARD_HITBOX_PADDING_TOP = 26;
 const CARD_HITBOX_PADDING_BOTTOM = 22;
 const PARKED_UNIT_TAP_RADIUS = 86;
 const MAIN_TUTORIAL_LEVEL_ID = "2";
+const STAR_LEVEL_ID = "1";
+const STAR_LEVEL_NAME = "star";
 const CACTUS_PREGAME_TUTORIAL_LEVEL_ID = "2";
 const CACTUS_PREGAME_TUTORIAL_LEVEL_NAME = "cactus";
 const LEVEL_ONE_TUTORIAL_STEPS = {
@@ -605,6 +607,8 @@ const BACK_BUTTON_UI = {
 const TOP_PANEL_FONT_WEIGHT = 800;
 const TOP_PANEL_FONT_FAMILY = "\"Baloo 2\", \"Arial Rounded MT Bold\", \"Trebuchet MS\", Arial, sans-serif";
 const OPEN_SANS_FONT_FAMILY = "\"Open Sans\", Arial, sans-serif";
+const LEVEL_TITLE_FONT_WEIGHT = 800;
+const LEVEL_TITLE_FONT_FAMILY = OPEN_SANS_FONT_FAMILY;
 const TIMER_PANEL_UI = {
   y: 36,
   w: 256,
@@ -797,7 +801,7 @@ const DEBUG_DEFAULTS = {
   queueCardCount: 7,
   activeUnitsLimit: 20,
   chickenSizeScale: 1.22,
-  topPanelFontSize: 67,
+  topPanelFontSize: 55,
   topLevelPanelScale: 1.2,
   topCoinsPanelScale: 1.2,
   backButtonScale: 1.2,
@@ -2348,8 +2352,8 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function getTopPanelFont() {
-  return `${TOP_PANEL_FONT_WEIGHT} ${Math.round(TOP_PANEL_FONT_SIZE)}px ${TOP_PANEL_FONT_FAMILY}`;
+function getTopPanelFont(fontSize = TOP_PANEL_FONT_SIZE) {
+  return `${LEVEL_TITLE_FONT_WEIGHT} ${fontSize}px/1 ${LEVEL_TITLE_FONT_FAMILY}`;
 }
 
 function getCardYOffsetByIndex(index) {
@@ -3775,6 +3779,12 @@ class Game {
     this.slotManager = new SlotManager(LAYOUT.slots, SLOT_CLAIM_ORDER);
     this.backButtonRect = { ...BACK_BUTTON_UI };
     this.restartButtonRect = { x: 0, y: 0, w: COINS_UI.panelW, h: COINS_UI.panelH };
+    this.topTimerPanelRect = {
+      x: (this.width - TIMER_PANEL_UI.w) * 0.5,
+      y: TIMER_PANEL_UI.y,
+      w: TIMER_PANEL_UI.w,
+      h: TIMER_PANEL_UI.h,
+    };
     this.preGameStartButtonRect = { x: 0, y: 0, w: 0, h: 0 };
     this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
     this.preGameSectorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
@@ -6071,7 +6081,7 @@ class Game {
       MAX_ACTIVE_UNITS_LIMIT
     );
     CHICKEN_SIZE_SCALE = clamp(Number(settings.chickenSizeScale ?? DEBUG_DEFAULTS.chickenSizeScale), 0.6, 1.8);
-    TOP_PANEL_FONT_SIZE = clamp(Number(settings.topPanelFontSize ?? DEBUG_DEFAULTS.topPanelFontSize), 24, 80);
+    TOP_PANEL_FONT_SIZE = clamp(Number(settings.topPanelFontSize ?? DEBUG_DEFAULTS.topPanelFontSize), 12, 80);
     TOP_LEVEL_PANEL_SCALE = clamp(Number(settings.topLevelPanelScale ?? DEBUG_DEFAULTS.topLevelPanelScale), 0.6, 1.8);
     TOP_COINS_PANEL_SCALE = clamp(Number(settings.topCoinsPanelScale ?? DEBUG_DEFAULTS.topCoinsPanelScale), 0.6, 1.8);
     BACK_BUTTON_SCALE = clamp(Number(settings.backButtonScale ?? DEBUG_DEFAULTS.backButtonScale), 0.6, 1.8);
@@ -12316,10 +12326,16 @@ class Game {
   }
 
   shouldShowBackButton() {
-    if (this.isCurrentLevelFirstPrimary()) {
+    if (this.gameState === "loading" || this.gameState === "preview" || this.gameState === "victory") {
       return false;
     }
-    return this.gameState !== "loading" && this.gameState !== "preview" && this.gameState !== "victory";
+    if (this.gameState === "pregame" && this.isCactusPregameTutorialEnabled()) {
+      return false;
+    }
+    if (this.isCurrentLevelFirstPrimary() && !(this.gameState === "pregame" && this.isCurrentStarLevel())) {
+      return false;
+    }
+    return true;
   }
 
   shouldShowRestartButton() {
@@ -12333,6 +12349,13 @@ class Game {
     const currentLevelId = String(this.currentLevelId || "");
     const firstPrimaryLevelId = String(this.primaryLevels?.[0]?.id || DEFAULT_LEVEL_ID);
     return currentLevelId === firstPrimaryLevelId;
+  }
+
+  isCurrentStarLevel() {
+    const levelId = String(this.currentLevelId || CURRENT_LEVEL?.id || "").trim();
+    const levelName = String(CURRENT_LEVEL?.name || "").trim().toLowerCase();
+    const displayName = String(CURRENT_LEVEL?.displayName || "").trim().toLowerCase();
+    return levelId === STAR_LEVEL_ID || levelName === STAR_LEVEL_NAME || displayName === STAR_LEVEL_NAME;
   }
 
   shouldShowTopLevelPanel() {
@@ -12377,18 +12400,21 @@ class Game {
         betweenButtonsW > 0 ? betweenButtonsW : viewportMaxPanelW
       )
     );
-    const minPanelW = Math.max(140, Math.min(TIMER_PANEL_UI.w, maxPanelW));
+    const minPanelW = Math.min(140, maxPanelW);
     const textPaddingX = Math.max(34, Math.round(panelH * 0.34));
     ctx.save();
     ctx.font = getTopPanelFont();
+    if ("letterSpacing" in ctx) {
+      ctx.letterSpacing = "0px";
+    }
     const measuredTextW = ctx.measureText(label).width;
     ctx.restore();
-    const preferredPanelW = Math.round(measuredTextW + textPaddingX * 2);
-    const panelW = clamp(preferredPanelW, minPanelW, maxPanelW);
+    const panelW = clamp(TIMER_PANEL_UI.w, minPanelW, maxPanelW);
     const panelX = (this.width - panelW) * 0.5;
     const panelY = TIMER_PANEL_UI.y;
     const textX = panelX + panelW * 0.5;
     const textY = panelY + panelH * 0.5 + 4;
+    this.topTimerPanelRect = { x: panelX, y: panelY, w: panelW, h: panelH };
 
     ctx.save();
     ctx.imageSmoothingEnabled = true;
@@ -12405,13 +12431,16 @@ class Game {
     const maxTextWidth = Math.max(40, panelW - textPaddingX * 2);
     let textFontSize = TOP_PANEL_FONT_SIZE;
     if (measuredTextW > maxTextWidth) {
-      const fontScale = clamp(maxTextWidth / Math.max(1, measuredTextW), 0.55, 1);
-      textFontSize = Math.max(24, Math.round(TOP_PANEL_FONT_SIZE * fontScale));
+      const fontScale = maxTextWidth / Math.max(1, measuredTextW);
+      textFontSize = Math.max(8, TOP_PANEL_FONT_SIZE * fontScale);
     }
-    ctx.font = `${TOP_PANEL_FONT_WEIGHT} ${textFontSize}px ${TOP_PANEL_FONT_FAMILY}`;
+    ctx.font = getTopPanelFont(textFontSize);
+    if ("letterSpacing" in ctx) {
+      ctx.letterSpacing = "0px";
+    }
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.lineWidth = 6;
+    ctx.lineWidth = Math.max(2, textFontSize * 0.11);
     ctx.strokeStyle = TIMER_PANEL_UI.textStroke;
     ctx.fillStyle = TIMER_PANEL_UI.textColor;
     ctx.strokeText(label, textX, textY);
@@ -12496,6 +12525,80 @@ class Game {
       heart: { x, y, w: heartW, h: heartH },
       coins: { x: x + heartW + gap, y, w: coinsW, h: coinsH },
     };
+  }
+
+  getPregameTopCoinsPanelRect() {
+    const sourceW =
+      this.loseTopCoinsPanelImage?.naturalWidth > 0 ? this.loseTopCoinsPanelImage.naturalWidth : 244;
+    const sourceH =
+      this.loseTopCoinsPanelImage?.naturalHeight > 0 ? this.loseTopCoinsPanelImage.naturalHeight : 96;
+    const targetH = Math.max(1, TIMER_PANEL_UI.h);
+    let w = sourceW * (targetH / sourceH);
+    let h = targetH;
+    const sideGap = Math.max(10, Math.round(LAYOUT.track.w * 0.02));
+    const rightX = Math.round(LAYOUT.track.x + LAYOUT.track.w - sideGap);
+    const timerRect = this.topTimerPanelRect || {
+      x: (this.width - TIMER_PANEL_UI.w) * 0.5,
+      y: TIMER_PANEL_UI.y,
+      w: TIMER_PANEL_UI.w,
+      h: TIMER_PANEL_UI.h,
+    };
+    const minX = timerRect.x + timerRect.w + sideGap;
+    const maxW = Math.max(80, rightX - minX);
+    if (w > maxW) {
+      const scale = maxW / w;
+      w *= scale;
+      h *= scale;
+    }
+    return {
+      x: Math.round(rightX - w),
+      y: Math.round(TIMER_PANEL_UI.y + (TIMER_PANEL_UI.h - h) * 0.5),
+      w,
+      h,
+    };
+  }
+
+  drawPregameTopCoinsPanel(ctx) {
+    const coinsCount = String(this.getCurrentExternalCoinsCount());
+    const panel = this.getPregameTopCoinsPanelRect();
+
+    ctx.save();
+    ctx.shadowColor = "rgba(8, 14, 36, 0.26)";
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+    if (
+      this.loseTopCoinsPanelImage?.complete &&
+      this.loseTopCoinsPanelImage.naturalWidth > 0 &&
+      this.loseTopCoinsPanelImage.naturalHeight > 0
+    ) {
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.drawImage(this.loseTopCoinsPanelImage, panel.x, panel.y, panel.w, panel.h);
+    } else {
+      const grad = ctx.createLinearGradient(panel.x, panel.y, panel.x, panel.y + panel.h);
+      grad.addColorStop(0, "#f5f9ff");
+      grad.addColorStop(1, "#d7e5ff");
+      roundedRect(ctx, panel.x, panel.y, panel.w, panel.h, Math.round(panel.h * 0.28));
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = LOSE_TOP_STATS_UI.coinsTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.coinsTextStroke;
+    ctx.lineWidth = Math.max(2, panel.h * 0.045);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `800 ${Math.max(20, Math.round(panel.h * 0.32 * LOSE_TOP_STATS_UI.coinsTextFontScale))}px "Open Sans", Arial, sans-serif`;
+    const coinsX = panel.x + panel.w * LOSE_TOP_STATS_UI.coinsTextXRatio + LOSE_TOP_STATS_UI.coinsTextOffsetX;
+    const coinsY = panel.y + panel.h * LOSE_TOP_STATS_UI.coinsTextYRatio + LOSE_TOP_STATS_UI.coinsTextOffsetY;
+    ctx.strokeText(coinsCount, coinsX, coinsY);
+    ctx.fillText(coinsCount, coinsX, coinsY);
+    ctx.restore();
   }
 
   drawLoseTopStats(ctx, alpha = 1) {
@@ -13067,6 +13170,7 @@ class Game {
       this.drawPregame(ctx);
       if (this.shouldShowTopLevelPanel()) {
         this.drawTopTimerPanel(ctx);
+        this.drawPregameTopCoinsPanel(ctx);
       }
       if (this.shouldShowBackButton()) {
         this.drawBackButton(ctx);
@@ -14402,9 +14506,9 @@ class Game {
       this.topPanelFontSizeValue,
       TOP_PANEL_FONT_SIZE,
       (value) => Number(value),
-      (value) => String(Math.round(value)),
+      (value) => value.toFixed(2),
       (value) => {
-        TOP_PANEL_FONT_SIZE = clamp(value, 24, 80);
+        TOP_PANEL_FONT_SIZE = clamp(value, 12, 80);
         this.invalidate(false);
         return TOP_PANEL_FONT_SIZE;
       }
