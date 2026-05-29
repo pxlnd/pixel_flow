@@ -9710,7 +9710,7 @@ class Game {
         if (this.pregameFigureDisappearTime >= PREGAME_FIGURE_DISAPPEAR_DURATION) {
           this.pregameStartTransitionActive = false;
           this.setGameState("playing");
-          this.trackCactusPregameTutorialEventOnce("tutorial_state", "tutorial_completed_state");
+          this.trackCactusPregameTutorialEventOnce("tutorial_state", "completed");
           this.levelStartFade = 1;
           this.invalidate(true);
           return;
