@@ -6835,12 +6835,20 @@ class Game {
 
     if (target.type === "color") {
       const sectorKey = this.pregameSectorKeys[target.sectorIndex] || null;
+      const targetColor = normalizeBlockColorName(target.colorKey);
+      if (!sectorKey || !targetColor) {
+        return true;
+      }
       if (sectorKey && this.pregameSelectedSectorKey !== sectorKey) {
         this.pregameSelectedSectorKey = sectorKey;
         this.pregameAutoSelectPending = false;
       }
-      this.trackPregameColorSelected(target.colorKey);
-      this.applyPregameColorPick(target.colorKey);
+      const applied = this.applyPregameColorPick(targetColor);
+      const assignedColor = normalizeBlockColorName(this.pregameSectorColorAssignments?.[sectorKey]);
+      if (!applied && assignedColor !== targetColor) {
+        return true;
+      }
+      this.trackPregameColorSelected(targetColor);
       this.trackCactusPregameTutorialEventOnce(target.completedEvent, "completed");
       this.advanceCactusPregameTutorial();
       return true;
