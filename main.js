@@ -10178,7 +10178,22 @@ class Game {
       movedDistance: 0,
     };
     this.setupCactusPregameTutorial();
+    this.ensurePregameSelectedSector();
     this.applyPregameColoringToBlocks({ rebuildCards: false });
+  }
+
+  ensurePregameSelectedSector() {
+    if (this.pregameSelectedSectorKey) {
+      return this.pregameSelectedSectorKey;
+    }
+    const sectors = Array.isArray(this.pregameSectorKeys) ? this.pregameSectorKeys : [];
+    const sectorKey = sectors[0] || null;
+    if (!sectorKey) {
+      return null;
+    }
+    this.pregameSelectedSectorKey = sectorKey;
+    this.pregameAutoSelectPending = false;
+    return sectorKey;
   }
 
   applyPregameColoringToBlocks(options = {}) {
@@ -10203,6 +10218,11 @@ class Game {
     const clamped = clamp(Number(nextOffset) || 0, 0, maxOffset);
     this.preGameColorScrollOffset = clamped;
     return clamped;
+  }
+
+  getPregameColorDragThresholdWorld() {
+    const safeScale = Math.max(0.0001, Number(this.viewportScale) || 1);
+    return PREGAME_COLOR_SCROLL_DRAG_THRESHOLD / safeScale;
   }
 
   getPregameColorPanelRect() {
@@ -10979,7 +10999,7 @@ class Game {
     if (isCancel) {
       return true;
     }
-    if (movedDistance <= PREGAME_COLOR_SCROLL_DRAG_THRESHOLD) {
+    if (movedDistance <= this.getPregameColorDragThresholdWorld()) {
       this.handlePregamePanelPointerDown(x, y);
     } else {
       this.handlePointerMove(x, y);
@@ -11031,6 +11051,7 @@ class Game {
       if (!isInsideRect(x, y, entry.rect)) {
         continue;
       }
+      this.ensurePregameSelectedSector();
       this.trackPregameColorSelected(entry.colorKey);
       this.applyPregameColorPick(entry.colorKey);
       return true;
