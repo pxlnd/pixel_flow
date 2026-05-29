@@ -3775,6 +3775,12 @@ class Game {
     this.slotManager = new SlotManager(LAYOUT.slots, SLOT_CLAIM_ORDER);
     this.backButtonRect = { ...BACK_BUTTON_UI };
     this.restartButtonRect = { x: 0, y: 0, w: COINS_UI.panelW, h: COINS_UI.panelH };
+    this.topTimerPanelRect = {
+      x: (this.width - TIMER_PANEL_UI.w) * 0.5,
+      y: TIMER_PANEL_UI.y,
+      w: TIMER_PANEL_UI.w,
+      h: TIMER_PANEL_UI.h,
+    };
     this.preGameStartButtonRect = { x: 0, y: 0, w: 0, h: 0 };
     this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
     this.preGameSectorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
@@ -12389,6 +12395,7 @@ class Game {
     const panelY = TIMER_PANEL_UI.y;
     const textX = panelX + panelW * 0.5;
     const textY = panelY + panelH * 0.5 + 4;
+    this.topTimerPanelRect = { x: panelX, y: panelY, w: panelW, h: panelH };
 
     ctx.save();
     ctx.imageSmoothingEnabled = true;
@@ -12496,6 +12503,80 @@ class Game {
       heart: { x, y, w: heartW, h: heartH },
       coins: { x: x + heartW + gap, y, w: coinsW, h: coinsH },
     };
+  }
+
+  getPregameTopCoinsPanelRect() {
+    const sourceW =
+      this.loseTopCoinsPanelImage?.naturalWidth > 0 ? this.loseTopCoinsPanelImage.naturalWidth : 244;
+    const sourceH =
+      this.loseTopCoinsPanelImage?.naturalHeight > 0 ? this.loseTopCoinsPanelImage.naturalHeight : 96;
+    const targetH = Math.max(1, TIMER_PANEL_UI.h);
+    let w = sourceW * (targetH / sourceH);
+    let h = targetH;
+    const sideGap = Math.max(10, Math.round(LAYOUT.track.w * 0.02));
+    const rightX = Math.round(LAYOUT.track.x + LAYOUT.track.w - sideGap);
+    const timerRect = this.topTimerPanelRect || {
+      x: (this.width - TIMER_PANEL_UI.w) * 0.5,
+      y: TIMER_PANEL_UI.y,
+      w: TIMER_PANEL_UI.w,
+      h: TIMER_PANEL_UI.h,
+    };
+    const minX = timerRect.x + timerRect.w + sideGap;
+    const maxW = Math.max(80, rightX - minX);
+    if (w > maxW) {
+      const scale = maxW / w;
+      w *= scale;
+      h *= scale;
+    }
+    return {
+      x: Math.round(rightX - w),
+      y: Math.round(TIMER_PANEL_UI.y + (TIMER_PANEL_UI.h - h) * 0.5),
+      w,
+      h,
+    };
+  }
+
+  drawPregameTopCoinsPanel(ctx) {
+    const coinsCount = String(this.getCurrentExternalCoinsCount());
+    const panel = this.getPregameTopCoinsPanelRect();
+
+    ctx.save();
+    ctx.shadowColor = "rgba(8, 14, 36, 0.26)";
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+    if (
+      this.loseTopCoinsPanelImage?.complete &&
+      this.loseTopCoinsPanelImage.naturalWidth > 0 &&
+      this.loseTopCoinsPanelImage.naturalHeight > 0
+    ) {
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.drawImage(this.loseTopCoinsPanelImage, panel.x, panel.y, panel.w, panel.h);
+    } else {
+      const grad = ctx.createLinearGradient(panel.x, panel.y, panel.x, panel.y + panel.h);
+      grad.addColorStop(0, "#f5f9ff");
+      grad.addColorStop(1, "#d7e5ff");
+      roundedRect(ctx, panel.x, panel.y, panel.w, panel.h, Math.round(panel.h * 0.28));
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = LOSE_TOP_STATS_UI.coinsTextColor;
+    ctx.strokeStyle = LOSE_TOP_STATS_UI.coinsTextStroke;
+    ctx.lineWidth = Math.max(2, panel.h * 0.045);
+    ctx.lineJoin = "round";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `800 ${Math.max(20, Math.round(panel.h * 0.32 * LOSE_TOP_STATS_UI.coinsTextFontScale))}px "Open Sans", Arial, sans-serif`;
+    const coinsX = panel.x + panel.w * LOSE_TOP_STATS_UI.coinsTextXRatio + LOSE_TOP_STATS_UI.coinsTextOffsetX;
+    const coinsY = panel.y + panel.h * LOSE_TOP_STATS_UI.coinsTextYRatio + LOSE_TOP_STATS_UI.coinsTextOffsetY;
+    ctx.strokeText(coinsCount, coinsX, coinsY);
+    ctx.fillText(coinsCount, coinsX, coinsY);
+    ctx.restore();
   }
 
   drawLoseTopStats(ctx, alpha = 1) {
@@ -13067,6 +13148,7 @@ class Game {
       this.drawPregame(ctx);
       if (this.shouldShowTopLevelPanel()) {
         this.drawTopTimerPanel(ctx);
+        this.drawPregameTopCoinsPanel(ctx);
       }
       if (this.shouldShowBackButton()) {
         this.drawBackButton(ctx);
