@@ -445,13 +445,13 @@ const LEVEL_ONE_TUTORIAL_STEPS = {
   done: "done",
 };
 const LEVEL_ONE_TUTORIAL_TRACK_EVENTS = {
-  pointerGreenBird: "tutor_pointer_greenbird",
-  launchGreenBird: "tutor_launch_greenbird",
-  halfwayPause: "tutor_halfwaypause",
-  pointerBlackBird: "tutor_pointer_blackbird",
-  launchBlackBird: "tutor_launch_blackbird",
-  freeTutorial: "tutor_freetutorial",
-  levelComplete: "tutor_levelcomplete",
+  pointerGreenBird: "tutorial_pointer_greenbird",
+  launchGreenBird: "tutorial_launch_greenbird",
+  halfwayPause: "tutorial_halfwaypause",
+  pointerBlackBird: "tutorial_pointer_blackbird",
+  launchBlackBird: "tutorial_launch_blackbird",
+  freeTutorial: "tutorial_freetutorial",
+  levelComplete: "tutorial_levelcomplete",
 };
 const LEVEL_ONE_GREEN_PAUSE_TRACK_PROGRESS = 0.7;
 const CACTUS_PREGAME_TUTORIAL_STEPS = {
@@ -469,44 +469,44 @@ const CACTUS_PREGAME_TUTORIAL_SEQUENCE = [
     type: "color",
     sectorIndex: 0,
     colorKey: "black",
-    pointerEvent: "tutor_pointer_blackcolor",
-    completedEvent: "tutor_paint_blackcolor",
+    pointerEvent: "tutorial_pointer_blackcolor",
+    completedEvent: "tutorial_paint_blackcolor",
   },
   {
     step: CACTUS_PREGAME_TUTORIAL_STEPS.tapSecondSector,
     type: "sector",
     sectorIndex: 1,
-    pointerEvent: "tutor_pointer_number2",
-    completedEvent: "tutor_select_number2",
+    pointerEvent: "tutorial_pointer_number2",
+    completedEvent: "tutorial_select_number2",
   },
   {
     step: CACTUS_PREGAME_TUTORIAL_STEPS.tapGreenColor,
     type: "color",
     sectorIndex: 1,
     colorKey: "green",
-    pointerEvent: "tutor_pointer_greencolor",
-    completedEvent: "tutor_paint_greencolor",
+    pointerEvent: "tutorial_pointer_greencolor",
+    completedEvent: "tutorial_paint_greencolor",
   },
   {
     step: CACTUS_PREGAME_TUTORIAL_STEPS.tapThirdSector,
     type: "sector",
     sectorIndex: 2,
-    pointerEvent: "tutor_pointer_number3",
-    completedEvent: "tutor_select_number3",
+    pointerEvent: "tutorial_pointer_number3",
+    completedEvent: "tutorial_select_number3",
   },
   {
     step: CACTUS_PREGAME_TUTORIAL_STEPS.tapOrangeColor,
     type: "color",
     sectorIndex: 2,
     colorKey: "orange",
-    pointerEvent: "tutor_pointer_orangecolor",
-    completedEvent: "tutor_paint_orangecolor",
+    pointerEvent: "tutorial_pointer_orangecolor",
+    completedEvent: "tutorial_paint_orangecolor",
   },
   {
     step: CACTUS_PREGAME_TUTORIAL_STEPS.tapStart,
     type: "start",
-    pointerEvent: "tutor_pointer_startbutton",
-    completedEvent: "tutor_press_startbutton",
+    pointerEvent: "tutorial_pointer_startbutton",
+    completedEvent: "tutorial_press_startbutton",
   },
 ];
 const LEVEL_ONE_TRAVEL_HINT_TEXT = "Wait for shooter to travel";
@@ -6684,7 +6684,7 @@ class Game {
     this.pregameTutorial.step = CACTUS_PREGAME_TUTORIAL_STEPS.tapBlackColor;
     this.pregameSelectedSectorKey = this.pregameSectorKeys[0] || null;
     this.pregameAutoSelectPending = false;
-    this.trackCactusPregameTutorialEventOnce("tutor_level_intro", "completed");
+    this.trackCactusPregameTutorialEventOnce("tutorial_level_intro", "completed");
     return true;
   }
 
@@ -9710,7 +9710,7 @@ class Game {
         if (this.pregameFigureDisappearTime >= PREGAME_FIGURE_DISAPPEAR_DURATION) {
           this.pregameStartTransitionActive = false;
           this.setGameState("playing");
-          this.trackCactusPregameTutorialEventOnce("tutor_state", "tutor_completed_state");
+          this.trackCactusPregameTutorialEventOnce("tutorial_state", "tutorial_completed_state");
           this.levelStartFade = 1;
           this.invalidate(true);
           return;
@@ -9741,7 +9741,7 @@ class Game {
           this.preGameStartButtonBounceTime = 0;
           this.preGameStartButtonWasAvailable = true;
           if (this.isCactusPregameTutorialEnabled()) {
-            this.trackCactusPregameTutorialEventOnce("tutor_show_startbutton", "completed");
+            this.trackCactusPregameTutorialEventOnce("tutorial_show_startbutton", "completed");
           }
         }
         const appearDuration = Math.max(0.001, Number(PREGAME_START_BUTTON_UI.appearDuration) || 0.24);
