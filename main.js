@@ -6679,6 +6679,7 @@ class Game {
       active: false,
       step: CACTUS_PREGAME_TUTORIAL_STEPS.done,
       handTime: 0,
+      stateCompletionPending: false,
       trackedEvents: new Set(),
     };
   }
@@ -6900,6 +6901,7 @@ class Game {
       dispatchUnityColoringScreenTrackEvent("coloring_screen_start_button", "clicked");
       this.pregameStartTransitionActive = true;
       this.pregameFigureDisappearTime = 0;
+      this.pregameTutorial.stateCompletionPending = true;
       this.trackCactusPregameTutorialEventOnce(target.completedEvent, "completed");
       this.advanceCactusPregameTutorial();
       return true;
@@ -9757,7 +9759,10 @@ class Game {
         if (this.pregameFigureDisappearTime >= PREGAME_FIGURE_DISAPPEAR_DURATION) {
           this.pregameStartTransitionActive = false;
           this.setGameState("playing");
-          this.trackCactusPregameTutorialEventOnce("tutorial_state", "completed");
+          if (this.pregameTutorial?.stateCompletionPending === true) {
+            this.pregameTutorial.stateCompletionPending = false;
+            this.trackCactusPregameTutorialEventOnce("tutorial_state", "completed");
+          }
           this.levelStartFade = 1;
           this.invalidate(true);
           return;
