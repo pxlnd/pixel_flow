@@ -3861,6 +3861,7 @@ class Game {
     this.queueCompletionTrackPending = false;
     this.queuedSpawnCardIndex = null;
     this.losePopupAppear = 1;
+    this.externalTutorialCompleted = normalizeExternalTutorialCompleted(pendingExternalTutorialCompleted);
     this.debugPanel = document.getElementById("debugPanel");
     this.debugHotspotBottomLeft = document.getElementById("debugHotspotBottomLeft");
     this.debugHotspotTopRight = document.getElementById("debugHotspotTopRight");
@@ -6683,14 +6684,56 @@ class Game {
   }
 
   isLevelOneTutorialEnabled() {
-    return String(this.currentLevelId || "") === MAIN_TUTORIAL_LEVEL_ID;
+    return String(this.currentLevelId || "") === MAIN_TUTORIAL_LEVEL_ID
+      && !this.isColoringTutorialCompleted();
   }
 
-  isCactusPregameTutorialEnabled() {
+  isCurrentCactusLevel() {
     const levelId = String(this.currentLevelId || CURRENT_LEVEL?.id || "").trim();
     const levelName = String(CURRENT_LEVEL?.name || "").trim().toLowerCase();
     return levelId === CACTUS_PREGAME_TUTORIAL_LEVEL_ID
       || levelName === CACTUS_PREGAME_TUTORIAL_LEVEL_NAME;
+  }
+
+  isColoringTutorialCompleted() {
+    return resolveExternalTutorialCompleted(this) === true;
+  }
+
+  isCactusPregameTutorialEnabled() {
+    return this.isCurrentCactusLevel() && !this.isColoringTutorialCompleted();
+  }
+
+  disableCactusTutorialsForCompletedColoring() {
+    if (!this.isCurrentCactusLevel()) {
+      return false;
+    }
+    if (this.tutorial) {
+      this.tutorial.active = false;
+      this.tutorial.gameplayPaused = false;
+      this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.done;
+      this.tutorial.completedCallbackSent = true;
+    }
+    if (this.pregameTutorial) {
+      this.pregameTutorial.active = false;
+      this.pregameTutorial.step = CACTUS_PREGAME_TUTORIAL_STEPS.done;
+      this.pregameTutorial.handTime = 0;
+    }
+    this.invalidate(true);
+    return true;
+  }
+
+  applyExternalTutorialCompleted(value) {
+    const normalized = normalizeExternalTutorialCompleted(value);
+    if (normalized === null) {
+      return false;
+    }
+    pendingExternalTutorialCompleted = normalized;
+    this.externalTutorialCompleted = normalized;
+    if (normalized) {
+      clearQueuedUnityTutorialTrackEvents();
+      this.disableCactusTutorialsForCompletedColoring();
+    }
+    return true;
   }
 
   hasCactusPregameTutorialLayout() {
@@ -15636,6 +15679,7 @@ let pendingExternalLivesTimer = null;
 let pendingExternalSubscriptionStatus = null;
 let pendingExternalTimeOutCoinsCost = null;
 let pendingExternalSoundsActive = null;
+let pendingExternalTutorialCompleted = null;
 const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
 const EXTERNAL_HEARTS_STORAGE_KEY = "pixelflow.external.hearts.v1";
 const EXTERNAL_MAX_LIVES_STORAGE_KEY = "pixelflow.external.max_lives.v1";
@@ -15769,6 +15813,29 @@ function normalizeExternalSubscriptionStatus(value) {
 }
 
 function normalizeExternalSoundsActive(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  const lowered = normalizedRaw.toLowerCase();
+  if (lowered === "true" || lowered === "1" || lowered === "yes") {
+    return true;
+  }
+  if (lowered === "false" || lowered === "0" || lowered === "no") {
+    return false;
+  }
+  return null;
+}
+
+function normalizeExternalTutorialCompleted(value) {
   const raw = String(value ?? "").trim();
   if (raw.length === 0) {
     return null;
@@ -15930,6 +15997,18 @@ function resolveExternalSubscriptionStatus(gameInstance) {
   }
 }
 
+function resolveExternalTutorialCompleted(gameInstance) {
+  const fromGame = normalizeExternalTutorialCompleted(gameInstance?.externalTutorialCompleted);
+  if (fromGame !== null) {
+    return fromGame;
+  }
+  const fromPending = normalizeExternalTutorialCompleted(pendingExternalTutorialCompleted);
+  if (fromPending !== null) {
+    return fromPending;
+  }
+  return false;
+}
+
 function resolveExternalTimeOutCoinsCost(gameInstance) {
   const fromGame = normalizeExternalTimeOutCoinsCost(gameInstance?.externalTimeOutCoinsCost);
   if (fromGame !== null) {
@@ -16022,6 +16101,19 @@ function shouldDispatchUnityScreenTapTrackEvent() {
 function clearQueuedUnityTrackEvents() {
   unityTrackEventQueue.length = 0;
   if (unityTrackEventTimer !== null) {
+    clearTimeout(unityTrackEventTimer);
+    unityTrackEventTimer = null;
+  }
+}
+
+function clearQueuedUnityTutorialTrackEvents() {
+  for (let index = unityTrackEventQueue.length - 1; index >= 0; index -= 1) {
+    const url = String(unityTrackEventQueue[index] || "");
+    if (url.includes("uniwebview://track?event=tutorial")) {
+      unityTrackEventQueue.splice(index, 1);
+    }
+  }
+  if (unityTrackEventQueue.length === 0 && unityTrackEventTimer !== null) {
     clearTimeout(unityTrackEventTimer);
     unityTrackEventTimer = null;
   }
@@ -16248,6 +16340,17 @@ if (typeof window !== "undefined") {
     pendingExternalSoundsActive = soundsActive;
     return normalizeExternalSoundsActive(soundsActive) !== null;
   };
+  window.setTutorialCompleted = (tutorialCompleted) => {
+    const normalized = normalizeExternalTutorialCompleted(tutorialCompleted);
+    if (normalized === null) {
+      return false;
+    }
+    pendingExternalTutorialCompleted = normalized;
+    if (normalized) {
+      clearQueuedUnityTutorialTrackEvents();
+    }
+    return true;
+  };
   window.rewardResult = () => false;
 }
 
@@ -16268,6 +16371,7 @@ async function bootstrapGame() {
   game.externalMaxLivesCount = resolveExternalMaxLivesCount(game);
   game.externalLivesTimer = resolveExternalLivesTimer(game);
   game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
+  game.externalTutorialCompleted = resolveExternalTutorialCompleted(game);
 
   const resolveExternalLevelSelection = (value) => {
     const allLevels = Array.isArray(game.availableLevels) ? game.availableLevels : [];
@@ -16466,6 +16570,7 @@ async function bootstrapGame() {
     }
     return game.setSoundsActive(normalized);
   };
+  window.setTutorialCompleted = (tutorialCompleted) => game.applyExternalTutorialCompleted(tutorialCompleted);
   window.rewardResult = (result) => {
     const normalized = String(result ?? "").trim().toLowerCase();
     if (normalized !== "true") {
@@ -16506,6 +16611,9 @@ async function bootstrapGame() {
   }
   if (pendingExternalSoundsActive !== null && pendingExternalSoundsActive !== undefined) {
     window.setSounds(pendingExternalSoundsActive);
+  }
+  if (pendingExternalTutorialCompleted !== null && pendingExternalTutorialCompleted !== undefined) {
+    window.setTutorialCompleted(pendingExternalTutorialCompleted);
   }
 
   void hydrateLevelDefinitionsInBackground(game);
