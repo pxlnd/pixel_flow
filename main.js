@@ -13570,7 +13570,6 @@ class Game {
         return;
       }
       if (backButtonVisible && isInsideRect(x, y, this.backButtonRect)) {
-        dispatchUnityColoringScreenTrackEvent("coloring_screen_back_button", "clicked");
         this.showQuitScreen();
         return;
       }
