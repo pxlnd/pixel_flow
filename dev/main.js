@@ -16472,9 +16472,6 @@ async function bootstrapGame() {
       game.externalLevelSelectionDeferred = false;
       game.syncDebugContentSelectors();
       game.saveDebugSettings();
-      if (shouldTrackResult) {
-        dispatchUnityLevelLoadedTrackEvent("success");
-      }
       return true;
     } catch {
       game.externalLevelSelectionDeferred = false;
