@@ -6665,6 +6665,7 @@ class Game {
       handTime: 0,
       firstTutorialUnitId: null,
       gameplayPaused: false,
+      completedCallbackSent: false,
       lastShownPointerStepTracked: null,
       trackedEvents: new Set(),
       travelHintMode: "hidden",
@@ -7067,9 +7068,14 @@ class Game {
 
   finishTutorial() {
     this.trackLevelOneTutorialEventOnce(LEVEL_ONE_TUTORIAL_TRACK_EVENTS.freeTutorial, "completed");
+    const shouldDispatchCompletedCallback = !this.tutorial.completedCallbackSent && this.isCactusPregameTutorialEnabled();
+    this.tutorial.completedCallbackSent = this.tutorial.completedCallbackSent || shouldDispatchCompletedCallback;
     this.tutorial.gameplayPaused = false;
     this.tutorial.active = false;
     this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.done;
+    if (shouldDispatchCompletedCallback) {
+      dispatchUnityTutorialCompletedEvent();
+    }
   }
 
   getTutorialTargetCard(color, lane = null) {
@@ -16165,6 +16171,10 @@ function dispatchUnityTutorialTrackEvent(eventName, eventAction) {
   const encodedEvent = encodeURIComponent(normalizedEvent);
   const encodedAction = encodeURIComponent(normalizedAction);
   return enqueueUnityTrackEventUrl(`uniwebview://track?event=${encodedEvent}&event_action=${encodedAction}&action=${encodedAction}`);
+}
+
+function dispatchUnityTutorialCompletedEvent() {
+  return dispatchUnityNavigationUrl("uniwebview://tutorial_completed");
 }
 
 function dispatchUnityLosePopupTrackEvent(eventAction) {
