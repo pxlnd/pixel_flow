@@ -5613,9 +5613,33 @@ class Game {
     return changed;
   }
 
+  getViewportCssSize() {
+    const visualViewport = window.visualViewport;
+    const width = visualViewport?.width || window.innerWidth || this.canvas.clientWidth || this.screenWidth || LOGICAL_WIDTH;
+    const height = visualViewport?.height || window.innerHeight || this.canvas.clientHeight || this.screenHeight || LOGICAL_HEIGHT;
+    return {
+      width: Math.max(1, width),
+      height: Math.max(1, height),
+    };
+  }
+
+  syncViewportCssVars() {
+    if (typeof document === "undefined" || !document.documentElement) {
+      return;
+    }
+    const { width, height } = this.getViewportCssSize();
+    if (this.viewportCssWidth !== width) {
+      this.viewportCssWidth = width;
+      document.documentElement.style.setProperty("--app-viewport-width", `${width}px`);
+    }
+    if (this.viewportCssHeight !== height) {
+      this.viewportCssHeight = height;
+      document.documentElement.style.setProperty("--app-viewport-height", `${height}px`);
+    }
+  }
+
   getViewportAdaptiveTuning() {
-    const vw = Math.max(1, window.innerWidth || this.canvas.clientWidth || LOGICAL_WIDTH);
-    const vh = Math.max(1, window.innerHeight || this.canvas.clientHeight || LOGICAL_HEIGHT);
+    const { width: vw, height: vh } = this.getViewportCssSize();
     const isPortrait = vh >= vw;
     if (isPortrait) {
       const aspect = vh / vw;
@@ -5651,8 +5675,7 @@ class Game {
   }
 
   isMobilePortraitViewport() {
-    const vw = Math.max(1, window.innerWidth || this.canvas.clientWidth || LOGICAL_WIDTH);
-    const vh = Math.max(1, window.innerHeight || this.canvas.clientHeight || LOGICAL_HEIGHT);
+    const { width: vw, height: vh } = this.getViewportCssSize();
     return vh >= vw;
   }
 
@@ -13364,16 +13387,31 @@ class Game {
   }
 
   resize() {
+    this.syncViewportCssVars();
     const rect = this.canvas.getBoundingClientRect();
-    this.screenWidth = Math.max(1, Math.round(rect.width || window.innerWidth || this.width));
-    this.screenHeight = Math.max(1, Math.round(rect.height || window.innerHeight || this.height));
-    this.dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
-    this.canvas.width = this.screenWidth * this.dpr;
-    this.canvas.height = this.screenHeight * this.dpr;
+    const nextScreenWidth = Math.max(1, Math.round(rect.width || window.innerWidth || this.width));
+    const nextScreenHeight = Math.max(1, Math.round(rect.height || window.innerHeight || this.height));
+    const nextDpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    const dimensionsChanged =
+      this.screenWidth !== nextScreenWidth ||
+      this.screenHeight !== nextScreenHeight ||
+      this.dpr !== nextDpr ||
+      this.canvas.width !== Math.round(nextScreenWidth * nextDpr) ||
+      this.canvas.height !== Math.round(nextScreenHeight * nextDpr);
+    if (!dimensionsChanged) {
+      return rect;
+    }
+
+    this.screenWidth = nextScreenWidth;
+    this.screenHeight = nextScreenHeight;
+    this.dpr = nextDpr;
+    this.canvas.width = Math.round(this.screenWidth * this.dpr);
+    this.canvas.height = Math.round(this.screenHeight * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.ctx.imageSmoothingEnabled = false;
     this.updateViewportTransform();
     this.applyDebugLayout();
+    return rect;
   }
 
   hitTest(x, y, rect) {
@@ -13573,7 +13611,7 @@ class Game {
   }
 
   getPointerPosition(event) {
-    const rect = this.canvas.getBoundingClientRect();
+    const rect = this.resize();
     const px = event.clientX - rect.left;
     const py = event.clientY - rect.top;
     const worldX = (px - this.viewportOffsetX) / this.viewportScale;
@@ -15008,7 +15046,22 @@ class Game {
   }
 
   bindEvents() {
-    window.addEventListener("resize", () => this.resize());
+    let resizeFrame = 0;
+    const scheduleResize = () => {
+      if (resizeFrame) {
+        cancelAnimationFrame(resizeFrame);
+      }
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0;
+        this.resize();
+      });
+    };
+    window.addEventListener("resize", scheduleResize);
+    window.addEventListener("orientationchange", scheduleResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", scheduleResize);
+      window.visualViewport.addEventListener("scroll", scheduleResize);
+    }
     const unlockAudio = () => {
       if (this.soundManager && typeof this.soundManager.unlock === "function") {
         this.soundManager.unlock();
