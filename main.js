@@ -1856,27 +1856,27 @@ const BLOCK_TILE_SOURCE_BY_COLOR = {
 };
 
 const BLOCK_TILE_ATLAS_SOURCE_BY_GROUP = {
-  original: "ui/blocks_new/original/atlas.png",
-  metal: "ui/blocks_new/metal/atlas.png",
-  lego: "ui/blocks_new/lego/atlas.png",
-  leather: "ui/blocks_new/leather/atlas.png",
-  knit: "ui/blocks_new/knit/atlas.png",
-  diamond: "ui/blocks_new/diamond/atlas.png",
-  cheese: "ui/blocks_new/cheese/atlas.png",
-  candy: "ui/blocks_new/candy/atlas.png",
-  bubbles: "ui/blocks_new/bubbles/atlas.png",
+  original: "ui/blocks_new/original.png",
+  metal: "ui/blocks_new/metal.png",
+  lego: "ui/blocks_new/lego.png",
+  leather: "ui/blocks_new/leather.png",
+  knit: "ui/blocks_new/knit.png",
+  diamond: "ui/blocks_new/diamond.png",
+  cheese: "ui/blocks_new/cheese.png",
+  candy: "ui/blocks_new/candy.png",
+  bubbles: "ui/blocks_new/bubbles.png",
 };
 
 const CHICKEN_SPRITE_ATLAS_SOURCE_BY_GROUP = {
-  original: "ui/birds_new/original/atlas.png",
-  metal: "ui/birds_new/metal/atlas.png",
-  lego: "ui/birds_new/lego/atlas.png",
-  leather: "ui/birds_new/leather/atlas.png",
-  knit: "ui/birds_new/knit/atlas.png",
-  diamond: "ui/birds_new/diamond/atlas.png",
-  cheese: "ui/birds_new/cheese/atlas.png",
-  candy: "ui/birds_new/candy/atlas.png",
-  bubbles: "ui/birds_new/bubbles/atlas.png",
+  original: "ui/birds_new/original.png",
+  metal: "ui/birds_new/metal.png",
+  lego: "ui/birds_new/lego.png",
+  leather: "ui/birds_new/leather.png",
+  knit: "ui/birds_new/knit.png",
+  diamond: "ui/birds_new/diamond.png",
+  cheese: "ui/birds_new/cheese.png",
+  candy: "ui/birds_new/candy.png",
+  bubbles: "ui/birds_new/bubbles.png",
 };
 
 const BLOCK_TILE_ATLAS_LAYOUT_BY_GROUP = {
