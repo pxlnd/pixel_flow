@@ -3826,6 +3826,7 @@ class Game {
     this.debugImageBucketColorCache = new Map();
     this.generatedBackdropCache = null;
     this.referenceAssetsRebuildScheduled = false;
+    this.referenceAssetsRebuildTimer = null;
 
     this.sprites = {
       holeTile: null,
@@ -4210,10 +4211,10 @@ class Game {
   }
 
   buildReferenceAssets() {
-    const blockColors = new Set([
-      ...Object.keys(BLOCK_COLOR_CONFIG),
-      ...Object.keys(BLOCK_TILE_SOURCE_BY_COLOR),
-    ]);
+    const blockColors = this.getCurrentReferenceAssetColorKeys();
+    for (const color of Object.keys(BLOCK_COLOR_CONFIG)) {
+      blockColors.add(color);
+    }
     this.blockTileUsesSourceImage = {};
     for (const color of blockColors) {
       this.sprites[`${color}Tile`] = this.createBlockSprite(color);
@@ -4226,10 +4227,7 @@ class Game {
     this.sprites.yellowTile = this.sprites.yellowTile || this.sprites.greenTile;
     this.sprites.redTile = this.sprites.redTile || this.sprites.greenTile;
     this.sprites.chickenByColor = {};
-    const chickenColors = new Set([
-      ...Object.keys(CHICKEN_SPRITE_SOURCE_BY_COLOR),
-      ...Object.keys(this.chickenSpriteAtlasFrameByColor),
-    ]);
+    const chickenColors = this.getCurrentReferenceAssetColorKeys();
     for (const color of chickenColors) {
       const imageSprite = this.getLoadedChickenSpriteImage(color);
       if (imageSprite && imageSprite.width > 0 && imageSprite.height > 0) {
@@ -4262,33 +4260,79 @@ class Game {
       return;
     }
     this.referenceAssetsRebuildScheduled = true;
-    requestAnimationFrame(() => {
+    this.referenceAssetsRebuildTimer = setTimeout(() => {
       this.referenceAssetsRebuildScheduled = false;
+      this.referenceAssetsRebuildTimer = null;
       this.buildReferenceAssets();
       this.invalidate(false);
-    });
+    }, 80);
   }
 
-  loadSpriteAtlasImages(frameByColor, atlasImageBySrc, onAtlasLoad, onAtlasError) {
-    const atlasSources = new Set(Object.values(frameByColor).map((frame) => frame?.src).filter(Boolean));
-    for (const src of atlasSources) {
-      if (atlasImageBySrc[src]) {
-        continue;
+  getCurrentReferenceAssetColorKeys() {
+    const colors = new Set(["green", "black", "blue", "white", "yellow", "red", "gray"]);
+    const addColor = (color) => {
+      const normalized = normalizeBlockColorName(color);
+      if (normalized) {
+        colors.add(normalized);
       }
-      const image = new Image();
-      image.decoding = "async";
-      image.onload = () => {
-        if (typeof onAtlasLoad === "function") {
-          onAtlasLoad(src);
+    };
+
+    for (const block of Array.isArray(this.blocks) ? this.blocks : []) {
+      addColor(block?.baseColor);
+      addColor(block?.color);
+    }
+    for (const card of Array.isArray(this.cards) ? this.cards : []) {
+      addColor(card?.color);
+    }
+    for (const card of Array.isArray(CURRENT_LEVEL?.layout?.cards) ? CURRENT_LEVEL.layout.cards : []) {
+      addColor(card?.color);
+    }
+    for (const row of Array.isArray(FALLBACK_FIELD_PATTERN) ? FALLBACK_FIELD_PATTERN : []) {
+      const cells = String(row || "");
+      for (let i = 0; i < cells.length; i += 1) {
+        addColor(getPatternCellColor(cells[i]));
+      }
+    }
+    const colorMatrix = CURRENT_LEVEL?.pixelArt?.colorMatrix;
+    if (Array.isArray(colorMatrix)) {
+      for (const row of colorMatrix) {
+        if (!Array.isArray(row)) {
+          continue;
         }
-      };
-      image.onerror = () => {
-        if (typeof onAtlasError === "function") {
-          onAtlasError(src);
+        for (const cell of row) {
+          addColor(normalizeColorMatrixCell(cell));
         }
-      };
-      image.src = src;
-      atlasImageBySrc[src] = image;
+      }
+    }
+    return colors;
+  }
+
+  ensureSpriteAtlasImage(src, atlasImageBySrc) {
+    const normalizedSrc = String(src || "").trim();
+    if (!normalizedSrc) {
+      return null;
+    }
+    const existing = atlasImageBySrc[normalizedSrc];
+    if (existing) {
+      return existing;
+    }
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      this.scheduleReferenceAssetsRebuild();
+    };
+    image.src = normalizedSrc;
+    atlasImageBySrc[normalizedSrc] = image;
+    return image;
+  }
+
+  loadSpriteAtlasImages(frameByColor, atlasImageBySrc, colorKeys = null) {
+    const frames = Array.isArray(colorKeys)
+      ? colorKeys.map((color) => frameByColor[color]).filter(Boolean)
+      : Object.values(frameByColor);
+    const atlasSources = new Set(frames.map((frame) => frame?.src).filter(Boolean));
+    for (const src of atlasSources) {
+      this.ensureSpriteAtlasImage(src, atlasImageBySrc);
     }
   }
 
@@ -4297,7 +4341,7 @@ class Game {
     if (!frame) {
       return null;
     }
-    const atlasImage = atlasImageBySrc[frame.src];
+    const atlasImage = this.ensureSpriteAtlasImage(frame.src, atlasImageBySrc);
     if (!atlasImage || !atlasImage.complete || atlasImage.naturalWidth <= 0 || atlasImage.naturalHeight <= 0) {
       return null;
     }
@@ -4321,83 +4365,14 @@ class Game {
     for (const [color, frame] of Object.entries(CHICKEN_SPRITE_ATLAS_FRAME_BY_COLOR)) {
       this.chickenSpriteAtlasFrameByColor[color] = frame;
     }
-    this.loadSpriteAtlasImages(
-      this.chickenSpriteAtlasFrameByColor,
-      this.chickenSpriteAtlasImageBySrc,
-      (src) => {
-        for (const [color, frame] of Object.entries(this.chickenSpriteAtlasFrameByColor)) {
-          if (frame.src !== src) {
-            continue;
-          }
-          try {
-            const canvas = this.getSpriteAtlasFrameCanvas(
-              this.chickenSpriteAtlasFrameByColor,
-              this.chickenSpriteAtlasImageBySrc,
-              this.chickenSpriteAtlasFrameCanvasByColor,
-              color
-            );
-            const sample = canvas ? this.extractRepresentativeColorFromImage(canvas) : null;
-            if (sample) {
-              this.chickenSpriteColorSampleByColor[color] = sample;
-            }
-          } catch {
-            // On file://, reading pixels can throw SecurityError (tainted canvas).
-          }
-        }
-        this.scheduleReferenceAssetsRebuild();
-      },
-      (src) => {
-        for (const [color, frame] of Object.entries(this.chickenSpriteAtlasFrameByColor)) {
-          if (frame.src === src) {
-            delete this.chickenSpriteColorSampleByColor[color];
-            delete this.chickenSpriteAtlasFrameCanvasByColor[color];
-          }
-        }
-      }
-    );
+    this.loadSpriteAtlasImages(this.chickenSpriteAtlasFrameByColor, this.chickenSpriteAtlasImageBySrc, [...this.getCurrentReferenceAssetColorKeys()]);
   }
 
   initBlockTileImages() {
     for (const [color, frame] of Object.entries(BLOCK_TILE_ATLAS_FRAME_BY_COLOR)) {
       this.blockTileAtlasFrameByColor[color] = frame;
     }
-    this.loadSpriteAtlasImages(
-      this.blockTileAtlasFrameByColor,
-      this.blockTileAtlasImageBySrc,
-      (src) => {
-        for (const [color, frame] of Object.entries(this.blockTileAtlasFrameByColor)) {
-          if (frame.src !== src) {
-            continue;
-          }
-          try {
-            const canvas = this.getSpriteAtlasFrameCanvas(
-              this.blockTileAtlasFrameByColor,
-              this.blockTileAtlasImageBySrc,
-              this.blockTileAtlasFrameCanvasByColor,
-              color
-            );
-            const sample = canvas ? this.extractRepresentativeColorFromImage(canvas) : null;
-            if (sample) {
-              this.blockTileColorSampleByColor[color] = sample;
-              BLOCK_COLOR_TO_RGB[color] = sample;
-            }
-          } catch {
-            // On file://, reading pixels can throw SecurityError (tainted canvas).
-          }
-        }
-        this.rebuildBlockColorSamplerPalette();
-        this.scheduleReferenceAssetsRebuild();
-      },
-      (src) => {
-        for (const [color, frame] of Object.entries(this.blockTileAtlasFrameByColor)) {
-          if (frame.src === src) {
-            delete this.blockTileColorSampleByColor[color];
-            delete this.blockTileAtlasFrameCanvasByColor[color];
-          }
-        }
-        this.rebuildBlockColorSamplerPalette();
-      }
-    );
+    this.loadSpriteAtlasImages(this.blockTileAtlasFrameByColor, this.blockTileAtlasImageBySrc, [...this.getCurrentReferenceAssetColorKeys()]);
   }
 
   extractRepresentativeColorFromImage(image) {
@@ -4734,19 +4709,20 @@ class Game {
   resolveChickenSpriteColorKey(color) {
     const normalized = String(color || "").trim().toLowerCase();
     const requestedColor = normalizeBlockColorName(normalized);
-    const loadedKeys = this.getAvailableLoadedChickenColorKeys();
-    if (loadedKeys.length === 0) {
-      return null;
-    }
     if (!requestedColor) {
+      const loadedKeys = this.getAvailableLoadedChickenColorKeys();
       return loadedKeys[0];
     }
     const alias = BLOCK_TILE_COLOR_ALIASES[requestedColor];
     const directCandidates = [requestedColor, alias].filter(Boolean);
     for (const key of directCandidates) {
-      if (loadedKeys.includes(key)) {
+      if (Object.prototype.hasOwnProperty.call(CHICKEN_SPRITE_SOURCE_BY_COLOR, key)) {
         return key;
       }
+    }
+    const loadedKeys = this.getAvailableLoadedChickenColorKeys();
+    if (loadedKeys.length === 0) {
+      return null;
     }
     const nearest = this.getNearestColorKeyFromSample(
       this.getColorSampleForColorKey(requestedColor),
@@ -5491,6 +5467,7 @@ class Game {
     this.ammoTextMetricsCache.clear();
     this.blocks = this.createBlocksFromReference();
     this.initializePregameColoring();
+    this.buildReferenceAssets();
     this.blocksBySpiral = this.blocks
       .slice()
       .sort((a, b) => (a.spiralIndex - b.spiralIndex) || (a.spiralOrder - b.spiralOrder));
@@ -10311,6 +10288,7 @@ class Game {
     if (!rebuildCards) {
       return;
     }
+    this.buildReferenceAssets();
     this.cards = this.cardManager.resetFromBlocks(this.blocks);
     this.enforceLevelOneTutorialQueue();
     this.invalidateTargetingCaches();
@@ -16673,7 +16651,9 @@ async function bootstrapGame() {
     window.setTutorialCompleted(pendingExternalTutorialCompleted);
   }
 
-  void hydrateLevelDefinitionsInBackground(game);
+  setTimeout(() => {
+    void hydrateLevelDefinitionsInBackground(game);
+  }, 250);
 }
 
 async function hydrateLevelDefinitionsInBackground(game) {
