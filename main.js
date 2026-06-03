@@ -1168,692 +1168,795 @@ const BLOCK_COLOR_LABELS = {
 };
 
 const CHICKEN_SPRITE_SOURCE_BY_COLOR = {
-  green: "ui/birds_new/original/green_chicken_01.png",
-  black: "ui/birds_new/original/black_chicken.png",
-  blue: "ui/birds_new/original/light_blue_chicken_01.png",
-  white: "ui/birds_new/original/Untitled.png",
-  yellow: "ui/birds_new/original/yellow_chicken_01.png",
-  red: "ui/birds_new/original/red_chicken.png",
-  red_alt: "ui/birds_new/original/dark_purple_chicken_01.png",
-  orange: "ui/birds_new/original/chicken_orange_02.png",
-  brown: "ui/birds_new/original/orange_chicken.png",
-  light_purple: "ui/birds_new/original/purple_chicken.png",
-  dark_pink: "ui/birds_new/original/dark_purple_chicken.png",
-  dark_blue: "ui/birds_new/original/dark_blue_chicken_01.png",
-  dark_purple: "ui/birds_new/original/dark_blue_chicken_02.png",
-  light_green: "ui/birds_new/original/light_green_chicken.png",
-  gray: "ui/birds_new/original/gray_chicken.png",
-  pink: "ui/birds_new/original/pink_chicken.png",
-  peach: "ui/birds_new/original/beige_chicken.png",
-  rose: "ui/birds_new/original/dirty_pink_chicken_01.png",
-  orchid: "ui/birds_new/original/light_purple_chicken_01.png",
-  light_beige: "ui/birds_new/original/chicken_beige.png",
-  light_beige_1: "ui/birds_new/original/light_beige_chicken.png",
-  light_blue: "ui/birds_new/original/light_blue_chicken.png",
-  light_blue_1: "ui/birds_new/original/light_blue_chicken-2.png",
-  light_blue_2: "ui/birds_new/original/light_blue_chicken-1.png",
-  light_brown: "ui/birds_new/original/light_brown_chicken-1.png",
-  light_brown_1: "ui/birds_new/original/light_brown_chicken.png",
-  dark_green: "ui/birds_new/original/dark_green_chicken-1.png",
-  yellow_biege: "ui/birds_new/original/chicken_light_beige.png",
-  light_gray: "ui/birds_new/original/light_gray_chicken.png",
-  light_gray_1: "ui/birds_new/original/gray_chicken.png",
-  light_pink_1: "ui/birds_new/original/light_pink_chicken.png",
-  light_pink_2: "ui/birds_new/original/pink_chicken.png",
-  light_pink_3: "ui/birds_new/original/dark_red_chicken_01.png",
-  medium_blue: "ui/birds_new/original/medium_blue_chicken.png",
-  medium_brown: "ui/birds_new/original/medium_brown_chicken-1.png",
-  medium_grey: "ui/birds_new/original/medium_grey_chicken.png",
-  brown_orange: "ui/birds_new/original/chicken_orange_02.png",
+  green: { x: 0, y: 0 },
+  black: { x: 170, y: 0 },
+  blue: { x: 340, y: 0 },
+  white: { x: 510, y: 0 },
+  yellow: { x: 680, y: 0 },
+  red: { x: 850, y: 0 },
+  red_alt: { x: 1020, y: 0 },
+  orange: { x: 1190, y: 0 },
+  brown: { x: 0, y: 169 },
+  light_purple: { x: 170, y: 169 },
+  dark_pink: { x: 340, y: 169 },
+  dark_blue: { x: 510, y: 169 },
+  dark_purple: { x: 680, y: 169 },
+  light_green: { x: 850, y: 169 },
+  gray: { x: 1020, y: 169 },
+  pink: { x: 1190, y: 169 },
+  peach: { x: 0, y: 338 },
+  rose: { x: 170, y: 338 },
+  orchid: { x: 340, y: 338 },
+  light_beige: { x: 510, y: 338 },
+  light_beige_1: { x: 680, y: 338 },
+  light_blue: { x: 850, y: 338 },
+  light_blue_1: { x: 1020, y: 338 },
+  light_blue_2: { x: 1190, y: 338 },
+  light_brown: { x: 0, y: 507 },
+  light_brown_1: { x: 170, y: 507 },
+  dark_green: { x: 340, y: 507 },
+  yellow_biege: { x: 510, y: 507 },
+  light_gray: { x: 680, y: 507 },
+  light_gray_1: { x: 850, y: 507 },
+  light_pink_1: { x: 1020, y: 507 },
+  light_pink_2: { x: 1190, y: 507 },
+  light_pink_3: { x: 0, y: 676 },
+  medium_blue: { x: 170, y: 676 },
+  medium_brown: { x: 340, y: 676 },
+  medium_grey: { x: 510, y: 676 },
+  brown_orange: { x: 680, y: 676 },
   // Leather
-  green_leather: "ui/birds_new/leather/green_chicken_01.png",
-  black_leather: "ui/birds_new/leather/black_chicken.png",
-  blue_leather: "ui/birds_new/leather/light_blue_chicken_01.png",
-  white_leather: "ui/birds_new/leather/white_chicken.png",
-  yellow_leather: "ui/birds_new/leather/yellow_chicken_01.png",
-  red_leather: "ui/birds_new/leather/red_chicken.png",
-  red_alt_leather: "ui/birds_new/leather/dark_purple_chicken_01.png",
-  orange_leather: "ui/birds_new/leather/chicken_orange_02.png",
-  brown_leather: "ui/birds_new/leather/orange_chicken.png",
-  light_purple_leather: "ui/birds_new/leather/purple_chicken.png",
-  dark_pink_leather: "ui/birds_new/leather/dark_purple_chicken.png",
-  dark_blue_leather: "ui/birds_new/leather/dark_blue_chicken_01.png",
-  dark_purple_leather: "ui/birds_new/leather/dark_blue_chicken_02.png",
-  light_green_leather: "ui/birds_new/leather/light_green_chicken.png",
-  gray_leather: "ui/birds_new/leather/gray_chicken.png",
-  pink_leather: "ui/birds_new/leather/pink_chicken.png",
-  peach_leather: "ui/birds_new/leather/beige_chicken.png",
-  rose_leather: "ui/birds_new/leather/dirty_pink_chicken_01.png",
-  orchid_leather: "ui/birds_new/leather/light_purple_chicken_01.png",
-  light_beige_leather: "ui/birds_new/leather/chicken_beige.png",
-  light_beige_1_leather: "ui/birds_new/leather/light_beige_chicken.png",
-  light_blue_leather: "ui/birds_new/leather/light_blue_chicken.png",
-  light_blue_1_leather: "ui/birds_new/leather/light_blue_chicken-2.png",
-  light_blue_2_leather: "ui/birds_new/leather/light_blue_chicken-1.png",
-  light_brown_leather: "ui/birds_new/leather/light_brown_chicken-1.png",
-  light_brown_1_leather: "ui/birds_new/leather/light_brown_chicken.png",
-  dark_green_leather: "ui/birds_new/leather/dark_green_chicken.png",
-  yellow_biege_leather: "ui/birds_new/leather/chicken_light_beige.png",
-  light_gray_leather: "ui/birds_new/leather/light_gray_chicken.png",
-  light_gray_1_leather: "ui/birds_new/leather/gray_chicken.png",
-  light_pink_1_leather: "ui/birds_new/leather/light_pink_chicken.png",
-  light_pink_2_leather: "ui/birds_new/leather/pink_chicken.png",
-  light_pink_3_leather: "ui/birds_new/leather/dark_red_chicken_01.png",
-  medium_blue_leather: "ui/birds_new/leather/medium_blue_chicken.png",
-  medium_brown_leather: "ui/birds_new/leather/medium_brown_chicken-1.png",
-  medium_grey_leather: "ui/birds_new/leather/medium_grey_chicken.png",
-  brown_orange_leather: "ui/birds_new/leather/chicken_orange_02.png",
+  green_leather: { x: 0, y: 0 },
+  black_leather: { x: 170, y: 0 },
+  blue_leather: { x: 340, y: 0 },
+  white_leather: { x: 510, y: 0 },
+  yellow_leather: { x: 680, y: 0 },
+  red_leather: { x: 850, y: 0 },
+  red_alt_leather: { x: 1020, y: 0 },
+  orange_leather: { x: 1190, y: 0 },
+  brown_leather: { x: 0, y: 167 },
+  light_purple_leather: { x: 170, y: 167 },
+  dark_pink_leather: { x: 340, y: 167 },
+  dark_blue_leather: { x: 510, y: 167 },
+  dark_purple_leather: { x: 680, y: 167 },
+  light_green_leather: { x: 850, y: 167 },
+  gray_leather: { x: 1020, y: 167 },
+  pink_leather: { x: 1190, y: 167 },
+  peach_leather: { x: 0, y: 334 },
+  rose_leather: { x: 170, y: 334 },
+  orchid_leather: { x: 340, y: 334 },
+  light_beige_leather: { x: 510, y: 334 },
+  light_beige_1_leather: { x: 680, y: 334 },
+  light_blue_leather: { x: 850, y: 334 },
+  light_blue_1_leather: { x: 1020, y: 334 },
+  light_blue_2_leather: { x: 1190, y: 334 },
+  light_brown_leather: { x: 0, y: 501 },
+  light_brown_1_leather: { x: 170, y: 501 },
+  dark_green_leather: { x: 340, y: 501 },
+  yellow_biege_leather: { x: 510, y: 501 },
+  light_gray_leather: { x: 680, y: 501 },
+  light_gray_1_leather: { x: 850, y: 501 },
+  light_pink_1_leather: { x: 1020, y: 501 },
+  light_pink_2_leather: { x: 1190, y: 501 },
+  light_pink_3_leather: { x: 0, y: 668 },
+  medium_blue_leather: { x: 170, y: 668 },
+  medium_brown_leather: { x: 340, y: 668 },
+  medium_grey_leather: { x: 510, y: 668 },
+  brown_orange_leather: { x: 680, y: 668 },
   // Candy
-  green_candy: "ui/birds_new/candy/green_chicken_01.png",
-  black_candy: "ui/birds_new/candy/black_chicken.png",
-  blue_candy: "ui/birds_new/candy/light_blue_chicken_01.png",
-  white_candy: "ui/birds_new/candy/white_chicken.png",
-  yellow_candy: "ui/birds_new/candy/yellow_chicken_01.png",
-  red_candy: "ui/birds_new/candy/red_chicken.png",
-  red_alt_candy: "ui/birds_new/candy/dark_purple_chicken_01.png",
-  orange_candy: "ui/birds_new/candy/chicken_orange_02.png",
-  brown_candy: "ui/birds_new/candy/orange_chicken.png",
-  light_purple_candy: "ui/birds_new/candy/purple_chicken.png",
-  dark_pink_candy: "ui/birds_new/candy/dark_purple_chicken.png",
-  dark_blue_candy: "ui/birds_new/candy/dark_blue_chicken_01.png",
-  dark_purple_candy: "ui/birds_new/candy/dark_blue_chicken_02.png",
-  light_green_candy: "ui/birds_new/candy/light_green_chicken.png",
-  gray_candy: "ui/birds_new/candy/gray_chicken.png",
-  pink_candy: "ui/birds_new/candy/pink_chicken.png",
-  peach_candy: "ui/birds_new/candy/beige_chicken.png",
-  rose_candy: "ui/birds_new/candy/dirty_pink_chicken_01.png",
-  orchid_candy: "ui/birds_new/candy/light_purple_chicken_01.png",
-  light_beige_candy: "ui/birds_new/candy/chicken_beige.png",
-  light_beige_1_candy: "ui/birds_new/candy/light_beige_chicken.png",
-  light_blue_candy: "ui/birds_new/candy/light_blue_chicken.png",
-  light_blue_1_candy: "ui/birds_new/candy/light_blue_chicken-2.png",
-  light_blue_2_candy: "ui/birds_new/candy/light_blue_chicken-1.png",
-  light_brown_candy: "ui/birds_new/candy/light_brown_chicken-1.png",
-  light_brown_1_candy: "ui/birds_new/candy/light_brown_chicken.png",
-  dark_green_candy: "ui/birds_new/candy/dark_green_chicken.png",
-  yellow_biege_candy: "ui/birds_new/candy/chicken_light_beige.png",
-  light_gray_candy: "ui/birds_new/candy/light_gray_chicken.png",
-  light_gray_1_candy: "ui/birds_new/candy/gray_chicken.png",
-  light_pink_1_candy: "ui/birds_new/candy/light_pink_chicken.png",
-  light_pink_2_candy: "ui/birds_new/candy/pink_chicken.png",
-  light_pink_3_candy: "ui/birds_new/candy/dark_red_chicken_01.png",
-  medium_blue_candy: "ui/birds_new/candy/medium_blue_chicken.png",
-  medium_brown_candy: "ui/birds_new/candy/medium_brown_chicken-1.png",
-  medium_grey_candy: "ui/birds_new/candy/medium_grey_chicken.png",
-  brown_orange_candy: "ui/birds_new/candy/chicken_orange_02.png",
+  green_candy: { x: 0, y: 0 },
+  black_candy: { x: 170, y: 0 },
+  blue_candy: { x: 340, y: 0 },
+  white_candy: { x: 510, y: 0 },
+  yellow_candy: { x: 680, y: 0 },
+  red_candy: { x: 850, y: 0 },
+  red_alt_candy: { x: 1020, y: 0 },
+  orange_candy: { x: 1190, y: 0 },
+  brown_candy: { x: 0, y: 167 },
+  light_purple_candy: { x: 170, y: 167 },
+  dark_pink_candy: { x: 340, y: 167 },
+  dark_blue_candy: { x: 510, y: 167 },
+  dark_purple_candy: { x: 680, y: 167 },
+  light_green_candy: { x: 850, y: 167 },
+  gray_candy: { x: 1020, y: 167 },
+  pink_candy: { x: 1190, y: 167 },
+  peach_candy: { x: 0, y: 334 },
+  rose_candy: { x: 170, y: 334 },
+  orchid_candy: { x: 340, y: 334 },
+  light_beige_candy: { x: 510, y: 334 },
+  light_beige_1_candy: { x: 680, y: 334 },
+  light_blue_candy: { x: 850, y: 334 },
+  light_blue_1_candy: { x: 1020, y: 334 },
+  light_blue_2_candy: { x: 1190, y: 334 },
+  light_brown_candy: { x: 0, y: 501 },
+  light_brown_1_candy: { x: 170, y: 501 },
+  dark_green_candy: { x: 340, y: 501 },
+  yellow_biege_candy: { x: 510, y: 501 },
+  light_gray_candy: { x: 680, y: 501 },
+  light_gray_1_candy: { x: 850, y: 501 },
+  light_pink_1_candy: { x: 1020, y: 501 },
+  light_pink_2_candy: { x: 1190, y: 501 },
+  light_pink_3_candy: { x: 0, y: 668 },
+  medium_blue_candy: { x: 170, y: 668 },
+  medium_brown_candy: { x: 340, y: 668 },
+  medium_grey_candy: { x: 510, y: 668 },
+  brown_orange_candy: { x: 680, y: 668 },
   // Lego
-  green_lego: "ui/birds_new/lego/green_chicken_01.png",
-  black_lego: "ui/birds_new/lego/black_chicken.png",
-  blue_lego: "ui/birds_new/lego/light_blue_chicken_01.png",
-  white_lego: "ui/birds_new/lego/white_chicken.png",
-  yellow_lego: "ui/birds_new/lego/yellow_chicken_01.png",
-  red_lego: "ui/birds_new/lego/red_chicken.png",
-  red_alt_lego: "ui/birds_new/lego/dark_purple_chicken_01.png",
-  orange_lego: "ui/birds_new/lego/chicken_orange_02.png",
-  brown_lego: "ui/birds_new/lego/orange_chicken.png",
-  light_purple_lego: "ui/birds_new/lego/purple_chicken.png",
-  dark_pink_lego: "ui/birds_new/lego/dark_purple_chicken.png",
-  dark_blue_lego: "ui/birds_new/lego/dark_blue_chicken_01.png",
-  dark_purple_lego: "ui/birds_new/lego/dark_blue_chicken_02.png",
-  light_green_lego: "ui/birds_new/lego/light_green_chicken.png",
-  gray_lego: "ui/birds_new/lego/gray_chicken.png",
-  pink_lego: "ui/birds_new/lego/pink_chicken.png",
-  peach_lego: "ui/birds_new/lego/beige_chicken.png",
-  rose_lego: "ui/birds_new/lego/dirty_pink_chicken_01.png",
-  orchid_lego: "ui/birds_new/lego/light_purple_chicken_01.png",
-  light_beige_lego: "ui/birds_new/lego/chicken_beige.png",
-  light_beige_1_lego: "ui/birds_new/lego/light_beige_chicken.png",
-  light_blue_lego: "ui/birds_new/lego/light_blue_chicken.png",
-  light_blue_1_lego: "ui/birds_new/lego/light_blue_chicken-2.png",
-  light_blue_2_lego: "ui/birds_new/lego/light_blue_chicken-1.png",
-  light_brown_lego: "ui/birds_new/lego/light_brown_chicken-1.png",
-  light_brown_1_lego: "ui/birds_new/lego/light_brown_chicken.png",
-  dark_green_lego: "ui/birds_new/lego/dark_green_chicken.png",
-  yellow_biege_lego: "ui/birds_new/lego/chicken_light_beige.png",
-  light_gray_lego: "ui/birds_new/lego/light_gray_chicken.png",
-  light_gray_1_lego: "ui/birds_new/lego/gray_chicken.png",
-  light_pink_1_lego: "ui/birds_new/lego/light_pink_chicken.png",
-  light_pink_2_lego: "ui/birds_new/lego/pink_chicken.png",
-  light_pink_3_lego: "ui/birds_new/lego/dark_red_chicken_01.png",
-  medium_blue_lego: "ui/birds_new/lego/medium_blue_chicken.png",
-  medium_brown_lego: "ui/birds_new/lego/medium_brown_chicken-1.png",
-  medium_grey_lego: "ui/birds_new/lego/medium_grey_chicken.png",
-  brown_orange_lego: "ui/birds_new/lego/chicken_orange_02.png",
+  green_lego: { x: 0, y: 0 },
+  black_lego: { x: 170, y: 0 },
+  blue_lego: { x: 340, y: 0 },
+  white_lego: { x: 510, y: 0 },
+  yellow_lego: { x: 680, y: 0 },
+  red_lego: { x: 850, y: 0 },
+  red_alt_lego: { x: 1020, y: 0 },
+  orange_lego: { x: 1190, y: 0 },
+  brown_lego: { x: 0, y: 167 },
+  light_purple_lego: { x: 170, y: 167 },
+  dark_pink_lego: { x: 340, y: 167 },
+  dark_blue_lego: { x: 510, y: 167 },
+  dark_purple_lego: { x: 680, y: 167 },
+  light_green_lego: { x: 850, y: 167 },
+  gray_lego: { x: 1020, y: 167 },
+  pink_lego: { x: 1190, y: 167 },
+  peach_lego: { x: 0, y: 334 },
+  rose_lego: { x: 170, y: 334 },
+  orchid_lego: { x: 340, y: 334 },
+  light_beige_lego: { x: 510, y: 334 },
+  light_beige_1_lego: { x: 680, y: 334 },
+  light_blue_lego: { x: 850, y: 334 },
+  light_blue_1_lego: { x: 1020, y: 334 },
+  light_blue_2_lego: { x: 1190, y: 334 },
+  light_brown_lego: { x: 0, y: 501 },
+  light_brown_1_lego: { x: 170, y: 501 },
+  dark_green_lego: { x: 340, y: 501 },
+  yellow_biege_lego: { x: 510, y: 501 },
+  light_gray_lego: { x: 680, y: 501 },
+  light_gray_1_lego: { x: 850, y: 501 },
+  light_pink_1_lego: { x: 1020, y: 501 },
+  light_pink_2_lego: { x: 1190, y: 501 },
+  light_pink_3_lego: { x: 0, y: 668 },
+  medium_blue_lego: { x: 170, y: 668 },
+  medium_brown_lego: { x: 340, y: 668 },
+  medium_grey_lego: { x: 510, y: 668 },
+  brown_orange_lego: { x: 680, y: 668 },
   // Metal
-  green_metal: "ui/birds_new/metal/green_chicken_01.png",
-  black_metal: "ui/birds_new/metal/black_chicken.png",
-  blue_metal: "ui/birds_new/metal/light_blue_chicken_01.png",
-  white_metal: "ui/birds_new/metal/white_chicken.png",
-  yellow_metal: "ui/birds_new/metal/yellow_chicken_01.png",
-  red_metal: "ui/birds_new/metal/red_chicken.png",
-  red_alt_metal: "ui/birds_new/metal/dark_purple_chicken_01.png",
-  orange_metal: "ui/birds_new/metal/orange_chicken_01.png",
-  brown_metal: "ui/birds_new/metal/orange_chicken.png",
-  light_purple_metal: "ui/birds_new/metal/purple_chicken.png",
-  dark_pink_metal: "ui/birds_new/metal/dark_purple_chicken.png",
-  dark_blue_metal: "ui/birds_new/metal/dark_blue_chicken_01.png",
-  dark_purple_metal: "ui/birds_new/metal/dark_blue_chicken_02.png",
-  light_green_metal: "ui/birds_new/metal/light_green_chicken.png",
-  gray_metal: "ui/birds_new/metal/gray_chicken.png",
-  pink_metal: "ui/birds_new/metal/pink_chicken.png",
-  peach_metal: "ui/birds_new/metal/beige_chicken.png",
-  rose_metal: "ui/birds_new/metal/dirty_pink_chicken_01.png",
-  orchid_metal: "ui/birds_new/metal/light_purple_chicken_01.png",
-  light_beige_metal: "ui/birds_new/metal/chicken_beige.png",
-  light_beige_1_metal: "ui/birds_new/metal/light_beige_chicken.png",
-  light_blue_metal: "ui/birds_new/metal/light_blue_chicken.png",
-  light_blue_1_metal: "ui/birds_new/metal/light_blue_chicken-2.png",
-  light_blue_2_metal: "ui/birds_new/metal/light_blue_chicken-1.png",
-  light_brown_metal: "ui/birds_new/metal/light_brown_chicken-1.png",
-  light_brown_1_metal: "ui/birds_new/metal/light_brown_chicken.png",
-  dark_green_metal: "ui/birds_new/metal/dark_green_chicken.png",
-  yellow_biege_metal: "ui/birds_new/metal/chicken_light_beige.png",
-  light_gray_metal: "ui/birds_new/metal/light_gray_chicken.png",
-  light_gray_1_metal: "ui/birds_new/metal/gray_chicken.png",
-  light_pink_1_metal: "ui/birds_new/metal/light_pink_chicken.png",
-  light_pink_2_metal: "ui/birds_new/metal/pink_chicken.png",
-  light_pink_3_metal: "ui/birds_new/metal/dark_red_chicken_01.png",
-  medium_blue_metal: "ui/birds_new/metal/medium_blue_chicken.png",
-  medium_brown_metal: "ui/birds_new/metal/medium_brown_chicken-1.png",
-  medium_grey_metal: "ui/birds_new/metal/medium_grey_chicken.png",
-  brown_orange_metal: "ui/birds_new/metal/orange_chicken_01.png",
+  green_metal: { x: 0, y: 0 },
+  black_metal: { x: 170, y: 0 },
+  blue_metal: { x: 340, y: 0 },
+  white_metal: { x: 510, y: 0 },
+  yellow_metal: { x: 680, y: 0 },
+  red_metal: { x: 850, y: 0 },
+  red_alt_metal: { x: 1020, y: 0 },
+  orange_metal: { x: 1190, y: 0 },
+  brown_metal: { x: 0, y: 167 },
+  light_purple_metal: { x: 170, y: 167 },
+  dark_pink_metal: { x: 340, y: 167 },
+  dark_blue_metal: { x: 510, y: 167 },
+  dark_purple_metal: { x: 680, y: 167 },
+  light_green_metal: { x: 850, y: 167 },
+  gray_metal: { x: 1020, y: 167 },
+  pink_metal: { x: 1190, y: 167 },
+  peach_metal: { x: 0, y: 334 },
+  rose_metal: { x: 170, y: 334 },
+  orchid_metal: { x: 340, y: 334 },
+  light_beige_metal: { x: 510, y: 334 },
+  light_beige_1_metal: { x: 680, y: 334 },
+  light_blue_metal: { x: 850, y: 334 },
+  light_blue_1_metal: { x: 1020, y: 334 },
+  light_blue_2_metal: { x: 1190, y: 334 },
+  light_brown_metal: { x: 0, y: 501 },
+  light_brown_1_metal: { x: 170, y: 501 },
+  dark_green_metal: { x: 340, y: 501 },
+  yellow_biege_metal: { x: 510, y: 501 },
+  light_gray_metal: { x: 680, y: 501 },
+  light_gray_1_metal: { x: 850, y: 501 },
+  light_pink_1_metal: { x: 1020, y: 501 },
+  light_pink_2_metal: { x: 1190, y: 501 },
+  light_pink_3_metal: { x: 0, y: 668 },
+  medium_blue_metal: { x: 170, y: 668 },
+  medium_brown_metal: { x: 340, y: 668 },
+  medium_grey_metal: { x: 510, y: 668 },
+  brown_orange_metal: { x: 680, y: 668 },
   // Cheese
-  green_cheese: "ui/birds_new/cheese/green_chicken_01.png",
-  black_cheese: "ui/birds_new/cheese/black_chicken.png",
-  blue_cheese: "ui/birds_new/cheese/light_blue_chicken_01.png",
-  white_cheese: "ui/birds_new/cheese/white_chicken.png",
-  yellow_cheese: "ui/birds_new/cheese/yellow_chicken_01.png",
-  red_cheese: "ui/birds_new/cheese/red_chicken.png",
-  red_alt_cheese: "ui/birds_new/cheese/dark_purple_chicken_01.png",
-  orange_cheese: "ui/birds_new/cheese/chicken_orange_02.png",
-  brown_cheese: "ui/birds_new/cheese/orange_chicken.png",
-  light_purple_cheese: "ui/birds_new/cheese/purple.png",
-  dark_pink_cheese: "ui/birds_new/cheese/dark_purple_chicken.png",
-  dark_blue_cheese: "ui/birds_new/cheese/dark_blue_chicken_01.png",
-  dark_purple_cheese: "ui/birds_new/cheese/dark_blue_chicken_02.png",
-  light_green_cheese: "ui/birds_new/cheese/light_green_chicken.png",
-  gray_cheese: "ui/birds_new/cheese/gray_chicken.png",
-  pink_cheese: "ui/birds_new/cheese/pink_chicken.png",
-  peach_cheese: "ui/birds_new/cheese/beige_chicken.png",
-  rose_cheese: "ui/birds_new/cheese/dirty_pink_chicken_01.png",
-  orchid_cheese: "ui/birds_new/cheese/light_purple_chicken_01.png",
-  light_beige_cheese: "ui/birds_new/cheese/chicken_beige.png",
-  light_beige_1_cheese: "ui/birds_new/cheese/light_beige_chicken.png",
-  light_blue_cheese: "ui/birds_new/cheese/light_blue_chicken.png",
-  light_blue_1_cheese: "ui/birds_new/cheese/light_blue_chicken-2.png",
-  light_blue_2_cheese: "ui/birds_new/cheese/light_blue_chicken-1.png",
-  light_brown_cheese: "ui/birds_new/cheese/light_brown_chicken-1.png",
-  light_brown_1_cheese: "ui/birds_new/cheese/light_brown_chicken.png",
-  dark_green_cheese: "ui/birds_new/cheese/dark_green_chicken.png",
-  yellow_biege_cheese: "ui/birds_new/cheese/chicken_light_beige.png",
-  light_gray_cheese: "ui/birds_new/cheese/light_gray_chicken.png",
-  light_gray_1_cheese: "ui/birds_new/cheese/gray_chicken.png",
-  light_pink_1_cheese: "ui/birds_new/cheese/light_pink_chicken.png",
-  light_pink_2_cheese: "ui/birds_new/cheese/pink_chicken.png",
-  light_pink_3_cheese: "ui/birds_new/cheese/dark_red_chicken_01.png",
-  medium_blue_cheese: "ui/birds_new/cheese/medium_blue_chicken.png",
-  medium_brown_cheese: "ui/birds_new/cheese/medium_brown_chicken-1.png",
-  medium_grey_cheese: "ui/birds_new/cheese/medium_grey_chicken.png",
-  brown_orange_cheese: "ui/birds_new/cheese/chicken_orange_02.png",
+  green_cheese: { x: 0, y: 0 },
+  black_cheese: { x: 170, y: 0 },
+  blue_cheese: { x: 340, y: 0 },
+  white_cheese: { x: 510, y: 0 },
+  yellow_cheese: { x: 680, y: 0 },
+  red_cheese: { x: 850, y: 0 },
+  red_alt_cheese: { x: 1020, y: 0 },
+  orange_cheese: { x: 1190, y: 0 },
+  brown_cheese: { x: 0, y: 167 },
+  light_purple_cheese: { x: 170, y: 167 },
+  dark_pink_cheese: { x: 340, y: 167 },
+  dark_blue_cheese: { x: 510, y: 167 },
+  dark_purple_cheese: { x: 680, y: 167 },
+  light_green_cheese: { x: 850, y: 167 },
+  gray_cheese: { x: 1020, y: 167 },
+  pink_cheese: { x: 1190, y: 167 },
+  peach_cheese: { x: 0, y: 334 },
+  rose_cheese: { x: 170, y: 334 },
+  orchid_cheese: { x: 340, y: 334 },
+  light_beige_cheese: { x: 510, y: 334 },
+  light_beige_1_cheese: { x: 680, y: 334 },
+  light_blue_cheese: { x: 850, y: 334 },
+  light_blue_1_cheese: { x: 1020, y: 334 },
+  light_blue_2_cheese: { x: 1190, y: 334 },
+  light_brown_cheese: { x: 0, y: 501 },
+  light_brown_1_cheese: { x: 170, y: 501 },
+  dark_green_cheese: { x: 340, y: 501 },
+  yellow_biege_cheese: { x: 510, y: 501 },
+  light_gray_cheese: { x: 680, y: 501 },
+  light_gray_1_cheese: { x: 850, y: 501 },
+  light_pink_1_cheese: { x: 1020, y: 501 },
+  light_pink_2_cheese: { x: 1190, y: 501 },
+  light_pink_3_cheese: { x: 0, y: 668 },
+  medium_blue_cheese: { x: 170, y: 668 },
+  medium_brown_cheese: { x: 340, y: 668 },
+  medium_grey_cheese: { x: 510, y: 668 },
+  brown_orange_cheese: { x: 680, y: 668 },
   // Diamond
-  green_diamond: "ui/birds_new/diamond/green_chicken_01.png",
-  black_diamond: "ui/birds_new/diamond/black_chicken.png",
-  blue_diamond: "ui/birds_new/diamond/light_blue_chicken_01.png",
-  white_diamond: "ui/birds_new/diamond/white_chicken.png",
-  yellow_diamond: "ui/birds_new/diamond/yellow_chicken_01.png",
-  red_diamond: "ui/birds_new/diamond/red_chicken.png",
-  red_alt_diamond: "ui/birds_new/diamond/dark_purple_chicken_01.png",
-  orange_diamond: "ui/birds_new/diamond/chicken_orange_02.png",
-  brown_diamond: "ui/birds_new/diamond/orange_chicken.png",
-  light_purple_diamond: "ui/birds_new/diamond/purple_chicken.png",
-  dark_pink_diamond: "ui/birds_new/diamond/dark_purple_chicken.png",
-  dark_blue_diamond: "ui/birds_new/diamond/dark_blue_chicken_01.png",
-  dark_purple_diamond: "ui/birds_new/diamond/dark_blue_chicken_02.png",
-  light_green_diamond: "ui/birds_new/diamond/light_green_chicken.png",
-  gray_diamond: "ui/birds_new/diamond/gray_chicken.png",
-  pink_diamond: "ui/birds_new/diamond/pink_chicken.png",
-  peach_diamond: "ui/birds_new/diamond/beige_chicken.png",
-  rose_diamond: "ui/birds_new/diamond/dirty_pink_chicken_01.png",
-  orchid_diamond: "ui/birds_new/diamond/light_purple_chicken_01.png",
-  light_beige_diamond: "ui/birds_new/diamond/chicken_beige.png",
-  light_beige_1_diamond: "ui/birds_new/diamond/light_beige_chicken.png",
-  light_blue_diamond: "ui/birds_new/diamond/light_blue_chicken.png",
-  light_blue_1_diamond: "ui/birds_new/diamond/light_blue_chicken-2.png",
-  light_blue_2_diamond: "ui/birds_new/diamond/light_blue_chicken-1.png",
-  light_brown_diamond: "ui/birds_new/diamond/light_brown_chicken-1.png",
-  light_brown_1_diamond: "ui/birds_new/diamond/light_brown_chicken.png",
-  dark_green_diamond: "ui/birds_new/diamond/dark_green_chicken.png",
-  yellow_biege_diamond: "ui/birds_new/diamond/chicken_light_beige.png",
-  light_gray_diamond: "ui/birds_new/diamond/light_gray_chicken.png",
-  light_gray_1_diamond: "ui/birds_new/diamond/gray_chicken.png",
-  light_pink_1_diamond: "ui/birds_new/diamond/light_pink_chicken.png",
-  light_pink_2_diamond: "ui/birds_new/diamond/pink_chicken.png",
-  light_pink_3_diamond: "ui/birds_new/diamond/dark_red_chicken_01.png",
-  medium_blue_diamond: "ui/birds_new/diamond/medium_blue_chicken.png",
-  medium_brown_diamond: "ui/birds_new/diamond/medium_brown_chicken-1.png",
-  medium_grey_diamond: "ui/birds_new/diamond/medium_grey_chicken.png",
-  brown_orange_diamond: "ui/birds_new/diamond/chicken_orange_02.png",
+  green_diamond: { x: 0, y: 0 },
+  black_diamond: { x: 170, y: 0 },
+  blue_diamond: { x: 340, y: 0 },
+  white_diamond: { x: 510, y: 0 },
+  yellow_diamond: { x: 680, y: 0 },
+  red_diamond: { x: 850, y: 0 },
+  red_alt_diamond: { x: 1020, y: 0 },
+  orange_diamond: { x: 1190, y: 0 },
+  brown_diamond: { x: 0, y: 167 },
+  light_purple_diamond: { x: 170, y: 167 },
+  dark_pink_diamond: { x: 340, y: 167 },
+  dark_blue_diamond: { x: 510, y: 167 },
+  dark_purple_diamond: { x: 680, y: 167 },
+  light_green_diamond: { x: 850, y: 167 },
+  gray_diamond: { x: 1020, y: 167 },
+  pink_diamond: { x: 1190, y: 167 },
+  peach_diamond: { x: 0, y: 334 },
+  rose_diamond: { x: 170, y: 334 },
+  orchid_diamond: { x: 340, y: 334 },
+  light_beige_diamond: { x: 510, y: 334 },
+  light_beige_1_diamond: { x: 680, y: 334 },
+  light_blue_diamond: { x: 850, y: 334 },
+  light_blue_1_diamond: { x: 1020, y: 334 },
+  light_blue_2_diamond: { x: 1190, y: 334 },
+  light_brown_diamond: { x: 0, y: 501 },
+  light_brown_1_diamond: { x: 170, y: 501 },
+  dark_green_diamond: { x: 340, y: 501 },
+  yellow_biege_diamond: { x: 510, y: 501 },
+  light_gray_diamond: { x: 680, y: 501 },
+  light_gray_1_diamond: { x: 850, y: 501 },
+  light_pink_1_diamond: { x: 1020, y: 501 },
+  light_pink_2_diamond: { x: 1190, y: 501 },
+  light_pink_3_diamond: { x: 0, y: 668 },
+  medium_blue_diamond: { x: 170, y: 668 },
+  medium_brown_diamond: { x: 340, y: 668 },
+  medium_grey_diamond: { x: 510, y: 668 },
+  brown_orange_diamond: { x: 680, y: 668 },
   // Bubbles
-  green_bubbles: "ui/birds_new/bubbles/green_chicken_01.png",
-  black_bubbles: "ui/birds_new/bubbles/black_chicken.png",
-  blue_bubbles: "ui/birds_new/bubbles/light_blue_chicken_01.png",
-  white_bubbles: "ui/birds_new/bubbles/white_chicken.png",
-  yellow_bubbles: "ui/birds_new/bubbles/yellow_chicken_01.png",
-  red_bubbles: "ui/birds_new/bubbles/red_chicken.png",
-  red_alt_bubbles: "ui/birds_new/bubbles/dark_purple_chicken_01.png",
-  orange_bubbles: "ui/birds_new/bubbles/chicken_orange_02.png",
-  brown_bubbles: "ui/birds_new/bubbles/orange_chicken.png",
-  light_purple_bubbles: "ui/birds_new/bubbles/purple_chicken.png",
-  dark_pink_bubbles: "ui/birds_new/bubbles/dark_purple_chicken.png",
-  dark_blue_bubbles: "ui/birds_new/bubbles/dark_blue_chicken_01.png",
-  dark_purple_bubbles: "ui/birds_new/bubbles/dark_blue_chicken_02.png",
-  light_green_bubbles: "ui/birds_new/bubbles/light_green_chicken.png",
-  gray_bubbles: "ui/birds_new/bubbles/gray_chicken.png",
-  pink_bubbles: "ui/birds_new/bubbles/pink_chicken.png",
-  peach_bubbles: "ui/birds_new/bubbles/beige_chicken.png",
-  rose_bubbles: "ui/birds_new/bubbles/dirty_pink_chicken_01.png",
-  orchid_bubbles: "ui/birds_new/bubbles/light_purple_chicken_01.png",
-  light_beige_bubbles: "ui/birds_new/bubbles/chicken_beige.png",
-  light_beige_1_bubbles: "ui/birds_new/bubbles/light_beige_chicken.png",
-  light_blue_bubbles: "ui/birds_new/bubbles/light_blue_chicken.png",
-  light_blue_1_bubbles: "ui/birds_new/bubbles/light_blue_chicken-2.png",
-  light_blue_2_bubbles: "ui/birds_new/bubbles/light_blue_chicken-1.png",
-  light_brown_bubbles: "ui/birds_new/bubbles/light_brown_chicken-1.png",
-  light_brown_1_bubbles: "ui/birds_new/bubbles/light_brown_chicken.png",
-  dark_green_bubbles: "ui/birds_new/bubbles/dark_green_chicken.png",
-  yellow_biege_bubbles: "ui/birds_new/bubbles/chicken_light_beige.png",
-  light_gray_bubbles: "ui/birds_new/bubbles/light_gray_chicken.png",
-  light_gray_1_bubbles: "ui/birds_new/bubbles/gray_chicken.png",
-  light_pink_1_bubbles: "ui/birds_new/bubbles/light_pink_chicken.png",
-  light_pink_2_bubbles: "ui/birds_new/bubbles/pink_chicken.png",
-  light_pink_3_bubbles: "ui/birds_new/bubbles/dark_red_chicken_01.png",
-  medium_blue_bubbles: "ui/birds_new/bubbles/medium_blue_chicken.png",
-  medium_brown_bubbles: "ui/birds_new/bubbles/medium_brown_chicken-1.png",
-  medium_grey_bubbles: "ui/birds_new/bubbles/medium_grey_chicken.png",
-  brown_orange_bubbles: "ui/birds_new/bubbles/chicken_orange_02.png",
+  green_bubbles: { x: 0, y: 0 },
+  black_bubbles: { x: 170, y: 0 },
+  blue_bubbles: { x: 340, y: 0 },
+  white_bubbles: { x: 510, y: 0 },
+  yellow_bubbles: { x: 680, y: 0 },
+  red_bubbles: { x: 850, y: 0 },
+  red_alt_bubbles: { x: 1020, y: 0 },
+  orange_bubbles: { x: 1190, y: 0 },
+  brown_bubbles: { x: 0, y: 167 },
+  light_purple_bubbles: { x: 170, y: 167 },
+  dark_pink_bubbles: { x: 340, y: 167 },
+  dark_blue_bubbles: { x: 510, y: 167 },
+  dark_purple_bubbles: { x: 680, y: 167 },
+  light_green_bubbles: { x: 850, y: 167 },
+  gray_bubbles: { x: 1020, y: 167 },
+  pink_bubbles: { x: 1190, y: 167 },
+  peach_bubbles: { x: 0, y: 334 },
+  rose_bubbles: { x: 170, y: 334 },
+  orchid_bubbles: { x: 340, y: 334 },
+  light_beige_bubbles: { x: 510, y: 334 },
+  light_beige_1_bubbles: { x: 680, y: 334 },
+  light_blue_bubbles: { x: 850, y: 334 },
+  light_blue_1_bubbles: { x: 1020, y: 334 },
+  light_blue_2_bubbles: { x: 1190, y: 334 },
+  light_brown_bubbles: { x: 0, y: 501 },
+  light_brown_1_bubbles: { x: 170, y: 501 },
+  dark_green_bubbles: { x: 340, y: 501 },
+  yellow_biege_bubbles: { x: 510, y: 501 },
+  light_gray_bubbles: { x: 680, y: 501 },
+  light_gray_1_bubbles: { x: 850, y: 501 },
+  light_pink_1_bubbles: { x: 1020, y: 501 },
+  light_pink_2_bubbles: { x: 1190, y: 501 },
+  light_pink_3_bubbles: { x: 0, y: 668 },
+  medium_blue_bubbles: { x: 170, y: 668 },
+  medium_brown_bubbles: { x: 340, y: 668 },
+  medium_grey_bubbles: { x: 510, y: 668 },
+  brown_orange_bubbles: { x: 680, y: 668 },
   // Knit
-  green_knit: "ui/birds_new/knit/green_chicken_01.png",
-  black_knit: "ui/birds_new/knit/black_chicken.png",
-  blue_knit: "ui/birds_new/knit/light_blue_chicken_01.png",
-  white_knit: "ui/birds_new/knit/white_chicken.png",
-  yellow_knit: "ui/birds_new/knit/yellow_chicken_01.png",
-  red_knit: "ui/birds_new/knit/red_chicken.png",
-  red_alt_knit: "ui/birds_new/knit/dark_purple_chicken_01.png",
-  orange_knit: "ui/birds_new/knit/chicken_orange_02.png",
-  brown_knit: "ui/birds_new/knit/orange_chicken.png",
-  light_purple_knit: "ui/birds_new/knit/purple.png",
-  dark_pink_knit: "ui/birds_new/knit/dark_purple_chicken.png",
-  dark_blue_knit: "ui/birds_new/knit/dark_blue_chicken_01.png",
-  dark_purple_knit: "ui/birds_new/knit/dark_blue_chicken_02.png",
-  light_green_knit: "ui/birds_new/knit/light_green_chicken.png",
-  gray_knit: "ui/birds_new/knit/gray_chicken.png",
-  pink_knit: "ui/birds_new/knit/pink_chicken.png",
-  peach_knit: "ui/birds_new/knit/beige_chicken.png",
-  rose_knit: "ui/birds_new/knit/dirty_pink_chicken_01.png",
-  orchid_knit: "ui/birds_new/knit/light_purple_chicken_01.png",
-  light_beige_knit: "ui/birds_new/knit/chicken_beige.png",
-  light_beige_1_knit: "ui/birds_new/knit/light_beige_chicken.png",
-  light_blue_knit: "ui/birds_new/knit/light_blue_chicken.png",
-  light_blue_1_knit: "ui/birds_new/knit/light_blue_chicken-2.png",
-  light_blue_2_knit: "ui/birds_new/knit/light_blue_chicken-1.png",
-  light_brown_knit: "ui/birds_new/knit/light_brown_chicken-1.png",
-  light_brown_1_knit: "ui/birds_new/knit/light_brown_chicken.png",
-  dark_green_knit: "ui/birds_new/knit/dark_green_chicken.png",
-  yellow_biege_knit: "ui/birds_new/knit/chicken_light_beige.png",
-  light_gray_knit: "ui/birds_new/knit/light_gray_chicken.png",
-  light_gray_1_knit: "ui/birds_new/knit/gray_chicken.png",
-  light_pink_1_knit: "ui/birds_new/knit/light_pink_chicken.png",
-  light_pink_2_knit: "ui/birds_new/knit/pink_chicken.png",
-  light_pink_3_knit: "ui/birds_new/knit/dark_red_chicken_01.png",
-  medium_blue_knit: "ui/birds_new/knit/medium_blue_chicken.png",
-  medium_brown_knit: "ui/birds_new/knit/medium_brown_chicken-1.png",
-  medium_grey_knit: "ui/birds_new/knit/medium_grey_chicken.png",
-  brown_orange_knit: "ui/birds_new/knit/chicken_orange_02.png",
+  green_knit: { x: 0, y: 0 },
+  black_knit: { x: 170, y: 0 },
+  blue_knit: { x: 340, y: 0 },
+  white_knit: { x: 510, y: 0 },
+  yellow_knit: { x: 680, y: 0 },
+  red_knit: { x: 850, y: 0 },
+  red_alt_knit: { x: 1020, y: 0 },
+  orange_knit: { x: 1190, y: 0 },
+  brown_knit: { x: 0, y: 167 },
+  light_purple_knit: { x: 170, y: 167 },
+  dark_pink_knit: { x: 340, y: 167 },
+  dark_blue_knit: { x: 510, y: 167 },
+  dark_purple_knit: { x: 680, y: 167 },
+  light_green_knit: { x: 850, y: 167 },
+  gray_knit: { x: 1020, y: 167 },
+  pink_knit: { x: 1190, y: 167 },
+  peach_knit: { x: 0, y: 334 },
+  rose_knit: { x: 170, y: 334 },
+  orchid_knit: { x: 340, y: 334 },
+  light_beige_knit: { x: 510, y: 334 },
+  light_beige_1_knit: { x: 680, y: 334 },
+  light_blue_knit: { x: 850, y: 334 },
+  light_blue_1_knit: { x: 1020, y: 334 },
+  light_blue_2_knit: { x: 1190, y: 334 },
+  light_brown_knit: { x: 0, y: 501 },
+  light_brown_1_knit: { x: 170, y: 501 },
+  dark_green_knit: { x: 340, y: 501 },
+  yellow_biege_knit: { x: 510, y: 501 },
+  light_gray_knit: { x: 680, y: 501 },
+  light_gray_1_knit: { x: 850, y: 501 },
+  light_pink_1_knit: { x: 1020, y: 501 },
+  light_pink_2_knit: { x: 1190, y: 501 },
+  light_pink_3_knit: { x: 0, y: 668 },
+  medium_blue_knit: { x: 170, y: 668 },
+  medium_brown_knit: { x: 340, y: 668 },
+  medium_grey_knit: { x: 510, y: 668 },
+  brown_orange_knit: { x: 680, y: 668 },
 };
 
 const BLOCK_TILE_SOURCE_BY_COLOR = {
-  green: "ui/blocks_new/original/green_01.png",
-  black: "ui/blocks_new/original/black.png",
-  blue: "ui/blocks_new/original/light_blue_01.png",
-  white: "ui/blocks_new/original/white.png",
-  yellow: "ui/blocks_new/original/yellow.png",
-  red: "ui/blocks_new/original/dark_red.png",
-  red_alt: "ui/blocks_new/original/dark_purple_01.png",
-  orange: "ui/blocks_new/original/orange_02.png",
-  brown: "ui/blocks_new/original/brown.png",
-  light_purple: "ui/blocks_new/original/purple.png",
-  dark_pink: "ui/blocks_new/original/dark_purple.png",
-  dark_blue: "ui/blocks_new/original/dark_blue_01.png",
-  dark_purple: "ui/blocks_new/original/dark_blue_02.png",
-  light_green: "ui/blocks_new/original/light_green.png",
-  gray: "ui/blocks_new/original/gray.png",
-  pink: "ui/blocks_new/original/pink.png",
-  peach: "ui/blocks_new/original/beige-1.png",
-  rose: "ui/blocks_new/original/dirty_pink.png",
-  orchid: "ui/blocks_new/original/light_purple_01.png",
-  light_beige: "ui/blocks_new/original/beige.png",
-  light_beige_1: "ui/blocks_new/original/light_beige-1.png",
-  light_blue: "ui/blocks_new/original/light_blue.png",
-  light_blue_1: "ui/blocks_new/original/light_blue-1.png",
-  light_blue_2: "ui/blocks_new/original/light_blue-2.png",
-  light_brown: "ui/blocks_new/original/light_brown.png",
-  light_brown_1: "ui/blocks_new/original/light_brown-1.png",
-  dark_green: "ui/blocks_new/original/dark_green_01.png",
-  yellow_biege: "ui/blocks_new/original/light_beige.png",
-  light_gray: "ui/blocks_new/original/light_gray.png",
-  light_gray_1: "ui/blocks_new/original/gray.png",
-  light_pink_1: "ui/blocks_new/original/light_pink.png",
-  light_pink_2: "ui/blocks_new/original/dirty_pink_01.png",
-  light_pink_3: "ui/blocks_new/original/dark_red_01.png",
-  medium_blue: "ui/blocks_new/original/medium_blue.png",
-  medium_brown: "ui/blocks_new/original/medium_browm.png",
-  medium_grey: "ui/blocks_new/original/medium_gray.png",
-  brown_orange: "ui/blocks_new/original/orange.png",
+  green: { x: 0, y: 0 },
+  black: { x: 140, y: 0 },
+  blue: { x: 280, y: 0 },
+  white: { x: 420, y: 0 },
+  yellow: { x: 560, y: 0 },
+  red: { x: 700, y: 0 },
+  red_alt: { x: 840, y: 0 },
+  orange: { x: 980, y: 0 },
+  brown: { x: 0, y: 140 },
+  light_purple: { x: 140, y: 140 },
+  dark_pink: { x: 280, y: 140 },
+  dark_blue: { x: 420, y: 140 },
+  dark_purple: { x: 560, y: 140 },
+  light_green: { x: 700, y: 140 },
+  gray: { x: 840, y: 140 },
+  pink: { x: 980, y: 140 },
+  peach: { x: 0, y: 280 },
+  rose: { x: 140, y: 280 },
+  orchid: { x: 280, y: 280 },
+  light_beige: { x: 420, y: 280 },
+  light_beige_1: { x: 560, y: 280 },
+  light_blue: { x: 700, y: 280 },
+  light_blue_1: { x: 840, y: 280 },
+  light_blue_2: { x: 980, y: 280 },
+  light_brown: { x: 0, y: 420 },
+  light_brown_1: { x: 140, y: 420 },
+  dark_green: { x: 280, y: 420 },
+  yellow_biege: { x: 420, y: 420 },
+  light_gray: { x: 560, y: 420 },
+  light_gray_1: { x: 700, y: 420 },
+  light_pink_1: { x: 840, y: 420 },
+  light_pink_2: { x: 980, y: 420 },
+  light_pink_3: { x: 0, y: 560 },
+  medium_blue: { x: 140, y: 560 },
+  medium_brown: { x: 280, y: 560 },
+  medium_grey: { x: 420, y: 560 },
+  brown_orange: { x: 560, y: 560 },
   // Leather
-  green_leather: "ui/blocks_new/leather/green_01.png",
-  black_leather: "ui/blocks_new/leather/black.png",
-  blue_leather: "ui/blocks_new/leather/light_blue_01.png",
-  white_leather: "ui/blocks_new/leather/white.png",
-  yellow_leather: "ui/blocks_new/leather/yellow.png",
-  red_leather: "ui/blocks_new/leather/dark_red.png",
-  red_alt_leather: "ui/blocks_new/leather/dark_purple_01.png",
-  orange_leather: "ui/blocks_new/leather/orange_02.png",
-  brown_leather: "ui/blocks_new/leather/brown.png",
-  light_purple_leather: "ui/blocks_new/leather/purple.png",
-  dark_pink_leather: "ui/blocks_new/leather/dark_purple.png",
-  dark_blue_leather: "ui/blocks_new/leather/dark_blue_01.png",
-  dark_purple_leather: "ui/blocks_new/leather/dark_blue_02.png",
-  light_green_leather: "ui/blocks_new/leather/light_green.png",
-  gray_leather: "ui/blocks_new/leather/gray.png",
-  pink_leather: "ui/blocks_new/leather/pink.png",
-  peach_leather: "ui/blocks_new/leather/beige-1.png",
-  rose_leather: "ui/blocks_new/leather/dirty_pink.png",
-  orchid_leather: "ui/blocks_new/leather/light_purple_01.png",
-  light_beige_leather: "ui/blocks_new/leather/beige.png",
-  light_beige_1_leather: "ui/blocks_new/leather/light_beige-1.png",
-  light_blue_leather: "ui/blocks_new/leather/light_blue.png",
-  light_blue_1_leather: "ui/blocks_new/leather/light_blue-1.png",
-  light_blue_2_leather: "ui/blocks_new/leather/light_blue-2.png",
-  light_brown_leather: "ui/blocks_new/leather/light_brown.png",
-  light_brown_1_leather: "ui/blocks_new/leather/light_brown-1.png",
-  dark_green_leather: "ui/blocks_new/leather/dark_green_01.png",
-  yellow_biege_leather: "ui/blocks_new/leather/light_beige.png",
-  light_gray_leather: "ui/blocks_new/leather/light_gray.png",
-  light_gray_1_leather: "ui/blocks_new/leather/gray.png",
-  light_pink_1_leather: "ui/blocks_new/leather/light_pink.png",
-  light_pink_2_leather: "ui/blocks_new/leather/dirty_pink_01.png",
-  light_pink_3_leather: "ui/blocks_new/leather/dark_red_01.png",
-  medium_blue_leather: "ui/blocks_new/leather/medium_blue.png",
-  medium_brown_leather: "ui/blocks_new/leather/medium_browm.png",
-  medium_grey_leather: "ui/blocks_new/leather/medium_gray.png",
-  brown_orange_leather: "ui/blocks_new/leather/orange.png",
+  green_leather: { x: 0, y: 0 },
+  black_leather: { x: 140, y: 0 },
+  blue_leather: { x: 280, y: 0 },
+  white_leather: { x: 420, y: 0 },
+  yellow_leather: { x: 560, y: 0 },
+  red_leather: { x: 700, y: 0 },
+  red_alt_leather: { x: 840, y: 0 },
+  orange_leather: { x: 980, y: 0 },
+  brown_leather: { x: 0, y: 140 },
+  light_purple_leather: { x: 140, y: 140 },
+  dark_pink_leather: { x: 280, y: 140 },
+  dark_blue_leather: { x: 420, y: 140 },
+  dark_purple_leather: { x: 560, y: 140 },
+  light_green_leather: { x: 700, y: 140 },
+  gray_leather: { x: 840, y: 140 },
+  pink_leather: { x: 980, y: 140 },
+  peach_leather: { x: 0, y: 280 },
+  rose_leather: { x: 140, y: 280 },
+  orchid_leather: { x: 280, y: 280 },
+  light_beige_leather: { x: 420, y: 280 },
+  light_beige_1_leather: { x: 560, y: 280 },
+  light_blue_leather: { x: 700, y: 280 },
+  light_blue_1_leather: { x: 840, y: 280 },
+  light_blue_2_leather: { x: 980, y: 280 },
+  light_brown_leather: { x: 0, y: 420 },
+  light_brown_1_leather: { x: 140, y: 420 },
+  dark_green_leather: { x: 280, y: 420 },
+  yellow_biege_leather: { x: 420, y: 420 },
+  light_gray_leather: { x: 560, y: 420 },
+  light_gray_1_leather: { x: 700, y: 420 },
+  light_pink_1_leather: { x: 840, y: 420 },
+  light_pink_2_leather: { x: 980, y: 420 },
+  light_pink_3_leather: { x: 0, y: 560 },
+  medium_blue_leather: { x: 140, y: 560 },
+  medium_brown_leather: { x: 280, y: 560 },
+  medium_grey_leather: { x: 420, y: 560 },
+  brown_orange_leather: { x: 560, y: 560 },
   // Candy
-  green_candy: "ui/blocks_new/candy/green_01.png",
-  black_candy: "ui/blocks_new/candy/black.png",
-  blue_candy: "ui/blocks_new/candy/light_blue_01.png",
-  white_candy: "ui/blocks_new/candy/white.png",
-  yellow_candy: "ui/blocks_new/candy/yellow.png",
-  red_candy: "ui/blocks_new/candy/dark_red.png",
-  red_alt_candy: "ui/blocks_new/candy/dark_purple_01.png",
-  orange_candy: "ui/blocks_new/candy/orange_02.png",
-  brown_candy: "ui/blocks_new/candy/brown.png",
-  light_purple_candy: "ui/blocks_new/candy/purple.png",
-  dark_pink_candy: "ui/blocks_new/candy/dark_purple.png",
-  dark_blue_candy: "ui/blocks_new/candy/dark_blue_01.png",
-  dark_purple_candy: "ui/blocks_new/candy/dark_blue_02.png",
-  light_green_candy: "ui/blocks_new/candy/light_green.png",
-  gray_candy: "ui/blocks_new/candy/gray.png",
-  pink_candy: "ui/blocks_new/candy/pink.png",
-  peach_candy: "ui/blocks_new/candy/beige-1.png",
-  rose_candy: "ui/blocks_new/candy/dirty_pink.png",
-  orchid_candy: "ui/blocks_new/candy/light_purple_01.png",
-  light_beige_candy: "ui/blocks_new/candy/beige.png",
-  light_beige_1_candy: "ui/blocks_new/candy/light_beige-1.png",
-  light_blue_candy: "ui/blocks_new/candy/light_blue.png",
-  light_blue_1_candy: "ui/blocks_new/candy/light_blue-1.png",
-  light_blue_2_candy: "ui/blocks_new/candy/light_blue-2.png",
-  light_brown_candy: "ui/blocks_new/candy/light_brown.png",
-  light_brown_1_candy: "ui/blocks_new/candy/light_brown-1.png",
-  dark_green_candy: "ui/blocks_new/candy/dark_green_01.png",
-  yellow_biege_candy: "ui/blocks_new/candy/light_beige.png",
-  light_gray_candy: "ui/blocks_new/candy/light_gray.png",
-  light_gray_1_candy: "ui/blocks_new/candy/gray.png",
-  light_pink_1_candy: "ui/blocks_new/candy/light_pink.png",
-  light_pink_2_candy: "ui/blocks_new/candy/dirty_pink_01.png",
-  light_pink_3_candy: "ui/blocks_new/candy/dark_red_01.png",
-  medium_blue_candy: "ui/blocks_new/candy/medium_blue.png",
-  medium_brown_candy: "ui/blocks_new/candy/medium_browm.png",
-  medium_grey_candy: "ui/blocks_new/candy/medium_gray.png",
-  brown_orange_candy: "ui/blocks_new/candy/orange.png",
+  green_candy: { x: 0, y: 0 },
+  black_candy: { x: 142, y: 0 },
+  blue_candy: { x: 284, y: 0 },
+  white_candy: { x: 426, y: 0 },
+  yellow_candy: { x: 568, y: 0 },
+  red_candy: { x: 710, y: 0 },
+  red_alt_candy: { x: 852, y: 0 },
+  orange_candy: { x: 994, y: 0 },
+  brown_candy: { x: 0, y: 140 },
+  light_purple_candy: { x: 142, y: 140 },
+  dark_pink_candy: { x: 284, y: 140 },
+  dark_blue_candy: { x: 426, y: 140 },
+  dark_purple_candy: { x: 568, y: 140 },
+  light_green_candy: { x: 710, y: 140 },
+  gray_candy: { x: 852, y: 140 },
+  pink_candy: { x: 994, y: 140 },
+  peach_candy: { x: 0, y: 280 },
+  rose_candy: { x: 142, y: 280 },
+  orchid_candy: { x: 284, y: 280 },
+  light_beige_candy: { x: 426, y: 280 },
+  light_beige_1_candy: { x: 568, y: 280 },
+  light_blue_candy: { x: 710, y: 280 },
+  light_blue_1_candy: { x: 852, y: 280 },
+  light_blue_2_candy: { x: 994, y: 280 },
+  light_brown_candy: { x: 0, y: 420 },
+  light_brown_1_candy: { x: 142, y: 420 },
+  dark_green_candy: { x: 284, y: 420 },
+  yellow_biege_candy: { x: 426, y: 420 },
+  light_gray_candy: { x: 568, y: 420 },
+  light_gray_1_candy: { x: 710, y: 420 },
+  light_pink_1_candy: { x: 852, y: 420 },
+  light_pink_2_candy: { x: 994, y: 420 },
+  light_pink_3_candy: { x: 0, y: 560 },
+  medium_blue_candy: { x: 142, y: 560 },
+  medium_brown_candy: { x: 284, y: 560 },
+  medium_grey_candy: { x: 426, y: 560 },
+  brown_orange_candy: { x: 568, y: 560 },
   // Lego
-  green_lego: "ui/blocks_new/lego/green_01.png",
-  black_lego: "ui/blocks_new/lego/black.png",
-  blue_lego: "ui/blocks_new/lego/light_blue_01.png",
-  white_lego: "ui/blocks_new/lego/white.png",
-  yellow_lego: "ui/blocks_new/lego/yellow.png",
-  red_lego: "ui/blocks_new/lego/dark_red.png",
-  red_alt_lego: "ui/blocks_new/lego/dark_purple_01.png",
-  orange_lego: "ui/blocks_new/lego/orange_02.png",
-  brown_lego: "ui/blocks_new/lego/brown.png",
-  light_purple_lego: "ui/blocks_new/lego/purple.png",
-  dark_pink_lego: "ui/blocks_new/lego/dark_purple.png",
-  dark_blue_lego: "ui/blocks_new/lego/dark_blue_01.png",
-  dark_purple_lego: "ui/blocks_new/lego/dark_blue_02.png",
-  light_green_lego: "ui/blocks_new/lego/light_green.png",
-  gray_lego: "ui/blocks_new/lego/gray.png",
-  pink_lego: "ui/blocks_new/lego/pink.png",
-  peach_lego: "ui/blocks_new/lego/beige-1.png",
-  rose_lego: "ui/blocks_new/lego/dirty_pink.png",
-  orchid_lego: "ui/blocks_new/lego/light_purple_01.png",
-  light_beige_lego: "ui/blocks_new/lego/beige.png",
-  light_beige_1_lego: "ui/blocks_new/lego/light_beige-1.png",
-  light_blue_lego: "ui/blocks_new/lego/light_blue.png",
-  light_blue_1_lego: "ui/blocks_new/lego/light_blue-1.png",
-  light_blue_2_lego: "ui/blocks_new/lego/light_blue-2.png",
-  light_brown_lego: "ui/blocks_new/lego/light_brown.png",
-  light_brown_1_lego: "ui/blocks_new/lego/light_brown-1.png",
-  dark_green_lego: "ui/blocks_new/lego/dark_green_01.png",
-  yellow_biege_lego: "ui/blocks_new/lego/light_beige.png",
-  light_gray_lego: "ui/blocks_new/lego/light_gray.png",
-  light_gray_1_lego: "ui/blocks_new/lego/gray.png",
-  light_pink_1_lego: "ui/blocks_new/lego/light_pink.png",
-  light_pink_2_lego: "ui/blocks_new/lego/dirty_pink_01.png",
-  light_pink_3_lego: "ui/blocks_new/lego/dark_red_01.png",
-  medium_blue_lego: "ui/blocks_new/lego/medium_blue.png",
-  medium_brown_lego: "ui/blocks_new/lego/medium_browm.png",
-  medium_grey_lego: "ui/blocks_new/lego/medium_gray.png",
-  brown_orange_lego: "ui/blocks_new/lego/orange.png",
+  green_lego: { x: 0, y: 0 },
+  black_lego: { x: 140, y: 0 },
+  blue_lego: { x: 280, y: 0 },
+  white_lego: { x: 420, y: 0 },
+  yellow_lego: { x: 560, y: 0 },
+  red_lego: { x: 700, y: 0 },
+  red_alt_lego: { x: 840, y: 0 },
+  orange_lego: { x: 980, y: 0 },
+  brown_lego: { x: 0, y: 143 },
+  light_purple_lego: { x: 140, y: 143 },
+  dark_pink_lego: { x: 280, y: 143 },
+  dark_blue_lego: { x: 420, y: 143 },
+  dark_purple_lego: { x: 560, y: 143 },
+  light_green_lego: { x: 700, y: 143 },
+  gray_lego: { x: 840, y: 143 },
+  pink_lego: { x: 980, y: 143 },
+  peach_lego: { x: 0, y: 286 },
+  rose_lego: { x: 140, y: 286 },
+  orchid_lego: { x: 280, y: 286 },
+  light_beige_lego: { x: 420, y: 286 },
+  light_beige_1_lego: { x: 560, y: 286 },
+  light_blue_lego: { x: 700, y: 286 },
+  light_blue_1_lego: { x: 840, y: 286 },
+  light_blue_2_lego: { x: 980, y: 286 },
+  light_brown_lego: { x: 0, y: 429 },
+  light_brown_1_lego: { x: 140, y: 429 },
+  dark_green_lego: { x: 280, y: 429 },
+  yellow_biege_lego: { x: 420, y: 429 },
+  light_gray_lego: { x: 560, y: 429 },
+  light_gray_1_lego: { x: 700, y: 429 },
+  light_pink_1_lego: { x: 840, y: 429 },
+  light_pink_2_lego: { x: 980, y: 429 },
+  light_pink_3_lego: { x: 0, y: 572 },
+  medium_blue_lego: { x: 140, y: 572 },
+  medium_brown_lego: { x: 280, y: 572 },
+  medium_grey_lego: { x: 420, y: 572 },
+  brown_orange_lego: { x: 560, y: 572 },
   // Metal
-  green_metal: "ui/blocks_new/metal/green_01.png",
-  black_metal: "ui/blocks_new/metal/black.png",
-  blue_metal: "ui/blocks_new/metal/light_blue_01.png",
-  white_metal: "ui/blocks_new/metal/white.png",
-  yellow_metal: "ui/blocks_new/metal/yellow.png",
-  red_metal: "ui/blocks_new/metal/dark_red.png",
-  red_alt_metal: "ui/blocks_new/metal/dark_purple_01.png",
-  orange_metal: "ui/blocks_new/metal/orange_02.png",
-  brown_metal: "ui/blocks_new/metal/brown.png",
-  light_purple_metal: "ui/blocks_new/metal/purple.png",
-  dark_pink_metal: "ui/blocks_new/metal/dark_purple.png",
-  dark_blue_metal: "ui/blocks_new/metal/dark_blue_01.png",
-  dark_purple_metal: "ui/blocks_new/metal/dark_blue_02.png",
-  light_green_metal: "ui/blocks_new/metal/light_green.png",
-  gray_metal: "ui/blocks_new/metal/gray.png",
-  pink_metal: "ui/blocks_new/metal/pink.png",
-  peach_metal: "ui/blocks_new/metal/beige-1.png",
-  rose_metal: "ui/blocks_new/metal/dirty_pink.png",
-  orchid_metal: "ui/blocks_new/metal/light_purple_01.png",
-  light_beige_metal: "ui/blocks_new/metal/beige.png",
-  light_beige_1_metal: "ui/blocks_new/metal/light_beige-1.png",
-  light_blue_metal: "ui/blocks_new/metal/light_blue.png",
-  light_blue_1_metal: "ui/blocks_new/metal/light_blue-1.png",
-  light_blue_2_metal: "ui/blocks_new/metal/light_blue-2.png",
-  light_brown_metal: "ui/blocks_new/metal/light_brown.png",
-  light_brown_1_metal: "ui/blocks_new/metal/light_brown-1.png",
-  dark_green_metal: "ui/blocks_new/metal/dark_green_01.png",
-  yellow_biege_metal: "ui/blocks_new/metal/light_beige.png",
-  light_gray_metal: "ui/blocks_new/metal/gray.png",
-  light_gray_1_metal: "ui/blocks_new/metal/gray.png",
-  light_pink_1_metal: "ui/blocks_new/metal/light_pink.png",
-  light_pink_2_metal: "ui/blocks_new/metal/dirty_pink_01.png",
-  light_pink_3_metal: "ui/blocks_new/metal/dark_red_01.png",
-  medium_blue_metal: "ui/blocks_new/metal/medium_blue.png",
-  medium_brown_metal: "ui/blocks_new/metal/medium_browm.png",
-  medium_grey_metal: "ui/blocks_new/metal/medium_gray.png",
-  brown_orange_metal: "ui/blocks_new/metal/orange.png",
+  green_metal: { x: 0, y: 0 },
+  black_metal: { x: 140, y: 0 },
+  blue_metal: { x: 280, y: 0 },
+  white_metal: { x: 420, y: 0 },
+  yellow_metal: { x: 560, y: 0 },
+  red_metal: { x: 700, y: 0 },
+  red_alt_metal: { x: 840, y: 0 },
+  orange_metal: { x: 980, y: 0 },
+  brown_metal: { x: 0, y: 140 },
+  light_purple_metal: { x: 140, y: 140 },
+  dark_pink_metal: { x: 280, y: 140 },
+  dark_blue_metal: { x: 420, y: 140 },
+  dark_purple_metal: { x: 560, y: 140 },
+  light_green_metal: { x: 700, y: 140 },
+  gray_metal: { x: 840, y: 140 },
+  pink_metal: { x: 980, y: 140 },
+  peach_metal: { x: 0, y: 280 },
+  rose_metal: { x: 140, y: 280 },
+  orchid_metal: { x: 280, y: 280 },
+  light_beige_metal: { x: 420, y: 280 },
+  light_beige_1_metal: { x: 560, y: 280 },
+  light_blue_metal: { x: 700, y: 280 },
+  light_blue_1_metal: { x: 840, y: 280 },
+  light_blue_2_metal: { x: 980, y: 280 },
+  light_brown_metal: { x: 0, y: 420 },
+  light_brown_1_metal: { x: 140, y: 420 },
+  dark_green_metal: { x: 280, y: 420 },
+  yellow_biege_metal: { x: 420, y: 420 },
+  light_gray_metal: { x: 560, y: 420 },
+  light_gray_1_metal: { x: 700, y: 420 },
+  light_pink_1_metal: { x: 840, y: 420 },
+  light_pink_2_metal: { x: 980, y: 420 },
+  light_pink_3_metal: { x: 0, y: 560 },
+  medium_blue_metal: { x: 140, y: 560 },
+  medium_brown_metal: { x: 280, y: 560 },
+  medium_grey_metal: { x: 420, y: 560 },
+  brown_orange_metal: { x: 560, y: 560 },
   // Cheese
-  green_cheese: "ui/blocks_new/cheese/green_01.png",
-  black_cheese: "ui/blocks_new/cheese/black.png",
-  blue_cheese: "ui/blocks_new/cheese/light_blue_01.png",
-  white_cheese: "ui/blocks_new/cheese/white.png",
-  yellow_cheese: "ui/blocks_new/cheese/yellow.png",
-  red_cheese: "ui/blocks_new/cheese/dark_red.png",
-  red_alt_cheese: "ui/blocks_new/cheese/dark_purple_01.png",
-  orange_cheese: "ui/blocks_new/cheese/orange_02.png",
-  brown_cheese: "ui/blocks_new/cheese/brown.png",
-  light_purple_cheese: "ui/blocks_new/cheese/purple.png",
-  dark_pink_cheese: "ui/blocks_new/cheese/dark_purple.png",
-  dark_blue_cheese: "ui/blocks_new/cheese/dark_blue_01.png",
-  dark_purple_cheese: "ui/blocks_new/cheese/dark_blue_02.png",
-  light_green_cheese: "ui/blocks_new/cheese/light_green.png",
-  gray_cheese: "ui/blocks_new/cheese/gray.png",
-  pink_cheese: "ui/blocks_new/cheese/pink.png",
-  peach_cheese: "ui/blocks_new/cheese/beige-1.png",
-  rose_cheese: "ui/blocks_new/cheese/dirty_pink.png",
-  orchid_cheese: "ui/blocks_new/cheese/light_purple_01.png",
-  light_beige_cheese: "ui/blocks_new/cheese/beige.png",
-  light_beige_1_cheese: "ui/blocks_new/cheese/light_beige-1.png",
-  light_blue_cheese: "ui/blocks_new/cheese/light_blue.png",
-  light_blue_1_cheese: "ui/blocks_new/cheese/light_blue-1.png",
-  light_blue_2_cheese: "ui/blocks_new/cheese/light_blue-2.png",
-  light_brown_cheese: "ui/blocks_new/cheese/light_brown.png",
-  light_brown_1_cheese: "ui/blocks_new/cheese/light_brown-1.png",
-  dark_green_cheese: "ui/blocks_new/cheese/dark_green_01.png",
-  yellow_biege_cheese: "ui/blocks_new/cheese/light_beige.png",
-  light_gray_cheese: "ui/blocks_new/cheese/light_gray.png",
-  light_gray_1_cheese: "ui/blocks_new/cheese/gray.png",
-  light_pink_1_cheese: "ui/blocks_new/cheese/light_pink.png",
-  light_pink_2_cheese: "ui/blocks_new/cheese/dirty_pink_01.png",
-  light_pink_3_cheese: "ui/blocks_new/cheese/dark_red_01.png",
-  medium_blue_cheese: "ui/blocks_new/cheese/medium_blue.png",
-  medium_brown_cheese: "ui/blocks_new/cheese/medium_browm.png",
-  medium_grey_cheese: "ui/blocks_new/cheese/medium_gray.png",
-  brown_orange_cheese: "ui/blocks_new/cheese/orange.png",
+  green_cheese: { x: 0, y: 0 },
+  black_cheese: { x: 140, y: 0 },
+  blue_cheese: { x: 280, y: 0 },
+  white_cheese: { x: 420, y: 0 },
+  yellow_cheese: { x: 560, y: 0 },
+  red_cheese: { x: 700, y: 0 },
+  red_alt_cheese: { x: 840, y: 0 },
+  orange_cheese: { x: 980, y: 0 },
+  brown_cheese: { x: 0, y: 140 },
+  light_purple_cheese: { x: 140, y: 140 },
+  dark_pink_cheese: { x: 280, y: 140 },
+  dark_blue_cheese: { x: 420, y: 140 },
+  dark_purple_cheese: { x: 560, y: 140 },
+  light_green_cheese: { x: 700, y: 140 },
+  gray_cheese: { x: 840, y: 140 },
+  pink_cheese: { x: 980, y: 140 },
+  peach_cheese: { x: 0, y: 280 },
+  rose_cheese: { x: 140, y: 280 },
+  orchid_cheese: { x: 280, y: 280 },
+  light_beige_cheese: { x: 420, y: 280 },
+  light_beige_1_cheese: { x: 560, y: 280 },
+  light_blue_cheese: { x: 700, y: 280 },
+  light_blue_1_cheese: { x: 840, y: 280 },
+  light_blue_2_cheese: { x: 980, y: 280 },
+  light_brown_cheese: { x: 0, y: 420 },
+  light_brown_1_cheese: { x: 140, y: 420 },
+  dark_green_cheese: { x: 280, y: 420 },
+  yellow_biege_cheese: { x: 420, y: 420 },
+  light_gray_cheese: { x: 560, y: 420 },
+  light_gray_1_cheese: { x: 700, y: 420 },
+  light_pink_1_cheese: { x: 840, y: 420 },
+  light_pink_2_cheese: { x: 980, y: 420 },
+  light_pink_3_cheese: { x: 0, y: 560 },
+  medium_blue_cheese: { x: 140, y: 560 },
+  medium_brown_cheese: { x: 280, y: 560 },
+  medium_grey_cheese: { x: 420, y: 560 },
+  brown_orange_cheese: { x: 560, y: 560 },
   // Diamond
-  green_diamond: "ui/blocks_new/diamond/green_01.png",
-  black_diamond: "ui/blocks_new/diamond/black.png",
-  blue_diamond: "ui/blocks_new/diamond/light_blue_01.png",
-  white_diamond: "ui/blocks_new/diamond/white.png",
-  yellow_diamond: "ui/blocks_new/diamond/yellow.png",
-  red_diamond: "ui/blocks_new/diamond/dark_red.png",
-  red_alt_diamond: "ui/blocks_new/diamond/dark_purple_01.png",
-  orange_diamond: "ui/blocks_new/diamond/orange_02.png",
-  brown_diamond: "ui/blocks_new/diamond/brown.png",
-  light_purple_diamond: "ui/blocks_new/diamond/purple.png",
-  dark_pink_diamond: "ui/blocks_new/diamond/dark_purple.png",
-  dark_blue_diamond: "ui/blocks_new/diamond/dark_blue_01.png",
-  dark_purple_diamond: "ui/blocks_new/diamond/dark_blue_02.png",
-  light_green_diamond: "ui/blocks_new/diamond/light_green.png",
-  gray_diamond: "ui/blocks_new/diamond/gray.png",
-  pink_diamond: "ui/blocks_new/diamond/pink.png",
-  peach_diamond: "ui/blocks_new/diamond/beige-1.png",
-  rose_diamond: "ui/blocks_new/diamond/dirty_pink.png",
-  orchid_diamond: "ui/blocks_new/diamond/light_purple_01.png",
-  light_beige_diamond: "ui/blocks_new/diamond/beige.png",
-  light_beige_1_diamond: "ui/blocks_new/diamond/light_beige-1.png",
-  light_blue_diamond: "ui/blocks_new/diamond/light_blue.png",
-  light_blue_1_diamond: "ui/blocks_new/diamond/light_blue-1.png",
-  light_blue_2_diamond: "ui/blocks_new/diamond/light_blue-2.png",
-  light_brown_diamond: "ui/blocks_new/diamond/light_brown.png",
-  light_brown_1_diamond: "ui/blocks_new/diamond/light_brown-1.png",
-  dark_green_diamond: "ui/blocks_new/diamond/dark_green_01.png",
-  yellow_biege_diamond: "ui/blocks_new/diamond/light_beige.png",
-  light_gray_diamond: "ui/blocks_new/diamond/light_gray.png",
-  light_gray_1_diamond: "ui/blocks_new/diamond/gray.png",
-  light_pink_1_diamond: "ui/blocks_new/diamond/light_pink.png",
-  light_pink_2_diamond: "ui/blocks_new/diamond/dirty_pink_01.png",
-  light_pink_3_diamond: "ui/blocks_new/diamond/dark_red_01.png",
-  medium_blue_diamond: "ui/blocks_new/diamond/medium_blue.png",
-  medium_brown_diamond: "ui/blocks_new/diamond/medium_browm.png",
-  medium_grey_diamond: "ui/blocks_new/diamond/medium_gray.png",
-  brown_orange_diamond: "ui/blocks_new/diamond/orange.png",
+  green_diamond: { x: 0, y: 0 },
+  black_diamond: { x: 140, y: 0 },
+  blue_diamond: { x: 280, y: 0 },
+  white_diamond: { x: 420, y: 0 },
+  yellow_diamond: { x: 560, y: 0 },
+  red_diamond: { x: 700, y: 0 },
+  red_alt_diamond: { x: 840, y: 0 },
+  orange_diamond: { x: 980, y: 0 },
+  brown_diamond: { x: 0, y: 140 },
+  light_purple_diamond: { x: 140, y: 140 },
+  dark_pink_diamond: { x: 280, y: 140 },
+  dark_blue_diamond: { x: 420, y: 140 },
+  dark_purple_diamond: { x: 560, y: 140 },
+  light_green_diamond: { x: 700, y: 140 },
+  gray_diamond: { x: 840, y: 140 },
+  pink_diamond: { x: 980, y: 140 },
+  peach_diamond: { x: 0, y: 280 },
+  rose_diamond: { x: 140, y: 280 },
+  orchid_diamond: { x: 280, y: 280 },
+  light_beige_diamond: { x: 420, y: 280 },
+  light_beige_1_diamond: { x: 560, y: 280 },
+  light_blue_diamond: { x: 700, y: 280 },
+  light_blue_1_diamond: { x: 840, y: 280 },
+  light_blue_2_diamond: { x: 980, y: 280 },
+  light_brown_diamond: { x: 0, y: 420 },
+  light_brown_1_diamond: { x: 140, y: 420 },
+  dark_green_diamond: { x: 280, y: 420 },
+  yellow_biege_diamond: { x: 420, y: 420 },
+  light_gray_diamond: { x: 560, y: 420 },
+  light_gray_1_diamond: { x: 700, y: 420 },
+  light_pink_1_diamond: { x: 840, y: 420 },
+  light_pink_2_diamond: { x: 980, y: 420 },
+  light_pink_3_diamond: { x: 0, y: 560 },
+  medium_blue_diamond: { x: 140, y: 560 },
+  medium_brown_diamond: { x: 280, y: 560 },
+  medium_grey_diamond: { x: 420, y: 560 },
+  brown_orange_diamond: { x: 560, y: 560 },
   // Bubbles
-  green_bubbles: "ui/blocks_new/bubbles/green_01.png",
-  black_bubbles: "ui/blocks_new/bubbles/black.png",
-  blue_bubbles: "ui/blocks_new/bubbles/light_blue_01.png",
-  white_bubbles: "ui/blocks_new/bubbles/Group 113449.png",
-  yellow_bubbles: "ui/blocks_new/bubbles/yellow.png",
-  red_bubbles: "ui/blocks_new/bubbles/dark_red.png",
-  red_alt_bubbles: "ui/blocks_new/bubbles/dark_purple_01.png",
-  orange_bubbles: "ui/blocks_new/bubbles/Group 113502.png",
-  brown_bubbles: "ui/blocks_new/bubbles/brown.png",
-  light_purple_bubbles: "ui/blocks_new/bubbles/purple.png",
-  dark_pink_bubbles: "ui/blocks_new/bubbles/dark_purple.png",
-  dark_blue_bubbles: "ui/blocks_new/bubbles/dark_blue_01.png",
-  dark_purple_bubbles: "ui/blocks_new/bubbles/dark_blue_02.png",
-  light_green_bubbles: "ui/blocks_new/bubbles/light_green.png",
-  gray_bubbles: "ui/blocks_new/bubbles/gray.png",
-  pink_bubbles: "ui/blocks_new/bubbles/pink.png",
-  peach_bubbles: "ui/blocks_new/bubbles/beige-1.png",
-  rose_bubbles: "ui/blocks_new/bubbles/dirty_pink.png",
-  orchid_bubbles: "ui/blocks_new/bubbles/light_purple_01.png",
-  light_beige_bubbles: "ui/blocks_new/bubbles/beige.png",
-  light_beige_1_bubbles: "ui/blocks_new/bubbles/light_beige-1.png",
-  light_blue_bubbles: "ui/blocks_new/bubbles/light_blue.png",
-  light_blue_1_bubbles: "ui/blocks_new/bubbles/light_blue-1.png",
-  light_blue_2_bubbles: "ui/blocks_new/bubbles/light_blue-2.png",
-  light_brown_bubbles: "ui/blocks_new/bubbles/light_brown.png",
-  light_brown_1_bubbles: "ui/blocks_new/bubbles/light_brown-1.png",
-  dark_green_bubbles: "ui/blocks_new/bubbles/dark_green_01.png",
-  yellow_biege_bubbles: "ui/blocks_new/bubbles/light_beige.png",
-  light_gray_bubbles: "ui/blocks_new/bubbles/light_gray.png",
-  light_gray_1_bubbles: "ui/blocks_new/bubbles/gray.png",
-  light_pink_1_bubbles: "ui/blocks_new/bubbles/light_pink.png",
-  light_pink_2_bubbles: "ui/blocks_new/bubbles/dirty_pink_01.png",
-  light_pink_3_bubbles: "ui/blocks_new/bubbles/dark_red_01.png",
-  medium_blue_bubbles: "ui/blocks_new/bubbles/medium_blue.png",
-  medium_brown_bubbles: "ui/blocks_new/bubbles/medium_browm.png",
-  medium_grey_bubbles: "ui/blocks_new/bubbles/medium_gray.png",
-  brown_orange_bubbles: "ui/blocks_new/bubbles/orange.png",
+  green_bubbles: { x: 0, y: 0 },
+  black_bubbles: { x: 140, y: 0 },
+  blue_bubbles: { x: 280, y: 0 },
+  white_bubbles: { x: 420, y: 0 },
+  yellow_bubbles: { x: 560, y: 0 },
+  red_bubbles: { x: 700, y: 0 },
+  red_alt_bubbles: { x: 840, y: 0 },
+  orange_bubbles: { x: 980, y: 0 },
+  brown_bubbles: { x: 0, y: 140 },
+  light_purple_bubbles: { x: 140, y: 140 },
+  dark_pink_bubbles: { x: 280, y: 140 },
+  dark_blue_bubbles: { x: 420, y: 140 },
+  dark_purple_bubbles: { x: 560, y: 140 },
+  light_green_bubbles: { x: 700, y: 140 },
+  gray_bubbles: { x: 840, y: 140 },
+  pink_bubbles: { x: 980, y: 140 },
+  peach_bubbles: { x: 0, y: 280 },
+  rose_bubbles: { x: 140, y: 280 },
+  orchid_bubbles: { x: 280, y: 280 },
+  light_beige_bubbles: { x: 420, y: 280 },
+  light_beige_1_bubbles: { x: 560, y: 280 },
+  light_blue_bubbles: { x: 700, y: 280 },
+  light_blue_1_bubbles: { x: 840, y: 280 },
+  light_blue_2_bubbles: { x: 980, y: 280 },
+  light_brown_bubbles: { x: 0, y: 420 },
+  light_brown_1_bubbles: { x: 140, y: 420 },
+  dark_green_bubbles: { x: 280, y: 420 },
+  yellow_biege_bubbles: { x: 420, y: 420 },
+  light_gray_bubbles: { x: 560, y: 420 },
+  light_gray_1_bubbles: { x: 700, y: 420 },
+  light_pink_1_bubbles: { x: 840, y: 420 },
+  light_pink_2_bubbles: { x: 980, y: 420 },
+  light_pink_3_bubbles: { x: 0, y: 560 },
+  medium_blue_bubbles: { x: 140, y: 560 },
+  medium_brown_bubbles: { x: 280, y: 560 },
+  medium_grey_bubbles: { x: 420, y: 560 },
+  brown_orange_bubbles: { x: 560, y: 560 },
   // Knit
-  green_knit: "ui/blocks_new/knit/green_01.png",
-  black_knit: "ui/blocks_new/knit/black.png",
-  blue_knit: "ui/blocks_new/knit/light_blue_01.png",
-  white_knit: "ui/blocks_new/knit/white.png",
-  yellow_knit: "ui/blocks_new/knit/yellow.png",
-  red_knit: "ui/blocks_new/knit/dark_red.png",
-  red_alt_knit: "ui/blocks_new/knit/dark_purple_01.png",
-  orange_knit: "ui/blocks_new/knit/orange_02.png",
-  brown_knit: "ui/blocks_new/knit/brown.png",
-  light_purple_knit: "ui/blocks_new/knit/purple.png",
-  dark_pink_knit: "ui/blocks_new/knit/dark_purple.png",
-  dark_blue_knit: "ui/blocks_new/knit/dark_blue_01.png",
-  dark_purple_knit: "ui/blocks_new/knit/dark_blue_02.png",
-  light_green_knit: "ui/blocks_new/knit/light_green.png",
-  gray_knit: "ui/blocks_new/knit/gray.png",
-  pink_knit: "ui/blocks_new/knit/pink.png",
-  peach_knit: "ui/blocks_new/knit/beige-1.png",
-  rose_knit: "ui/blocks_new/knit/dirty_pink.png",
-  orchid_knit: "ui/blocks_new/knit/light_purple_01.png",
-  light_beige_knit: "ui/blocks_new/knit/beige.png",
-  light_beige_1_knit: "ui/blocks_new/knit/light_beige-1.png",
-  light_blue_knit: "ui/blocks_new/knit/light_blue.png",
-  light_blue_1_knit: "ui/blocks_new/knit/light_blue-1.png",
-  light_blue_2_knit: "ui/blocks_new/knit/light_blue-2.png",
-  light_brown_knit: "ui/blocks_new/knit/light_brown.png",
-  light_brown_1_knit: "ui/blocks_new/knit/light_brown-1.png",
-  dark_green_knit: "ui/blocks_new/knit/dark_green_01.png",
-  yellow_biege_knit: "ui/blocks_new/knit/light_beige.png",
-  light_gray_knit: "ui/blocks_new/knit/light_gray.png",
-  light_gray_1_knit: "ui/blocks_new/knit/gray.png",
-  light_pink_1_knit: "ui/blocks_new/knit/light_pink.png",
-  light_pink_2_knit: "ui/blocks_new/knit/dirty_pink_01.png",
-  light_pink_3_knit: "ui/blocks_new/knit/dark_red_01.png",
-  medium_blue_knit: "ui/blocks_new/knit/medium_blue.png",
-  medium_brown_knit: "ui/blocks_new/knit/medium_browm.png",
-  medium_grey_knit: "ui/blocks_new/knit/medium_gray.png",
-  brown_orange_knit: "ui/blocks_new/knit/orange.png",
+  green_knit: { x: 0, y: 0 },
+  black_knit: { x: 140, y: 0 },
+  blue_knit: { x: 280, y: 0 },
+  white_knit: { x: 420, y: 0 },
+  yellow_knit: { x: 560, y: 0 },
+  red_knit: { x: 700, y: 0 },
+  red_alt_knit: { x: 840, y: 0 },
+  orange_knit: { x: 980, y: 0 },
+  brown_knit: { x: 0, y: 140 },
+  light_purple_knit: { x: 140, y: 140 },
+  dark_pink_knit: { x: 280, y: 140 },
+  dark_blue_knit: { x: 420, y: 140 },
+  dark_purple_knit: { x: 560, y: 140 },
+  light_green_knit: { x: 700, y: 140 },
+  gray_knit: { x: 840, y: 140 },
+  pink_knit: { x: 980, y: 140 },
+  peach_knit: { x: 0, y: 280 },
+  rose_knit: { x: 140, y: 280 },
+  orchid_knit: { x: 280, y: 280 },
+  light_beige_knit: { x: 420, y: 280 },
+  light_beige_1_knit: { x: 560, y: 280 },
+  light_blue_knit: { x: 700, y: 280 },
+  light_blue_1_knit: { x: 840, y: 280 },
+  light_blue_2_knit: { x: 980, y: 280 },
+  light_brown_knit: { x: 0, y: 420 },
+  light_brown_1_knit: { x: 140, y: 420 },
+  dark_green_knit: { x: 280, y: 420 },
+  yellow_biege_knit: { x: 420, y: 420 },
+  light_gray_knit: { x: 560, y: 420 },
+  light_gray_1_knit: { x: 700, y: 420 },
+  light_pink_1_knit: { x: 840, y: 420 },
+  light_pink_2_knit: { x: 980, y: 420 },
+  light_pink_3_knit: { x: 0, y: 560 },
+  medium_blue_knit: { x: 140, y: 560 },
+  medium_brown_knit: { x: 280, y: 560 },
+  medium_grey_knit: { x: 420, y: 560 },
+  brown_orange_knit: { x: 560, y: 560 },
 };
+
+const BLOCK_TILE_ATLAS_SOURCE_BY_GROUP = {
+  original: "ui/blocks_new/original/atlas.png",
+  metal: "ui/blocks_new/metal/atlas.png",
+  lego: "ui/blocks_new/lego/atlas.png",
+  leather: "ui/blocks_new/leather/atlas.png",
+  knit: "ui/blocks_new/knit/atlas.png",
+  diamond: "ui/blocks_new/diamond/atlas.png",
+  cheese: "ui/blocks_new/cheese/atlas.png",
+  candy: "ui/blocks_new/candy/atlas.png",
+  bubbles: "ui/blocks_new/bubbles/atlas.png",
+};
+
+const CHICKEN_SPRITE_ATLAS_SOURCE_BY_GROUP = {
+  original: "ui/birds_new/original/atlas.png",
+  metal: "ui/birds_new/metal/atlas.png",
+  lego: "ui/birds_new/lego/atlas.png",
+  leather: "ui/birds_new/leather/atlas.png",
+  knit: "ui/birds_new/knit/atlas.png",
+  diamond: "ui/birds_new/diamond/atlas.png",
+  cheese: "ui/birds_new/cheese/atlas.png",
+  candy: "ui/birds_new/candy/atlas.png",
+  bubbles: "ui/birds_new/bubbles/atlas.png",
+};
+
+const BLOCK_TILE_ATLAS_LAYOUT_BY_GROUP = {
+  original: { cellW: 140, cellH: 140, columns: 8, count: 37 },
+  metal: { cellW: 140, cellH: 140, columns: 8, count: 37 },
+  lego: { cellW: 140, cellH: 143, columns: 8, count: 37 },
+  leather: { cellW: 140, cellH: 140, columns: 8, count: 37 },
+  knit: { cellW: 140, cellH: 140, columns: 8, count: 37 },
+  diamond: { cellW: 140, cellH: 140, columns: 8, count: 37 },
+  cheese: { cellW: 140, cellH: 140, columns: 8, count: 37 },
+  candy: { cellW: 142, cellH: 140, columns: 8, count: 37 },
+  bubbles: { cellW: 140, cellH: 140, columns: 8, count: 37 },
+};
+
+const CHICKEN_SPRITE_ATLAS_LAYOUT_BY_GROUP = {
+  original: { cellW: 170, cellH: 169, columns: 8, count: 37 },
+  metal: { cellW: 170, cellH: 167, columns: 8, count: 37 },
+  lego: { cellW: 170, cellH: 167, columns: 8, count: 37 },
+  leather: { cellW: 170, cellH: 167, columns: 8, count: 37 },
+  knit: { cellW: 170, cellH: 167, columns: 8, count: 37 },
+  diamond: { cellW: 170, cellH: 167, columns: 8, count: 37 },
+  cheese: { cellW: 170, cellH: 167, columns: 8, count: 37 },
+  candy: { cellW: 170, cellH: 167, columns: 8, count: 37 },
+  bubbles: { cellW: 170, cellH: 167, columns: 8, count: 37 },
+};
+
+const SPRITE_ATLAS_GROUP_BY_SUFFIX = {
+  metal: "metal",
+  lego: "lego",
+  leather: "leather",
+  knit: "knit",
+  diamond: "diamond",
+  cheese: "cheese",
+  candy: "candy",
+  bubbles: "bubbles",
+};
+
+function getSpriteAtlasGroupFromColorKey(color) {
+  const colorKey = String(color || "");
+  for (const suffix of Object.keys(SPRITE_ATLAS_GROUP_BY_SUFFIX)) {
+    if (colorKey.endsWith(`_${suffix}`)) {
+      return SPRITE_ATLAS_GROUP_BY_SUFFIX[suffix];
+    }
+  }
+  return "original";
+}
+
+function buildSpriteAtlasFrameByColor(sourceByColor, atlasSourceByGroup, atlasLayoutByGroup) {
+  const frameByColor = {};
+  for (const [color, position] of Object.entries(sourceByColor)) {
+    const group = getSpriteAtlasGroupFromColorKey(color);
+    const atlasSrc = atlasSourceByGroup[group];
+    const layout = atlasLayoutByGroup[group];
+    const x = Math.round(Number(position?.x));
+    const y = Math.round(Number(position?.y));
+    if (!atlasSrc || !layout || !Number.isFinite(x) || !Number.isFinite(y)) {
+      continue;
+    }
+    frameByColor[color] = {
+      src: atlasSrc,
+      x,
+      y,
+      w: layout.cellW,
+      h: layout.cellH,
+    };
+  }
+  return frameByColor;
+}
+
+const BLOCK_TILE_ATLAS_FRAME_BY_COLOR = buildSpriteAtlasFrameByColor(
+  BLOCK_TILE_SOURCE_BY_COLOR,
+  BLOCK_TILE_ATLAS_SOURCE_BY_GROUP,
+  BLOCK_TILE_ATLAS_LAYOUT_BY_GROUP
+);
+
+const CHICKEN_SPRITE_ATLAS_FRAME_BY_COLOR = buildSpriteAtlasFrameByColor(
+  CHICKEN_SPRITE_SOURCE_BY_COLOR,
+  CHICKEN_SPRITE_ATLAS_SOURCE_BY_GROUP,
+  CHICKEN_SPRITE_ATLAS_LAYOUT_BY_GROUP
+);
 
 const BLOCK_TILE_COLOR_ALIASES = {
   pink: "dark_pink",
@@ -3713,7 +3816,9 @@ class Game {
     this.blockTemplateImage = new Image();
     this.blockTemplateImage.src = "ui/block.png";
     this.blockTemplateImage.decoding = "async";
-    this.blockTileImageByColor = {};
+    this.blockTileAtlasImageBySrc = {};
+    this.blockTileAtlasFrameByColor = {};
+    this.blockTileAtlasFrameCanvasByColor = {};
     this.blockTileColorSampleByColor = {};
     this.blockTileUsesSourceImage = {};
     this.chickenSpriteColorSampleByColor = {};
@@ -3736,7 +3841,9 @@ class Game {
       woodPattern: null,
       chickenByColor: {},
     };
-    this.chickenSpriteImageByColor = {};
+    this.chickenSpriteAtlasImageBySrc = {};
+    this.chickenSpriteAtlasFrameByColor = {};
+    this.chickenSpriteAtlasFrameCanvasByColor = {};
     this.initChickenSpriteImages();
     this.initBlockTileImages();
     this.rebuildBlockColorSamplerPalette();
@@ -4121,11 +4228,11 @@ class Game {
     this.sprites.chickenByColor = {};
     const chickenColors = new Set([
       ...Object.keys(CHICKEN_SPRITE_SOURCE_BY_COLOR),
-      ...Object.keys(this.chickenSpriteImageByColor),
+      ...Object.keys(this.chickenSpriteAtlasFrameByColor),
     ]);
     for (const color of chickenColors) {
-      const imageSprite = this.chickenSpriteImageByColor[color];
-      if (imageSprite && imageSprite.complete && imageSprite.naturalWidth > 0 && imageSprite.naturalHeight > 0) {
+      const imageSprite = this.getLoadedChickenSpriteImage(color);
+      if (imageSprite && imageSprite.width > 0 && imageSprite.height > 0) {
         this.sprites.chickenByColor[color] = imageSprite;
       }
     }
@@ -4162,214 +4269,135 @@ class Game {
     });
   }
 
-  initChickenSpriteImages() {
-    for (const [color, src] of Object.entries(CHICKEN_SPRITE_SOURCE_BY_COLOR)) {
-      this.registerChickenSpriteImageSource(color, src);
-    }
-    // For file:// sessions directory listing is often unavailable; probe by predictable color filenames.
-    const isFileProtocol = typeof window !== "undefined" && window.location?.protocol === "file:";
-    if (isFileProtocol) {
-      for (const color of Object.keys(BLOCK_TILE_SOURCE_BY_COLOR)) {
-        this.registerChickenSpriteImageSource(color, `ui/birds/${color}.png`);
+  loadSpriteAtlasImages(frameByColor, atlasImageBySrc, onAtlasLoad, onAtlasError) {
+    const atlasSources = new Set(Object.values(frameByColor).map((frame) => frame?.src).filter(Boolean));
+    for (const src of atlasSources) {
+      if (atlasImageBySrc[src]) {
+        continue;
       }
-    }
-    void this.discoverChickenSpriteSourcesFromUiDirectory();
-  }
-
-  registerChickenSpriteImageSource(color, src) {
-    const normalizedColor = String(color || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, "_");
-    const normalizedSrc = String(src || "").trim();
-    if (!normalizedColor || !normalizedSrc) {
-      return;
-    }
-    if (this.chickenSpriteImageByColor[normalizedColor]) {
-      return;
-    }
-    CHICKEN_SPRITE_SOURCE_BY_COLOR[normalizedColor] = normalizedSrc;
-    const image = new Image();
-    image.decoding = "async";
-    image.src = normalizedSrc;
-    image.onload = () => {
-      try {
-        const sample = this.extractRepresentativeColorFromImage(image);
-        if (sample) {
-          this.chickenSpriteColorSampleByColor[normalizedColor] = sample;
+      const image = new Image();
+      image.decoding = "async";
+      image.onload = () => {
+        if (typeof onAtlasLoad === "function") {
+          onAtlasLoad(src);
         }
-      } catch {
-        // On file://, reading pixels can throw SecurityError (tainted canvas).
-      }
-      this.scheduleReferenceAssetsRebuild();
-    };
-    image.onerror = () => {
-      delete this.chickenSpriteColorSampleByColor[normalizedColor];
-    };
-    this.chickenSpriteImageByColor[normalizedColor] = image;
+      };
+      image.onerror = () => {
+        if (typeof onAtlasError === "function") {
+          onAtlasError(src);
+        }
+      };
+      image.src = src;
+      atlasImageBySrc[src] = image;
+    }
   }
 
-  normalizeDiscoveredChickenColorKey(baseName) {
-    const normalized = String(baseName || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, "_")
-      .replace(/_+\d+$/, "")
-      .replace(/^chicken_+/, "")
-      .replace(/_+chicken$/, "")
-      .replace(/^bird_+/, "")
-      .replace(/_+bird$/, "");
-    if (!normalized || normalized === "chicken" || normalized === "bird") {
+  getSpriteAtlasFrameCanvas(frameByColor, atlasImageBySrc, canvasByColor, color) {
+    const frame = frameByColor[color];
+    if (!frame) {
       return null;
     }
-    return normalized;
+    const atlasImage = atlasImageBySrc[frame.src];
+    if (!atlasImage || !atlasImage.complete || atlasImage.naturalWidth <= 0 || atlasImage.naturalHeight <= 0) {
+      return null;
+    }
+    if (canvasByColor[color]) {
+      return canvasByColor[color];
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(frame.w));
+    canvas.height = Math.max(1, Math.round(frame.h));
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) {
+      return null;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(atlasImage, frame.x, frame.y, frame.w, frame.h, 0, 0, canvas.width, canvas.height);
+    canvasByColor[color] = canvas;
+    return canvas;
   }
 
-  async discoverChickenSpriteSourcesFromUiDirectory() {
-    if (typeof fetch !== "function") {
-      return;
+  initChickenSpriteImages() {
+    for (const [color, frame] of Object.entries(CHICKEN_SPRITE_ATLAS_FRAME_BY_COLOR)) {
+      this.chickenSpriteAtlasFrameByColor[color] = frame;
     }
-    let response;
-    try {
-      response = await fetch("ui/birds/", { cache: "no-store" });
-    } catch {
-      return;
-    }
-    if (!response?.ok) {
-      return;
-    }
-    let html = "";
-    try {
-      html = await response.text();
-    } catch {
-      return;
-    }
-    if (!html || typeof html !== "string") {
-      return;
-    }
-    const hrefMatches = [...html.matchAll(/href\s*=\s*["']([^"']+?\.png(?:\?[^"']*)?)["']/gi)];
-    if (hrefMatches.length === 0) {
-      return;
-    }
-    for (const match of hrefMatches) {
-      const rawHref = String(match[1] || "").trim();
-      if (!rawHref) {
-        continue;
+    this.loadSpriteAtlasImages(
+      this.chickenSpriteAtlasFrameByColor,
+      this.chickenSpriteAtlasImageBySrc,
+      (src) => {
+        for (const [color, frame] of Object.entries(this.chickenSpriteAtlasFrameByColor)) {
+          if (frame.src !== src) {
+            continue;
+          }
+          try {
+            const canvas = this.getSpriteAtlasFrameCanvas(
+              this.chickenSpriteAtlasFrameByColor,
+              this.chickenSpriteAtlasImageBySrc,
+              this.chickenSpriteAtlasFrameCanvasByColor,
+              color
+            );
+            const sample = canvas ? this.extractRepresentativeColorFromImage(canvas) : null;
+            if (sample) {
+              this.chickenSpriteColorSampleByColor[color] = sample;
+            }
+          } catch {
+            // On file://, reading pixels can throw SecurityError (tainted canvas).
+          }
+        }
+        this.scheduleReferenceAssetsRebuild();
+      },
+      (src) => {
+        for (const [color, frame] of Object.entries(this.chickenSpriteAtlasFrameByColor)) {
+          if (frame.src === src) {
+            delete this.chickenSpriteColorSampleByColor[color];
+            delete this.chickenSpriteAtlasFrameCanvasByColor[color];
+          }
+        }
       }
-      const decodedHref = decodeURIComponent(rawHref.split("?")[0].split("#")[0]);
-      const fileName = decodedHref.split("/").filter(Boolean).pop() || "";
-      if (!fileName.toLowerCase().endsWith(".png")) {
-        continue;
-      }
-      const baseName = fileName.slice(0, -4).trim().toLowerCase();
-      const normalizedBaseName = this.normalizeDiscoveredChickenColorKey(baseName);
-      const colorKey = normalizedBaseName
-        ? normalizedBaseName.replace(/_alt(?:_\d+)?$/, "")
-        : null;
-      if (!colorKey || !/^[a-z0-9_]+$/.test(colorKey)) {
-        continue;
-      }
-      if (baseName.includes("legacy") || baseName.includes("backup")) {
-        continue;
-      }
-      if (Object.prototype.hasOwnProperty.call(CHICKEN_SPRITE_SOURCE_BY_COLOR, colorKey)) {
-        continue;
-      }
-      this.registerChickenSpriteImageSource(colorKey, `ui/birds/${fileName}`);
-    }
+    );
   }
 
   initBlockTileImages() {
-    for (const [color, src] of Object.entries(BLOCK_TILE_SOURCE_BY_COLOR)) {
-      this.registerBlockTileImageSource(color, src);
+    for (const [color, frame] of Object.entries(BLOCK_TILE_ATLAS_FRAME_BY_COLOR)) {
+      this.blockTileAtlasFrameByColor[color] = frame;
     }
-    void this.discoverBlockTileSourcesFromUiDirectory();
-  }
-
-  registerBlockTileImageSource(color, src) {
-    const normalizedColor = String(color || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, "_");
-    const normalizedSrc = String(src || "").trim();
-    if (!normalizedColor || !normalizedSrc) {
-      return;
-    }
-    if (this.blockTileImageByColor[normalizedColor]) {
-      return;
-    }
-    BLOCK_TILE_SOURCE_BY_COLOR[normalizedColor] = normalizedSrc;
-    const image = new Image();
-    image.decoding = "async";
-    image.src = normalizedSrc;
-    image.onload = () => {
-      try {
-        const sample = this.extractRepresentativeColorFromImage(image);
-        if (sample) {
-          this.blockTileColorSampleByColor[normalizedColor] = sample;
-          BLOCK_COLOR_TO_RGB[normalizedColor] = sample;
+    this.loadSpriteAtlasImages(
+      this.blockTileAtlasFrameByColor,
+      this.blockTileAtlasImageBySrc,
+      (src) => {
+        for (const [color, frame] of Object.entries(this.blockTileAtlasFrameByColor)) {
+          if (frame.src !== src) {
+            continue;
+          }
+          try {
+            const canvas = this.getSpriteAtlasFrameCanvas(
+              this.blockTileAtlasFrameByColor,
+              this.blockTileAtlasImageBySrc,
+              this.blockTileAtlasFrameCanvasByColor,
+              color
+            );
+            const sample = canvas ? this.extractRepresentativeColorFromImage(canvas) : null;
+            if (sample) {
+              this.blockTileColorSampleByColor[color] = sample;
+              BLOCK_COLOR_TO_RGB[color] = sample;
+            }
+          } catch {
+            // On file://, reading pixels can throw SecurityError (tainted canvas).
+          }
         }
-      } catch {
-        // On file://, reading pixels can throw SecurityError (tainted canvas).
+        this.rebuildBlockColorSamplerPalette();
+        this.scheduleReferenceAssetsRebuild();
+      },
+      (src) => {
+        for (const [color, frame] of Object.entries(this.blockTileAtlasFrameByColor)) {
+          if (frame.src === src) {
+            delete this.blockTileColorSampleByColor[color];
+            delete this.blockTileAtlasFrameCanvasByColor[color];
+          }
+        }
+        this.rebuildBlockColorSamplerPalette();
       }
-      this.rebuildBlockColorSamplerPalette();
-      this.scheduleReferenceAssetsRebuild();
-    };
-    image.onerror = () => {
-      delete this.blockTileColorSampleByColor[normalizedColor];
-      this.rebuildBlockColorSamplerPalette();
-    };
-    this.blockTileImageByColor[normalizedColor] = image;
-  }
-
-  async discoverBlockTileSourcesFromUiDirectory() {
-    if (typeof fetch !== "function") {
-      return;
-    }
-    let response;
-    try {
-      response = await fetch("ui/blocks/", { cache: "no-store" });
-    } catch {
-      return;
-    }
-    if (!response?.ok) {
-      return;
-    }
-    let html = "";
-    try {
-      html = await response.text();
-    } catch {
-      return;
-    }
-    if (!html || typeof html !== "string") {
-      return;
-    }
-    const hrefMatches = [...html.matchAll(/href\s*=\s*["']([^"']+?\.png(?:\?[^"']*)?)["']/gi)];
-    if (hrefMatches.length === 0) {
-      return;
-    }
-    for (const match of hrefMatches) {
-      const rawHref = String(match[1] || "").trim();
-      if (!rawHref) {
-        continue;
-      }
-      const decodedHref = decodeURIComponent(rawHref.split("?")[0].split("#")[0]);
-      const fileName = decodedHref.split("/").filter(Boolean).pop() || "";
-      if (!fileName.toLowerCase().endsWith(".png")) {
-        continue;
-      }
-      const baseName = fileName.slice(0, -4).trim().toLowerCase();
-      const colorKey = baseName
-        .replace(/[\s-]+/g, "_")
-        .replace(/^tile_+/, "");
-      if (!/^[a-z0-9_]+$/.test(colorKey)) {
-        continue;
-      }
-      if (Object.prototype.hasOwnProperty.call(BLOCK_TILE_SOURCE_BY_COLOR, colorKey)) {
-        continue;
-      }
-      this.registerBlockTileImageSource(colorKey, `ui/blocks/${fileName}`);
-    }
+    );
   }
 
   extractRepresentativeColorFromImage(image) {
@@ -4567,15 +4595,17 @@ class Game {
   }
 
   getAvailableLoadedBlockTileColorKeys() {
-    return Object.keys(this.blockTileImageByColor).filter((key) => {
-      const image = this.blockTileImageByColor[key];
+    return Object.keys(this.blockTileAtlasFrameByColor).filter((key) => {
+      const frame = this.blockTileAtlasFrameByColor[key];
+      const image = frame ? this.blockTileAtlasImageBySrc[frame.src] : null;
       return !!(image && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0);
     });
   }
 
   getAvailableLoadedChickenColorKeys() {
-    return Object.keys(this.chickenSpriteImageByColor).filter((key) => {
-      const image = this.chickenSpriteImageByColor[key];
+    return Object.keys(this.chickenSpriteAtlasFrameByColor).filter((key) => {
+      const frame = this.chickenSpriteAtlasFrameByColor[key];
+      const image = frame ? this.chickenSpriteAtlasImageBySrc[frame.src] : null;
       return !!(image && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0);
     });
   }
@@ -4734,11 +4764,25 @@ class Game {
     if (!key) {
       return null;
     }
-    const image = this.blockTileImageByColor[key];
-    if (!image || !image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+    return this.getSpriteAtlasFrameCanvas(
+      this.blockTileAtlasFrameByColor,
+      this.blockTileAtlasImageBySrc,
+      this.blockTileAtlasFrameCanvasByColor,
+      key
+    );
+  }
+
+  getLoadedChickenSpriteImage(color) {
+    const key = this.resolveChickenSpriteColorKey(color);
+    if (!key) {
       return null;
     }
-    return image;
+    return this.getSpriteAtlasFrameCanvas(
+      this.chickenSpriteAtlasFrameByColor,
+      this.chickenSpriteAtlasImageBySrc,
+      this.chickenSpriteAtlasFrameCanvasByColor,
+      key
+    );
   }
 
   getBlockSpritePalette(color) {
