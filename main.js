@@ -4012,6 +4012,10 @@ class Game {
     this.idleAssistHadActiveTrackUnits = false;
     this.currentBackgroundId = DEFAULT_BACKGROUND_ID;
     this.topLevelNavVisible = true;
+    this.levelRevealSuspended = false;
+    this.levelRevealGateToken = 0;
+    this.imageReadyPromiseByImage = new WeakMap();
+    this.setLevelLoadingCoverVisible(true);
 
     clearLegacyMainTutorialCompletedFlag();
     this.loadDebugSettings();
@@ -4100,6 +4104,141 @@ class Game {
       return true;
     }
     return false;
+  }
+
+  setLevelLoadingCoverVisible(visible) {
+    if (typeof document === "undefined" || !document.body) {
+      return;
+    }
+    document.body.classList.toggle("is-level-loading", visible === true);
+  }
+
+  isImageReady(image) {
+    return !!(image && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0);
+  }
+
+  waitForImageReady(image) {
+    if (!image || !image.src) {
+      return Promise.resolve(false);
+    }
+    if (this.isImageReady(image)) {
+      return Promise.resolve(true);
+    }
+    if (image.complete) {
+      return Promise.resolve(false);
+    }
+    const cached = this.imageReadyPromiseByImage.get(image);
+    if (cached) {
+      return cached;
+    }
+    const promise = new Promise((resolve) => {
+      let settled = false;
+      const timeoutId = setTimeout(() => finish(this.isImageReady(image)), 2500);
+      const finish = (ready) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timeoutId);
+        image.removeEventListener("load", handleLoad);
+        image.removeEventListener("error", handleError);
+        this.imageReadyPromiseByImage.delete(image);
+        resolve(ready === true);
+      };
+      const handleLoad = () => finish(this.isImageReady(image));
+      const handleError = () => finish(false);
+      image.addEventListener("load", handleLoad, { once: true });
+      image.addEventListener("error", handleError, { once: true });
+      if (typeof image.decode === "function") {
+        image.decode()
+          .then(() => finish(this.isImageReady(image)))
+          .catch(() => {
+            if (image.complete) {
+              finish(this.isImageReady(image));
+            }
+          });
+      }
+    });
+    this.imageReadyPromiseByImage.set(image, promise);
+    return promise;
+  }
+
+  beginLevelRevealGate() {
+    this.levelRevealGateToken += 1;
+    this.levelRevealSuspended = true;
+    this.needsRender = true;
+    this.setLevelLoadingCoverVisible(true);
+    return this.levelRevealGateToken;
+  }
+
+  getPregameCriticalImages() {
+    const images = [
+      this.backdropImage,
+      this.railwayImage,
+      this.woodImage,
+      this.slotCellImage,
+      this.timerPanelImage,
+      this.backButtonImage,
+      this.loseTopCoinsPanelImage,
+    ];
+    if (this.pregameTutorial?.active) {
+      images.push(this.tutorHandImage);
+    }
+
+    this.getPregameColorPanelRect();
+    const criticalTileColors = new Set(["gray"]);
+    for (const sectorKey of this.pregameSectorKeys || []) {
+      criticalTileColors.add(sectorKey);
+    }
+    for (const entry of this.preGameColorButtons || []) {
+      if (isInsideRect(
+        entry.rect.x + entry.rect.w * 0.5,
+        entry.rect.y + entry.rect.h * 0.5,
+        this.preGameColorViewportRect
+      )) {
+        criticalTileColors.add(entry.colorKey);
+      }
+    }
+    for (const color of criticalTileColors) {
+      const key = this.resolveBlockTileColorKey(color);
+      const image = key ? this.blockTileImageByColor[key] : null;
+      if (image) {
+        images.push(image);
+      }
+    }
+
+    const uniqueImages = [];
+    const seen = new Set();
+    for (const image of images) {
+      if (!image || !image.src || seen.has(image.src)) {
+        continue;
+      }
+      seen.add(image.src);
+      uniqueImages.push(image);
+    }
+    return uniqueImages;
+  }
+
+  async waitForPregameCriticalAssets() {
+    const images = this.getPregameCriticalImages();
+    await Promise.all(images.map((image) => this.waitForImageReady(image)));
+  }
+
+  revealPregameWhenReady(gateToken) {
+    void this.waitForPregameCriticalAssets().catch(() => false).then(() => {
+      if (this.levelRevealGateToken !== gateToken) {
+        return;
+      }
+      this.buildReferenceAssets();
+      this.rebuildStaticSceneLayer();
+      this.rebuildBlockFieldLayer();
+      this.levelRevealSuspended = false;
+      this.setLevelLoadingCoverVisible(false);
+      this.needsRender = true;
+      this.lastTimestamp = performance.now();
+      this.simAccumulator = 0;
+      this.invalidate(true);
+    });
   }
 
   buildReferenceAssets() {
@@ -5443,7 +5582,10 @@ class Game {
     return this.gameState;
   }
 
-  restart() {
+  restart(options = {}) {
+    const revealGateToken = Number.isFinite(options.revealGateToken)
+      ? options.revealGateToken
+      : this.beginLevelRevealGate();
     this.ammoTextMetricsCache.clear();
     this.blocks = this.createBlocksFromReference();
     this.initializePregameColoring();
@@ -5505,6 +5647,7 @@ class Game {
     this.lastTimestamp = performance.now();
     this.refreshAutoplayProgressTracker(true);
     this.invalidate(true);
+    this.revealPregameWhenReady(revealGateToken);
   }
 
   createBlocksFromReference() {
@@ -5967,6 +6110,7 @@ class Game {
 
   applyLevelConfig(levelId, options = {}) {
     const { restart = true, displayLevelNumber = null } = options;
+    const revealGateToken = restart ? this.beginLevelRevealGate() : null;
     const nextLevelId = this.getValidLevelId(levelId);
     syncLevelGlobals(getLevelConfig(nextLevelId), { displayLevelNumber });
     this.currentLevelId = nextLevelId;
@@ -5993,7 +6137,7 @@ class Game {
     }
     this.syncDebugPaintColorOptions();
     if (restart) {
-      this.restart();
+      this.restart({ revealGateToken });
     }
     this.invalidate(false);
   }
@@ -9922,14 +10066,11 @@ class Game {
   }
 
   drawLoading(ctx) {
+    ctx.save();
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.fillStyle = "#343839";
-    ctx.fillRect(0, 0, this.width, this.height);
-    ctx.fillStyle = COLORS.white;
-    ctx.font = "700 42px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const label = this.gameState === "error" ? "Failed to initialize game" : "Loading...";
-    ctx.fillText(label, this.width / 2, this.height / 2);
+    ctx.fillRect(0, 0, this.screenWidth, this.screenHeight);
+    ctx.restore();
   }
 
   drawBackground(ctx) {
@@ -13424,6 +13565,10 @@ class Game {
   }
 
   invalidate(animate = false) {
+    if (this.levelRevealSuspended) {
+      this.needsRender = true;
+      return;
+    }
     this.needsRender = true;
     if (animate || this.hasActiveAnimations()) {
       if (!this.isLoopRunning) {
