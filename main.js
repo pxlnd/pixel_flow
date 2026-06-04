@@ -617,7 +617,7 @@ const COINS_UI = {
 const PREGAME_START_BUTTON_UI = {
   width: 480,
   height: 180,
-  bottomAnchorOffset: 64,
+  bottomAnchorOffset: 24,
   hitPadding: 0,
   appearDuration: 0.4,
   bounceStartDelay: 0.0,
@@ -639,19 +639,19 @@ const PREGAME_START_BUTTON_UI = {
 const PREGAME_COLOR_PANEL_UI = {
   minW: 420,
   sideMargin: 22,
-  offsetFromRails: 18,
   minGapToStart: 54,
   minLayoutScale: 0.8,
   layoutScaleStep: 0.02,
   paddingX: 18,
-  sectionGap: 54,
-  panelRadius: 28,
+  railToSectorGap: 48,
+  sectionGap: 42,
+  panelRadius: 40,
   panelInset: 5,
   panelBorder: 4,
-  sectorPaddingLeft: 32,
-  sectorPaddingRight: 32,
-  sectorPaddingTop: 18,
-  sectorPaddingBottom: 18,
+  sectorPaddingLeft: 48,
+  sectorPaddingRight: 48,
+  sectorPaddingTop: 24,
+  sectorPaddingBottom: 24,
   sectorRowGap: 10,
   sectionGapExtraIfSpace: 60,
   itemGapMultiplier: 2,
@@ -674,6 +674,15 @@ const PREGAME_COLOR_PANEL_UI = {
   colorTrackFill: "#272A34",
   colorTrackBorder: "#575970",
   colorTrackBorderWidth: 8,
+  tabW: 326,
+  tabH: 101,
+  tabGap: 74,
+  tabOffsetY: -36,
+  tabTrackOverlap: 0,
+  tabFontSize: 50,
+  tabTextOffsetY: 0,
+  tabSelectedTextColor: "#FFFFFF",
+  tabInactiveTextColor: "#A8A9B4",
 };
 const PREGAME_CHECKMARK_SIZE_SCALE = 0.7;
 const PREGAME_CHECKMARK_MIN_SIZE = 10;
@@ -704,6 +713,23 @@ const PREGAME_EXTRA_COLOR_OPTIONS = [
   "medium_blue",
   "medium_brown",
   "medium_grey",
+];
+const PREGAME_PALETTE_TAB_COLOR = "color";
+const PREGAME_PALETTE_TAB_MATERIAL = "material";
+const PREGAME_PALETTE_TABS = [
+  { id: PREGAME_PALETTE_TAB_COLOR, label: "Color" },
+  { id: PREGAME_PALETTE_TAB_MATERIAL, label: "Material" },
+];
+const PREGAME_MATERIAL_OPTIONS = [
+  { id: "original", label: "Original", sampleColor: "white" },
+  { id: "leather", label: "Leather", sampleColor: "white_leather" },
+  { id: "candy", label: "Candy", sampleColor: "white_candy" },
+  { id: "lego", label: "Lego", sampleColor: "white_lego" },
+  { id: "metal", label: "Metal", sampleColor: "white_metal" },
+  { id: "cheese", label: "Cheese", sampleColor: "white_cheese" },
+  { id: "diamond", label: "Diamond", sampleColor: "white_diamond" },
+  { id: "bubbles", label: "Bubbles", sampleColor: "white_bubbles" },
+  { id: "knit", label: "Knit", sampleColor: "white_knit" },
 ];
 const PREGAME_COLOR_FILL_DURATION = 0.86;
 const LOSE_POPUP_UI = {
@@ -1903,6 +1929,56 @@ function getSpriteAtlasGroupFromColorKey(color) {
   return "original";
 }
 
+function getPregameMaterialDefinition(materialKey) {
+  const normalized = String(materialKey || "").trim().toLowerCase();
+  return PREGAME_MATERIAL_OPTIONS.find((material) => material.id === normalized)
+    || PREGAME_MATERIAL_OPTIONS[0];
+}
+
+function getPregameMaterialFromColorKey(colorKey) {
+  const normalized = String(colorKey || "").trim().toLowerCase();
+  for (const material of PREGAME_MATERIAL_OPTIONS) {
+    if (material.id === "original") {
+      continue;
+    }
+    if (normalized.endsWith(`_${material.id}`)) {
+      return material.id;
+    }
+  }
+  return "original";
+}
+
+function getPregameBaseColorFromColorKey(colorKey) {
+  const normalized = normalizeBlockColorName(colorKey);
+  if (!normalized) {
+    return null;
+  }
+  const material = getPregameMaterialFromColorKey(normalized);
+  if (material === "original") {
+    return normalized;
+  }
+  const suffix = `_${material}`;
+  return normalized.endsWith(suffix)
+    ? normalizeBlockColorName(normalized.slice(0, -suffix.length))
+    : normalized;
+}
+
+function composePregameMaterialColorKey(baseColor, materialKey) {
+  const base = getPregameBaseColorFromColorKey(baseColor);
+  if (!base) {
+    return null;
+  }
+  const material = getPregameMaterialDefinition(materialKey).id;
+  if (material === "original") {
+    return Object.prototype.hasOwnProperty.call(BLOCK_TILE_SOURCE_BY_COLOR, base) ? base : null;
+  }
+  const candidate = `${base}_${material}`;
+  if (Object.prototype.hasOwnProperty.call(BLOCK_TILE_SOURCE_BY_COLOR, candidate)) {
+    return candidate;
+  }
+  return Object.prototype.hasOwnProperty.call(BLOCK_TILE_SOURCE_BY_COLOR, base) ? base : null;
+}
+
 function buildSpriteAtlasFrameByColor(sourceByColor, atlasSourceByGroup, atlasLayoutByGroup) {
   const frameByColor = {};
   for (const [color, position] of Object.entries(sourceByColor)) {
@@ -2128,6 +2204,10 @@ function getBlockColorConfig(color) {
     const derived = deriveBlockColorConfigFromRgb(BLOCK_COLOR_TO_RGB[normalized]);
     BLOCK_COLOR_CONFIG[normalized] = derived;
     return derived;
+  }
+  const baseColor = getPregameBaseColorFromColorKey(normalized);
+  if (baseColor && baseColor !== normalized) {
+    return getBlockColorConfig(baseColor);
   }
   return BLOCK_COLOR_CONFIG.green;
 }
@@ -3196,6 +3276,10 @@ class CardManager {
     if (alias && Object.prototype.hasOwnProperty.call(BLOCK_COLOR_TO_RGB, alias)) {
       return BLOCK_COLOR_TO_RGB[alias];
     }
+    const baseColor = getPregameBaseColorFromColorKey(normalized);
+    if (baseColor && baseColor !== normalized) {
+      return this.getColorSample(baseColor);
+    }
     return null;
   }
 
@@ -3792,6 +3876,12 @@ class Game {
     this.checkmarkImage = new Image();
     this.checkmarkImage.src = "ui/checkmark.png";
     this.checkmarkImage.decoding = "async";
+    this.preGameTabOnImage = new Image();
+    this.preGameTabOnImage.src = "ui/tab_on.png";
+    this.preGameTabOnImage.decoding = "async";
+    this.preGameTabOffImage = new Image();
+    this.preGameTabOffImage.src = "ui/tab_off.png";
+    this.preGameTabOffImage.decoding = "async";
     this.blockTemplateImage = new Image();
     this.blockTemplateImage.src = "ui/block.png";
     this.blockTemplateImage.decoding = "async";
@@ -3880,8 +3970,11 @@ class Game {
     this.preGameColorContentRect = { x: 0, y: 0, w: 0, h: 0 };
     this.preGameSectorButtons = [];
     this.preGameColorButtons = [];
+    this.preGamePaletteTabButtons = [];
     this.preGameColorScrollOffset = 0;
     this.preGameColorScrollMaxOffset = 0;
+    this.preGameMaterialScrollOffset = 0;
+    this.preGameMaterialScrollMaxOffset = 0;
     this.preGameLayoutScale = 1;
     this.preGameStartButtonAppearProgress = 0;
     this.preGameStartButtonBounceTime = 0;
@@ -3894,7 +3987,12 @@ class Game {
     };
     this.pregameSectorKeys = [];
     this.pregameColorPalette = [];
+    this.pregameMaterialPalette = PREGAME_MATERIAL_OPTIONS;
+    this.pregameActivePaletteTab = PREGAME_PALETTE_TAB_COLOR;
+    this.pregameSelectedMaterialKey = "original";
     this.pregameSelectedSectorKey = null;
+    this.pregameSectorBaseColorAssignments = {};
+    this.pregameSectorMaterialAssignments = {};
     this.pregameSectorColorAssignments = {};
     this.pregameColorFillEffects = {};
     this.pregamePulseTime = 0;
@@ -4166,6 +4264,12 @@ class Game {
     this.checkmarkImage.onload = () => {
       this.invalidate(false);
     };
+    this.preGameTabOnImage.onload = () => {
+      this.invalidate(false);
+    };
+    this.preGameTabOffImage.onload = () => {
+      this.invalidate(false);
+    };
     this.blockTemplateImage.onload = () => {
       this.buildReferenceAssets();
       this.invalidate(false);
@@ -4268,6 +4372,8 @@ class Game {
       this.timerPanelImage,
       this.backButtonImage,
       this.loseTopCoinsPanelImage,
+      this.preGameTabOnImage,
+      this.preGameTabOffImage,
     ];
     if (this.pregameTutorial?.active) {
       images.push(this.tutorHandImage);
@@ -4639,6 +4745,16 @@ class Game {
         || BLOCK_COLOR_TO_RGB[alias];
       if (aliasSample) {
         return aliasSample;
+      }
+    }
+    const baseColor = getPregameBaseColorFromColorKey(normalized);
+    if (baseColor && baseColor !== normalized) {
+      const baseSample =
+        this.blockTileColorSampleByColor[baseColor]
+        || this.chickenSpriteColorSampleByColor[baseColor]
+        || BLOCK_COLOR_TO_RGB[baseColor];
+      if (baseSample) {
+        return baseSample;
       }
     }
     // Name-based fallback so unknown shades don't flash green before PNG finishes loading.
@@ -10576,7 +10692,7 @@ class Game {
     const sectorKeys = [];
     const seen = new Set();
     for (const block of this.blocks) {
-      const normalized = normalizeBlockColorName(block?.baseColor || block?.color);
+      const normalized = getPregameBaseColorFromColorKey(block?.baseColor || block?.color);
       if (!normalized || seen.has(normalized)) {
         continue;
       }
@@ -10587,12 +10703,8 @@ class Game {
     const palette = [];
     const paletteSeen = new Set();
     const appendPaletteColor = (color) => {
-      const normalized = normalizeBlockColorName(color);
-      const isKnownColor = normalized && (
-        Object.prototype.hasOwnProperty.call(BLOCK_COLOR_CONFIG, normalized)
-        || Object.prototype.hasOwnProperty.call(BLOCK_COLOR_TO_RGB, normalized)
-        || Object.prototype.hasOwnProperty.call(BLOCK_TILE_SOURCE_BY_COLOR, normalized)
-      );
+      const normalized = getPregameBaseColorFromColorKey(color);
+      const isKnownColor = normalized && Object.prototype.hasOwnProperty.call(BLOCK_TILE_SOURCE_BY_COLOR, normalized);
       if (!isKnownColor || paletteSeen.has(normalized)) {
         return;
       }
@@ -10608,10 +10720,17 @@ class Game {
 
     this.pregameSectorKeys = sectorKeys;
     this.pregameColorPalette = palette;
+    this.pregameMaterialPalette = PREGAME_MATERIAL_OPTIONS;
+    this.pregameActivePaletteTab = PREGAME_PALETTE_TAB_COLOR;
+    this.pregameSelectedMaterialKey = "original";
     this.pregameSelectedSectorKey = null;
     this.pregameAutoSelectPending = sectorKeys.length > 0;
+    this.pregameSectorBaseColorAssignments = {};
+    this.pregameSectorMaterialAssignments = {};
     this.pregameSectorColorAssignments = {};
     for (const sectorKey of sectorKeys) {
+      this.pregameSectorBaseColorAssignments[sectorKey] = null;
+      this.pregameSectorMaterialAssignments[sectorKey] = "original";
       this.pregameSectorColorAssignments[sectorKey] = null;
     }
     this.pregameColorFillEffects = {};
@@ -10623,8 +10742,11 @@ class Game {
     this.preGameColorContentRect = { x: 0, y: 0, w: 0, h: 0 };
     this.preGameSectorButtons = [];
     this.preGameColorButtons = [];
+    this.preGamePaletteTabButtons = [];
     this.preGameColorScrollOffset = 0;
     this.preGameColorScrollMaxOffset = 0;
+    this.preGameMaterialScrollOffset = 0;
+    this.preGameMaterialScrollMaxOffset = 0;
     this.preGameLayoutScale = 1;
     this.preGameStartButtonAppearProgress = 0;
     this.preGameStartButtonBounceTime = 0;
@@ -10639,11 +10761,96 @@ class Game {
     this.applyPregameColoringToBlocks({ rebuildCards: false });
   }
 
+  getPregameActivePaletteTab() {
+    return this.pregameActivePaletteTab === PREGAME_PALETTE_TAB_MATERIAL
+      ? PREGAME_PALETTE_TAB_MATERIAL
+      : PREGAME_PALETTE_TAB_COLOR;
+  }
+
+  getPregameActivePaletteItems() {
+    if (this.getPregameActivePaletteTab() === PREGAME_PALETTE_TAB_MATERIAL) {
+      return this.pregameMaterialPalette || PREGAME_MATERIAL_OPTIONS;
+    }
+    return this.pregameColorPalette || [];
+  }
+
+  getPregameActiveScrollOffset() {
+    return this.getPregameActivePaletteTab() === PREGAME_PALETTE_TAB_MATERIAL
+      ? this.preGameMaterialScrollOffset
+      : this.preGameColorScrollOffset;
+  }
+
+  setPregameActiveScrollOffset(scrollOffset) {
+    if (this.getPregameActivePaletteTab() === PREGAME_PALETTE_TAB_MATERIAL) {
+      this.preGameMaterialScrollOffset = scrollOffset;
+    } else {
+      this.preGameColorScrollOffset = scrollOffset;
+    }
+  }
+
+  getPregameActiveScrollMaxOffset() {
+    return this.getPregameActivePaletteTab() === PREGAME_PALETTE_TAB_MATERIAL
+      ? this.preGameMaterialScrollMaxOffset
+      : this.preGameColorScrollMaxOffset;
+  }
+
+  setPregameActiveScrollMaxOffset(maxOffset) {
+    if (this.getPregameActivePaletteTab() === PREGAME_PALETTE_TAB_MATERIAL) {
+      this.preGameMaterialScrollMaxOffset = maxOffset;
+    } else {
+      this.preGameColorScrollMaxOffset = maxOffset;
+    }
+  }
+
+  getPregameSectorBaseColor(sectorKey) {
+    const normalizedSectorKey = normalizeBlockColorName(sectorKey);
+    if (!normalizedSectorKey) {
+      return null;
+    }
+    const explicitBase = getPregameBaseColorFromColorKey(this.pregameSectorBaseColorAssignments?.[normalizedSectorKey]);
+    if (explicitBase) {
+      return explicitBase;
+    }
+    return getPregameBaseColorFromColorKey(this.pregameSectorColorAssignments?.[normalizedSectorKey]);
+  }
+
+  getPregameSectorMaterial(sectorKey) {
+    const normalizedSectorKey = normalizeBlockColorName(sectorKey);
+    if (!normalizedSectorKey) {
+      return "original";
+    }
+    const explicitMaterial = this.pregameSectorMaterialAssignments?.[normalizedSectorKey];
+    if (explicitMaterial) {
+      return getPregameMaterialDefinition(explicitMaterial).id;
+    }
+    return getPregameMaterialFromColorKey(this.pregameSectorColorAssignments?.[normalizedSectorKey]);
+  }
+
+  getPregameSelectedMaterial() {
+    return getPregameMaterialDefinition(this.pregameSelectedMaterialKey).id;
+  }
+
+  syncPregameSectorColorAssignment(sectorKey) {
+    const normalizedSectorKey = normalizeBlockColorName(sectorKey);
+    if (!normalizedSectorKey) {
+      return null;
+    }
+    const baseColor = this.getPregameSectorBaseColor(normalizedSectorKey);
+    if (!baseColor) {
+      this.pregameSectorColorAssignments[normalizedSectorKey] = null;
+      return null;
+    }
+    const material = this.getPregameSectorMaterial(normalizedSectorKey);
+    const colorKey = composePregameMaterialColorKey(baseColor, material);
+    this.pregameSectorColorAssignments[normalizedSectorKey] = colorKey;
+    return colorKey;
+  }
+
   applyPregameColoringToBlocks(options = {}) {
     const rebuildCards = options.rebuildCards === true;
     const assignments = this.pregameSectorColorAssignments || {};
     for (const block of this.blocks) {
-      const sectorKey = normalizeBlockColorName(block?.baseColor || block?.color);
+      const sectorKey = getPregameBaseColorFromColorKey(block?.baseColor || block?.color);
       const assignedColor = normalizeBlockColorName(assignments[sectorKey]);
       block.color = assignedColor || "gray";
     }
@@ -10658,15 +10865,16 @@ class Game {
   }
 
   clampPregameColorScrollOffset(nextOffset) {
-    const maxOffset = Math.max(0, Number(this.preGameColorScrollMaxOffset) || 0);
+    const maxOffset = Math.max(0, Number(this.getPregameActiveScrollMaxOffset()) || 0);
     const clamped = clamp(Number(nextOffset) || 0, 0, maxOffset);
-    this.preGameColorScrollOffset = clamped;
+    this.setPregameActiveScrollOffset(clamped);
     return clamped;
   }
 
   getPregameColorPanelRect() {
     const sectors = this.pregameSectorKeys;
-    const palette = this.pregameColorPalette;
+    const activeTab = this.getPregameActivePaletteTab();
+    const palette = this.getPregameActivePaletteItems();
     if (!Array.isArray(sectors) || sectors.length === 0 || !Array.isArray(palette) || palette.length === 0) {
       this.preGameColorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
       this.preGameSectorPanelRect = { x: 0, y: 0, w: 0, h: 0 };
@@ -10675,8 +10883,11 @@ class Game {
       this.preGameColorContentRect = { x: 0, y: 0, w: 0, h: 0 };
       this.preGameSectorButtons = [];
       this.preGameColorButtons = [];
+      this.preGamePaletteTabButtons = [];
       this.preGameColorScrollMaxOffset = 0;
       this.preGameColorScrollOffset = 0;
+      this.preGameMaterialScrollMaxOffset = 0;
+      this.preGameMaterialScrollOffset = 0;
       return this.preGameColorPanelRect;
     }
 
@@ -10715,6 +10926,7 @@ class Game {
       const sectorPaddingRight = scaleInt(ui.sectorPaddingRight, 0);
       const sectorPaddingTop = scaleInt(ui.sectorPaddingTop, 0);
       const sectorPaddingBottom = scaleInt(ui.sectorPaddingBottom, 0);
+      const railToSectorGap = scaleInt(ui.railToSectorGap, 0);
       const baseSectionGap = scaleInt(ui.sectionGap, 0);
       const sectionGapExtraIfSpace = Math.max(0, Number(ui.sectionGapExtraIfSpace) || 0);
       const sectorButtonW = scaleInt(ui.sectorButtonW, 22);
@@ -10740,6 +10952,13 @@ class Game {
         Number.isFinite(ui.colorTrackPaddingBottom) ? ui.colorTrackPaddingBottom : (ui.colorTrackPaddingY || 0),
         0
       );
+      const tabW = scaleInt(ui.tabW, 80);
+      const tabH = scaleInt(ui.tabH, 28);
+      const tabGap = scaleNum(ui.tabGap, 0);
+      const tabOffsetY = Math.round((Number(ui.tabOffsetY) || 0) * layoutScale);
+      const tabTrackOverlap = Math.min(tabH - 1, scaleInt(ui.tabTrackOverlap, 0));
+      const tabFontSize = scaleInt(ui.tabFontSize, 12);
+      const tabTextOffsetY = scaleNum(ui.tabTextOffsetY, 0);
       const sectorAvailableInnerW = Math.max(120, panelW - sectorPaddingLeft - sectorPaddingRight);
       const sectorColumns = Math.max(
         1,
@@ -10776,7 +10995,8 @@ class Game {
         Math.floor((innerW - colorButtonGap * (visibleColorCount - 1)) / visibleColorCount)
       );
       const colorButtonSize = Math.max(1, Math.floor(rawColorButtonSize * layoutScale));
-      const colorPanelH = Math.round(colorPaddingTop + colorButtonSize + colorPaddingBottom);
+      const colorTrackH = Math.round(colorTrackPaddingTop + colorButtonSize + colorTrackPaddingBottom);
+      const colorPanelH = Math.round(tabOffsetY + tabH - tabTrackOverlap + colorTrackH);
       const startW = Math.max(120, Math.round(baseStartW * layoutScale));
       const startH = Math.max(56, Math.round(baseStartH * layoutScale));
       const startY = visibleWorldBottom - startH - bottomOffsetInWorld;
@@ -10797,6 +11017,7 @@ class Game {
         sectorPaddingRight,
         sectorPaddingTop,
         sectorPaddingBottom,
+        railToSectorGap,
         sectorButtonW,
         sectorButtonH,
         sectorButtonGap,
@@ -10815,10 +11036,19 @@ class Game {
         colorTrackPaddingRight,
         colorTrackPaddingTop,
         colorTrackPaddingBottom,
+        tabW,
+        tabH,
+        tabGap,
+        tabOffsetY,
+        tabTrackOverlap,
+        tabFontSize,
+        tabTextOffsetY,
+        colorTrackH,
         startW,
         startH,
         startY,
         availableSpace,
+        availableForPanels,
         fits,
       };
     };
@@ -10844,9 +11074,10 @@ class Game {
     }
     this.preGameLayoutScale = metrics.layoutScale;
 
-    const centeredTop = railsBottom + Math.max(0, (metrics.availableSpace - metrics.panelClusterH) * 0.5);
+    const maxTopGap = Math.max(0, metrics.availableForPanels - metrics.panelClusterH);
+    const topGap = Math.min(metrics.railToSectorGap, maxTopGap);
     const sectorPanelX = Math.round((this.width - metrics.sectorPanelW) * 0.5);
-    const sectorPanelY = Math.round(centeredTop);
+    const sectorPanelY = Math.round(railsBottom + topGap);
     const sectorInnerX = Math.round(sectorPanelX + metrics.sectorPaddingLeft);
     const sectorButtons = [];
     let sectorCursorY = Math.round(sectorPanelY + metrics.sectorPaddingTop);
@@ -10877,9 +11108,28 @@ class Game {
     };
 
     const colorPanelY = Math.round(sectorPanelRect.y + sectorPanelRect.h + metrics.sectionGap);
+    const tabY = Math.round(colorPanelY + metrics.tabOffsetY);
+    const tabsTotalW = PREGAME_PALETTE_TABS.length * metrics.tabW
+      + Math.max(0, PREGAME_PALETTE_TABS.length - 1) * metrics.tabGap;
+    let tabX = Math.round(this.width * 0.5 - tabsTotalW * 0.5);
+    const paletteTabButtons = [];
+    for (const tab of PREGAME_PALETTE_TABS) {
+      paletteTabButtons.push({
+        tabId: tab.id,
+        label: tab.label,
+        rect: {
+          x: tabX,
+          y: tabY,
+          w: metrics.tabW,
+          h: metrics.tabH,
+        },
+      });
+      tabX += metrics.tabW + metrics.tabGap;
+    }
+    const colorTrackTop = Math.round(tabY + metrics.tabH - metrics.tabTrackOverlap);
     const colorViewportRect = {
       x: Math.round(innerX),
-      y: Math.round(colorPanelY + metrics.colorPaddingTop),
+      y: Math.round(colorTrackTop + metrics.colorTrackPaddingTop),
       w: Math.round(innerW),
       h: metrics.colorButtonSize,
     };
@@ -10887,9 +11137,9 @@ class Game {
       palette.length * metrics.colorButtonSize
       + Math.max(0, palette.length - 1) * metrics.colorButtonGap
     );
-    this.preGameColorScrollMaxOffset = Math.max(0, colorContentW - colorViewportRect.w);
-    this.clampPregameColorScrollOffset(this.preGameColorScrollOffset);
-    if (this.preGameColorScrollMaxOffset <= 0.5 && this.preGameColorDragState?.active) {
+    this.setPregameActiveScrollMaxOffset(Math.max(0, colorContentW - colorViewportRect.w));
+    this.clampPregameColorScrollOffset(this.getPregameActiveScrollOffset());
+    if (this.getPregameActiveScrollMaxOffset() <= 0.5 && this.preGameColorDragState?.active) {
       this.preGameColorDragState = {
         active: false,
         pointerId: null,
@@ -10897,13 +11147,26 @@ class Game {
         movedDistance: 0,
       };
     }
-    const scrollOffset = this.preGameColorScrollOffset;
+    const scrollOffset = this.getPregameActiveScrollOffset();
 
     const colorButtons = [];
+    const activeSectorMaterial = activeTab === PREGAME_PALETTE_TAB_COLOR
+      ? this.getPregameSelectedMaterial()
+      : "original";
     for (let i = 0; i < palette.length; i += 1) {
+      const paletteItem = palette[i];
+      const isMaterialTab = activeTab === PREGAME_PALETTE_TAB_MATERIAL;
+      const materialKey = isMaterialTab ? getPregameMaterialDefinition(paletteItem?.id).id : null;
+      const baseColor = isMaterialTab ? null : getPregameBaseColorFromColorKey(paletteItem);
+      const colorKey = isMaterialTab
+        ? getPregameMaterialDefinition(materialKey).sampleColor
+        : (composePregameMaterialColorKey(baseColor, activeSectorMaterial) || baseColor);
       const x = colorViewportRect.x + i * (metrics.colorButtonSize + metrics.colorButtonGap) - scrollOffset;
       colorButtons.push({
-        colorKey: palette[i],
+        colorKey,
+        baseColor,
+        materialKey,
+        tabId: activeTab,
         rect: {
           x: Math.round(x),
           y: colorViewportRect.y,
@@ -10923,7 +11186,7 @@ class Game {
       x: panelX,
       y: colorPanelY,
       w: Math.round(panelW),
-      h: Math.round(metrics.colorPaddingTop + metrics.colorButtonSize + metrics.colorPaddingBottom),
+      h: Math.round(metrics.colorPanelH),
     };
     const panelRect = {
       x: panelX,
@@ -10939,6 +11202,7 @@ class Game {
     this.preGameColorContentRect = colorContentRect;
     this.preGameSectorButtons = sectorButtons;
     this.preGameColorButtons = colorButtons;
+    this.preGamePaletteTabButtons = paletteTabButtons;
     return panelRect;
   }
 
@@ -11087,6 +11351,43 @@ class Game {
     ctx.restore();
   }
 
+  drawPregamePaletteTabs(ctx) {
+    const ui = PREGAME_COLOR_PANEL_UI;
+    const activeTab = this.getPregameActivePaletteTab();
+    const fontSize = Math.max(16, Math.round((Number(ui.tabFontSize) || 34) * this.preGameLayoutScale));
+    const textOffsetY = (Number(ui.tabTextOffsetY) || 0) * this.preGameLayoutScale;
+    for (const tabButton of this.preGamePaletteTabButtons || []) {
+      const rect = tabButton.rect;
+      const isSelected = tabButton.tabId === activeTab;
+      const image = isSelected ? this.preGameTabOnImage : this.preGameTabOffImage;
+      ctx.save();
+      if (this.isImageReady(image)) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(image, rect.x, rect.y, rect.w, rect.h);
+      } else {
+        const radius = Math.max(12, Math.round(rect.h * 0.28));
+        roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, radius);
+        ctx.fillStyle = isSelected ? "#405BD4" : "#343741";
+        ctx.fill();
+        ctx.lineWidth = Math.max(2, Math.round(3 * this.preGameLayoutScale));
+        ctx.strokeStyle = "#5B607C";
+        ctx.stroke();
+      }
+      ctx.font = `800 ${fontSize}px ${OPEN_SANS_FONT_FAMILY}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = isSelected
+        ? String(ui.tabSelectedTextColor || "#FFFFFF")
+        : String(ui.tabInactiveTextColor || "#A8A9B4");
+      ctx.shadowColor = isSelected ? "rgba(0, 0, 0, 0.24)" : "transparent";
+      ctx.shadowBlur = isSelected ? 3 : 0;
+      ctx.shadowOffsetY = isSelected ? 2 : 0;
+      ctx.fillText(tabButton.label, rect.x + rect.w * 0.5, rect.y + rect.h * 0.6);
+      ctx.restore();
+    }
+  }
+
   drawPregameColorPanel(ctx) {
     const panelRect = this.getPregameColorPanelRect();
     if (panelRect.w <= 0 || panelRect.h <= 0) {
@@ -11109,11 +11410,12 @@ class Game {
     const highlightRgb = hexToRgb(highlightColor, { r: 255, g: 249, b: 60 });
     const highlightShadowColor = `rgba(${highlightRgb.r}, ${highlightRgb.g}, ${highlightRgb.b}, 0.62)`;
     const assignments = this.pregameSectorColorAssignments || {};
-    const assignedColorSet = new Set();
+    const activeTab = this.getPregameActivePaletteTab();
+    const assignedColorKeySet = new Set();
     for (const sectorKey of this.pregameSectorKeys || []) {
       const assigned = normalizeBlockColorName(assignments[sectorKey]);
       if (assigned) {
-        assignedColorSet.add(assigned);
+        assignedColorKeySet.add(assigned);
       }
     }
 
@@ -11178,8 +11480,11 @@ class Game {
 
     }
 
+    this.drawPregamePaletteTabs(ctx);
+
     const activeSectorKey = this.pregameSelectedSectorKey;
-    const activeMappedColor = normalizeBlockColorName(assignments[activeSectorKey]);
+    const activeBaseColor = this.getPregameSectorBaseColor(activeSectorKey);
+    const activeMaterial = this.getPregameSelectedMaterial();
     const colorContentRect = this.preGameColorContentRect;
     if (colorContentRect.w > 0 && colorContentRect.h > 0) {
       const trackRadius = Math.max(10, Math.round(colorContentRect.h * 0.32));
@@ -11207,8 +11512,13 @@ class Game {
       if (rect.x > this.width || rect.x + rect.w < 0) {
         continue;
       }
-      const isSelectedColor = activeMappedColor === entry.colorKey;
-      const isAssignedColor = assignedColorSet.has(entry.colorKey);
+      const isMaterialTab = activeTab === PREGAME_PALETTE_TAB_MATERIAL;
+      const isSelectedColor = isMaterialTab
+        ? activeMaterial === entry.materialKey
+        : activeBaseColor === entry.baseColor;
+      const isAssignedColor = isMaterialTab
+        ? isSelectedColor
+        : assignedColorKeySet.has(entry.colorKey);
       if (isAssignedColor) {
         ctx.save();
         roundedRect(
@@ -11231,7 +11541,7 @@ class Game {
         strokeStyle: "rgba(220, 232, 255, 0.9)",
         glossAlpha: 0.18,
       });
-      if (isAssignedColor) {
+      if (!isMaterialTab && isAssignedColor) {
         this.drawPregameSelectionCheck(ctx, rect, {
           scale: PREGAME_CHECKMARK_SIZE_SCALE,
           shadowBlur: 4.5,
@@ -11315,28 +11625,80 @@ class Game {
 
   applyPregameColorPick(colorKey) {
     const sectorKey = this.pregameSelectedSectorKey;
-    const normalizedColor = normalizeBlockColorName(colorKey);
-    if (!sectorKey || !normalizedColor) {
+    const normalizedSectorKey = normalizeBlockColorName(sectorKey);
+    const normalizedColor = getPregameBaseColorFromColorKey(colorKey);
+    if (!normalizedSectorKey || !normalizedColor) {
       return false;
     }
     const assignments = this.pregameSectorColorAssignments || {};
-    if (normalizeBlockColorName(assignments[sectorKey]) === normalizedColor) {
+    const baseAssignments = this.pregameSectorBaseColorAssignments || {};
+    const selectedMaterial = this.getPregameSelectedMaterial();
+    if (
+      this.getPregameSectorBaseColor(normalizedSectorKey) === normalizedColor
+      && this.getPregameSectorMaterial(normalizedSectorKey) === selectedMaterial
+    ) {
       return false;
     }
+    const previousColor = normalizeBlockColorName(assignments[normalizedSectorKey]) || "gray";
+    const nextColor = composePregameMaterialColorKey(normalizedColor, selectedMaterial);
+    if (!nextColor) {
+      return false;
+    }
+    for (const otherSectorKey of Object.keys(baseAssignments)) {
+      if (otherSectorKey === normalizedSectorKey) {
+        continue;
+      }
+      const otherAssignedColor = normalizeBlockColorName(assignments[otherSectorKey]);
+      if (otherAssignedColor !== nextColor) {
+        continue;
+      }
+      const otherPreviousColor = normalizeBlockColorName(assignments[otherSectorKey]) || "gray";
+      baseAssignments[otherSectorKey] = null;
+      assignments[otherSectorKey] = null;
+      this.startPregameColorFillEffect(otherSectorKey, otherPreviousColor, "gray");
+    }
+    baseAssignments[normalizedSectorKey] = normalizedColor;
+    this.pregameSectorMaterialAssignments[normalizedSectorKey] = selectedMaterial;
+    this.pregameSectorColorAssignments[normalizedSectorKey] = nextColor;
+    this.startPregameColorFillEffect(normalizedSectorKey, previousColor, nextColor || "gray");
+    this.applyPregameColoringToBlocks({ rebuildCards: true });
+    return true;
+  }
+
+  applyPregameMaterialPick(materialKey) {
+    const sectorKey = normalizeBlockColorName(this.pregameSelectedSectorKey);
+    if (!sectorKey) {
+      return false;
+    }
+    const material = getPregameMaterialDefinition(materialKey).id;
+    const wasSelectedMaterial = this.getPregameSelectedMaterial() === material;
+    this.pregameSelectedMaterialKey = material;
+    if (this.getPregameSectorMaterial(sectorKey) === material && wasSelectedMaterial) {
+      return false;
+    }
+    const assignments = this.pregameSectorColorAssignments || {};
     const previousColor = normalizeBlockColorName(assignments[sectorKey]) || "gray";
-    for (const [otherSectorKey, assignedColorKey] of Object.entries(assignments)) {
+    this.pregameSectorMaterialAssignments[sectorKey] = material;
+    const nextColor = this.syncPregameSectorColorAssignment(sectorKey);
+    if (!nextColor) {
+      this.invalidate(true);
+      return true;
+    }
+    const baseAssignments = this.pregameSectorBaseColorAssignments || {};
+    for (const otherSectorKey of Object.keys(assignments)) {
       if (otherSectorKey === sectorKey) {
         continue;
       }
-      const otherAssignedColor = normalizeBlockColorName(assignedColorKey);
-      if (otherAssignedColor !== normalizedColor) {
+      const otherAssignedColor = normalizeBlockColorName(assignments[otherSectorKey]);
+      if (otherAssignedColor !== nextColor) {
         continue;
       }
+      const otherPreviousColor = normalizeBlockColorName(assignments[otherSectorKey]) || "gray";
+      baseAssignments[otherSectorKey] = null;
       assignments[otherSectorKey] = null;
-      this.startPregameColorFillEffect(otherSectorKey, normalizedColor, "gray");
+      this.startPregameColorFillEffect(otherSectorKey, otherPreviousColor, "gray");
     }
-    assignments[sectorKey] = normalizedColor;
-    this.startPregameColorFillEffect(sectorKey, previousColor, normalizedColor);
+    this.startPregameColorFillEffect(sectorKey, previousColor, nextColor);
     this.applyPregameColoringToBlocks({ rebuildCards: true });
     return true;
   }
@@ -11376,6 +11738,33 @@ class Game {
     );
   }
 
+  trackPregameMaterialSelected(materialKey) {
+    const material = getPregameMaterialDefinition(materialKey).id;
+    return dispatchUnityColoringScreenTrackEvent(
+      "coloring_screen_material_selected",
+      material
+    );
+  }
+
+  setPregamePaletteTab(tabId) {
+    const normalizedTab = tabId === PREGAME_PALETTE_TAB_MATERIAL
+      ? PREGAME_PALETTE_TAB_MATERIAL
+      : PREGAME_PALETTE_TAB_COLOR;
+    if (this.getPregameActivePaletteTab() === normalizedTab) {
+      return false;
+    }
+    this.pregameActivePaletteTab = normalizedTab;
+    this.preGameColorDragState = {
+      active: false,
+      pointerId: null,
+      lastX: 0,
+      movedDistance: 0,
+    };
+    this.getPregameColorPanelRect();
+    this.invalidate(true);
+    return true;
+  }
+
   beginPregameColorPanelDrag(pointerId, x, y) {
     if (this.gameState !== "pregame" || this.pregameStartTransitionActive) {
       return false;
@@ -11384,7 +11773,7 @@ class Game {
       return false;
     }
     this.getPregameColorPanelRect();
-    if (this.preGameColorScrollMaxOffset <= 0.5) {
+    if (this.getPregameActiveScrollMaxOffset() <= 0.5) {
       return false;
     }
     if (!isInsideRect(x, y, this.preGameColorViewportRect)) {
@@ -11417,7 +11806,7 @@ class Game {
     drag.lastX = x;
     drag.movedDistance += Math.abs(deltaX);
     if (Math.abs(deltaX) > 0.001) {
-      this.clampPregameColorScrollOffset(this.preGameColorScrollOffset - deltaX);
+      this.clampPregameColorScrollOffset(this.getPregameActiveScrollOffset() - deltaX);
       this.invalidate(false);
     }
     this.canvas.style.cursor = "grabbing";
@@ -11457,7 +11846,7 @@ class Game {
       return true;
     }
     this.getPregameColorPanelRect();
-    if (this.preGameColorScrollMaxOffset <= 0.5) {
+    if (this.getPregameActiveScrollMaxOffset() <= 0.5) {
       return false;
     }
     if (!isInsideRect(x, y, this.preGameColorViewportRect)) {
@@ -11467,7 +11856,7 @@ class Game {
     if (Math.abs(primaryDelta) < 0.01) {
       return false;
     }
-    this.clampPregameColorScrollOffset(this.preGameColorScrollOffset + primaryDelta);
+    this.clampPregameColorScrollOffset(this.getPregameActiveScrollOffset() + primaryDelta);
     this.invalidate(false);
     return true;
   }
@@ -11489,12 +11878,24 @@ class Game {
       }
       return true;
     }
+    for (const entry of this.preGamePaletteTabButtons) {
+      if (!isInsideRect(x, y, entry.rect)) {
+        continue;
+      }
+      this.setPregamePaletteTab(entry.tabId);
+      return true;
+    }
     for (const entry of this.preGameColorButtons) {
       if (!isInsideRect(x, y, entry.rect)) {
         continue;
       }
-      this.trackPregameColorSelected(entry.colorKey);
-      this.applyPregameColorPick(entry.colorKey);
+      if (entry.tabId === PREGAME_PALETTE_TAB_MATERIAL) {
+        this.trackPregameMaterialSelected(entry.materialKey);
+        this.applyPregameMaterialPick(entry.materialKey);
+      } else {
+        this.trackPregameColorSelected(entry.baseColor || entry.colorKey);
+        this.applyPregameColorPick(entry.baseColor || entry.colorKey);
+      }
       return true;
     }
     return true;
@@ -11503,6 +11904,11 @@ class Game {
   isPointOnPregamePanelControls(x, y) {
     this.getPregameColorPanelRect();
     for (const entry of this.preGameSectorButtons) {
+      if (isInsideRect(x, y, entry.rect)) {
+        return true;
+      }
+    }
+    for (const entry of this.preGamePaletteTabButtons) {
       if (isInsideRect(x, y, entry.rect)) {
         return true;
       }
@@ -11693,7 +12099,7 @@ class Game {
       1
     );
     for (const block of this.blocks) {
-      const sectorKey = normalizeBlockColorName(block?.baseColor || block?.color);
+      const sectorKey = getPregameBaseColorFromColorKey(block?.baseColor || block?.color);
       const isSelectedSector = !!selectedSectorKey && sectorKey === selectedSectorKey;
       const assignedColor = normalizeBlockColorName(assignments[sectorKey]);
       const hasAssignedColor = !!assignedColor;
