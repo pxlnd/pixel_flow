@@ -5579,6 +5579,12 @@ class Game {
       this.clearQueuedSpawnRequest();
     }
     this.gameState = normalizedNextState;
+    if (
+      (normalizedNextState === "pregame" && previousState !== "pregame") ||
+      (previousState === "pregame" && normalizedNextState !== "pregame")
+    ) {
+      this.resize();
+    }
     return this.gameState;
   }
 
@@ -13807,11 +13813,13 @@ class Game {
   }
 
   getPointerPosition(event) {
-    const rect = this.resize();
-    const px = event.clientX - rect.left;
-    const py = event.clientY - rect.top;
-    const worldX = (px - this.viewportOffsetX) / this.viewportScale;
-    const worldY = (py - this.viewportOffsetY) / this.viewportScale;
+    const rect = this.canvas.getBoundingClientRect();
+    const rectWidth = Math.max(1, rect.width || this.screenWidth || this.width);
+    const rectHeight = Math.max(1, rect.height || this.screenHeight || this.height);
+    const screenX = (event.clientX - rect.left) * (this.screenWidth / rectWidth);
+    const screenY = (event.clientY - rect.top) * (this.screenHeight / rectHeight);
+    const worldX = (screenX - this.viewportOffsetX) / this.viewportScale;
+    const worldY = (screenY - this.viewportOffsetY) / this.viewportScale;
     if (!Number.isFinite(worldX) || !Number.isFinite(worldY)) {
       return null;
     }
@@ -15243,7 +15251,10 @@ class Game {
 
   bindEvents() {
     let resizeFrame = 0;
-    const scheduleResize = () => {
+    const scheduleResize = (options = {}) => {
+      if (options.source === "visualViewport" && this.gameState === "pregame") {
+        return;
+      }
       if (resizeFrame) {
         cancelAnimationFrame(resizeFrame);
       }
@@ -15255,8 +15266,9 @@ class Game {
     window.addEventListener("resize", scheduleResize);
     window.addEventListener("orientationchange", scheduleResize);
     if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", scheduleResize);
-      window.visualViewport.addEventListener("scroll", scheduleResize);
+      const scheduleVisualViewportResize = () => scheduleResize({ source: "visualViewport" });
+      window.visualViewport.addEventListener("resize", scheduleVisualViewportResize);
+      window.visualViewport.addEventListener("scroll", scheduleVisualViewportResize);
     }
     const unlockAudio = () => {
       if (this.soundManager && typeof this.soundManager.unlock === "function") {
