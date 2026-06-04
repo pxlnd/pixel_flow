@@ -45,6 +45,11 @@ body {
     env(safe-area-inset-left, 0);
 }
 
+body.is-level-loading {
+  background-color: #343839;
+  background-image: none !important;
+}
+
 .app {
   position: relative;
   width: calc(var(--app-viewport-width, 100vw) - env(safe-area-inset-left, 0) - env(safe-area-inset-right, 0));
