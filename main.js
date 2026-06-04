@@ -10842,6 +10842,9 @@ class Game {
 
     for (const entry of this.preGameColorButtons) {
       const rect = entry.rect;
+      if (rect.x > this.width || rect.x + rect.w < 0) {
+        continue;
+      }
       const isSelectedColor = activeMappedColor === entry.colorKey;
       const isAssignedColor = assignedColorSet.has(entry.colorKey);
       if (isAssignedColor) {
