@@ -463,12 +463,12 @@ const LEVEL_ONE_TUTORIAL_STEPS = {
   done: "done",
 };
 const LEVEL_ONE_TUTORIAL_TRACK_EVENTS = {
-  pointerGreenBird: "tutorial_pointer_greenbird",
-  launchGreenBird: "tutorial_launch_greenbird",
+  pointerGreenBird: "tutorial_pointer_first_bird",
+  launchGreenBird: "tutorial_launch_first_bird",
   halfwayPause: "tutorial_halfwaypause",
-  pointerBlackBird: "tutorial_pointer_blackbird",
-  launchBlackBird: "tutorial_launch_blackbird",
-  freeTutorial: "tutorial_freetutorial",
+  pointerBlackBird: "tutorial_pointer_second_bird",
+  launchBlackBird: "tutorial_launch_second_bird",
+  freeTutorial: "tutorial_freetutorialial",
   levelComplete: "tutorial_levelcomplete",
 };
 const LEVEL_ONE_GREEN_PAUSE_TRACK_PROGRESS = 0.7;
