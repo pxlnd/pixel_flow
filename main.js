@@ -13421,10 +13421,10 @@ class Game {
       h *= scale;
     }
     return {
-      x: Math.round(rightX - w),
-      y: Math.round(TIMER_PANEL_UI.y + (TIMER_PANEL_UI.h - h) * 0.5),
-      w,
-      h,
+      x: Math.round(rightX - w) - 10,
+      y: Math.round(TIMER_PANEL_UI.y + (TIMER_PANEL_UI.h - h) * 0.5) - 10,
+      w: w + 28,
+      h: h + 14,
     };
   }
 
