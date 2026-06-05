@@ -477,6 +477,17 @@ const CACTUS_PREGAME_TUTORIAL_STEPS = {
   done: "done",
 };
 const PREGAME_TUTORIAL_MAX_COLOR_COUNT = 9;
+const PREGAME_TUTORIAL_COLOR_ORDINALS = [
+  "first",
+  "second",
+  "third",
+  "fourth",
+  "fifth",
+  "sixth",
+  "seventh",
+  "eighth",
+  "ninth",
+];
 const LEVEL_ONE_TRAVEL_HINT_TEXT = "Wait for shooter to travel";
 const LEVEL_ONE_TRAVEL_HINT_LETTER_ANIM_DURATION = 0.6;
 const LEVEL_ONE_TRAVEL_HINT_LETTER_STAGGER = 0.018;
@@ -6929,13 +6940,14 @@ class Game {
       };
     }
     const normalizedColor = normalizeBlockColorName(colorKey);
+    const colorOrdinal = PREGAME_TUTORIAL_COLOR_ORDINALS[sectorIndex] || String(sectionNumber);
     return {
       step: `tap-color-${sectionNumber}`,
       type: "color",
       sectorIndex,
       colorKey: normalizedColor,
-      pointerEvent: `tutorial_pointer_${normalizedColor}color`,
-      completedEvent: `tutorial_paint_${normalizedColor}color`,
+      pointerEvent: `tutorial_pointer_${colorOrdinal}_color`,
+      completedEvent: `tutorial_paint_${colorOrdinal}_color`,
     };
   }
 
@@ -6977,7 +6989,7 @@ class Game {
     this.pregameTutorial.step = firstStep.step;
     this.pregameSelectedSectorKey = this.pregameSectorKeys[0] || null;
     this.pregameAutoSelectPending = false;
-    this.trackCactusPregameTutorialEventOnce("tutorial_level_intro", "completed");
+    this.trackCactusPregameTutorialEventOnce("tutor_level_intro", "completed");
     return true;
   }
 
