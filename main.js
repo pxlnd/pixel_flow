@@ -660,15 +660,17 @@ const PREGAME_COLOR_PANEL_UI = {
   sectorRowGap: 10,
   sectionGapExtraIfSpace: 60,
   itemGapMultiplier: 2,
-  sectorButtonW: 82,
-  sectorButtonH: 82,
-  sectorButtonGap: 10,
+  sectorButtonW: 122,
+  sectorButtonH: 122,
+  sectorButtonGap: 20,
+  sectorButtonMinSize: 44,
+  sectorButtonMinGap: 6,
   colorPaddingTop: 12,
   colorPaddingBottom: 14,
   colorButtonGap: 12,
   highlightColor: "#FFF93C",
-  highlightStrokeWidth: 6,
-  shellHighlightCornerRadius: 20,
+  highlightStrokeWidth: 8,
+  shellHighlightCornerRadius: 32,
   colorHighlightCornerRadius: 32,
   colorHighlightGlowSize: 14,
   colorVisibleCount: 6,
@@ -3839,6 +3841,9 @@ class Game {
     this.titleFrameImage = new Image();
     this.titleFrameImage.src = "ui/frame.png";
     this.titleFrameImage.decoding = "async";
+    this.shellPanelPlusImage = new Image();
+    this.shellPanelPlusImage.src = "ui/plus.png";
+    this.shellPanelPlusImage.decoding = "async";
     this.restartButtonImage = new Image();
     this.restartButtonImage.src = getThemeAsset("restartButton", "ui/restart_button.png");
     this.restartButtonImage.decoding = "async";
@@ -4227,6 +4232,9 @@ class Game {
     this.titleFrameImage.onload = () => {
       this.invalidate(false);
     };
+    this.shellPanelPlusImage.onload = () => {
+      this.invalidate(false);
+    };
     this.restartButtonImage.onload = () => {
       this.invalidate(false);
     };
@@ -4382,6 +4390,7 @@ class Game {
       this.slotCellImage,
       this.timerPanelImage,
       this.titleFrameImage,
+      this.shellPanelPlusImage,
       this.backButtonImage,
       this.loseTopCoinsPanelImage,
       this.preGameTabOnImage,
@@ -10941,9 +10950,14 @@ class Game {
       const railToSectorGap = scaleInt(ui.railToSectorGap, 0);
       const baseSectionGap = scaleInt(ui.sectionGap, 0);
       const sectionGapExtraIfSpace = Math.max(0, Number(ui.sectionGapExtraIfSpace) || 0);
-      const sectorButtonW = scaleInt(ui.sectorButtonW, 22);
-      const sectorButtonH = scaleInt(ui.sectorButtonH, 22);
-      const sectorButtonGap = scaleNum((Number(ui.sectorButtonGap) || 0) * itemGapMultiplier, 0);
+      const baseSectorButtonW = scaleInt(ui.sectorButtonW, 22);
+      const baseSectorButtonH = scaleInt(ui.sectorButtonH, 22);
+      const baseSectorButtonGap = scaleNum((Number(ui.sectorButtonGap) || 0) * itemGapMultiplier, 0);
+      const minSectorButtonSize = scaleInt(ui.sectorButtonMinSize, 1);
+      const minSectorButtonGap = Math.min(
+        baseSectorButtonGap,
+        scaleNum(Number.isFinite(ui.sectorButtonMinGap) ? ui.sectorButtonMinGap : 0, 0)
+      );
       const sectorRowGap = scaleNum((Number(ui.sectorRowGap) || 0) * itemGapMultiplier, 0);
       const colorPaddingTop = scaleInt(ui.colorPaddingTop, 0);
       const colorPaddingBottom = scaleInt(ui.colorPaddingBottom, 0);
@@ -10972,21 +10986,38 @@ class Game {
       const tabFontSize = scaleInt(ui.tabFontSize, 12);
       const tabTextOffsetY = scaleNum(ui.tabTextOffsetY, 0);
       const sectorAvailableInnerW = Math.max(120, panelW - sectorPaddingLeft - sectorPaddingRight);
-      const sectorColumns = Math.max(
-        1,
-        Math.floor((sectorAvailableInnerW + sectorButtonGap) / (sectorButtonW + sectorButtonGap))
-      );
-      const sectorRows = [];
-      let sectorMaxRowW = 0;
-      for (let rowStart = 0; rowStart < sectors.length; rowStart += sectorColumns) {
-        const rowItems = sectors.slice(rowStart, rowStart + sectorColumns);
-        const rowW = (
-          rowItems.length * sectorButtonW
-          + Math.max(0, rowItems.length - 1) * sectorButtonGap
+      const sectorCount = Math.max(1, sectors.length);
+      let sectorButtonW = baseSectorButtonW;
+      let sectorButtonH = baseSectorButtonH;
+      let sectorButtonGap = sectorCount > 1 ? baseSectorButtonGap : 0;
+      let sectorRowW = sectorCount * sectorButtonW + Math.max(0, sectorCount - 1) * sectorButtonGap;
+      if (sectorRowW > sectorAvailableInnerW) {
+        const rowScale = sectorAvailableInnerW / Math.max(1, sectorRowW);
+        sectorButtonGap = sectorCount > 1
+          ? Math.max(minSectorButtonGap, Math.floor(baseSectorButtonGap * rowScale))
+          : 0;
+        let availableButtonW = Math.floor(
+          (sectorAvailableInnerW - Math.max(0, sectorCount - 1) * sectorButtonGap) / sectorCount
         );
-        sectorRows.push({ rowItems, rowW });
-        sectorMaxRowW = Math.max(sectorMaxRowW, rowW);
+        if (availableButtonW < minSectorButtonSize && sectorCount > 1) {
+          sectorButtonGap = Math.max(
+            0,
+            Math.min(
+              sectorButtonGap,
+              Math.floor((sectorAvailableInnerW - minSectorButtonSize * sectorCount) / (sectorCount - 1))
+            )
+          );
+          availableButtonW = Math.floor(
+            (sectorAvailableInnerW - Math.max(0, sectorCount - 1) * sectorButtonGap) / sectorCount
+          );
+        }
+        sectorButtonW = Math.max(1, Math.min(baseSectorButtonW, availableButtonW));
+        const buttonScale = sectorButtonW / Math.max(1, baseSectorButtonW);
+        sectorButtonH = Math.max(1, Math.round(baseSectorButtonH * buttonScale));
+        sectorRowW = sectorCount * sectorButtonW + Math.max(0, sectorCount - 1) * sectorButtonGap;
       }
+      const sectorRows = [{ rowItems: sectors, rowW: sectorRowW }];
+      const sectorMaxRowW = sectorRowW;
       const sectorPanelInnerW = Math.max(sectorButtonW, Math.min(sectorAvailableInnerW, sectorMaxRowW));
       const sectorPanelW = Math.round(Math.min(
         panelW,
@@ -11221,71 +11252,6 @@ class Game {
     return panelRect;
   }
 
-  drawPregamePanelShell(ctx, rect, options = {}) {
-    const ui = PREGAME_COLOR_PANEL_UI;
-    const outerRadius = ui.panelRadius;
-    const innerRadius = Math.max(outerRadius - ui.panelInset, 8);
-    const inset = ui.panelInset;
-    const outerFill = String(options.outerFill || "#545777");
-    const borderColor = String(options.borderColor || "rgba(128, 137, 181, 0.96)");
-    const innerShadowColor = String(options.innerShadowColor || "rgba(25, 29, 46, 0.75)");
-    const innerFillTop = options.innerFillTop;
-    const innerFillBottom = options.innerFillBottom;
-    const useFlatInnerFill = typeof options.innerFill === "string" && options.innerFill.length > 0;
-    const showInnerShadow = options.showInnerShadow !== false;
-    const shadowColor = options.shadowColor === null
-      ? null
-      : String(options.shadowColor || "rgba(5, 8, 20, 0.6)");
-    const shadowBlur = Number.isFinite(options.shadowBlur) ? options.shadowBlur : 22;
-    const shadowOffsetY = Number.isFinite(options.shadowOffsetY) ? options.shadowOffsetY : 7;
-
-    ctx.save();
-    if (shadowColor) {
-      ctx.shadowColor = shadowColor;
-      ctx.shadowBlur = shadowBlur;
-      ctx.shadowOffsetY = shadowOffsetY;
-    }
-    roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, outerRadius);
-    ctx.fillStyle = outerFill;
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    const gradient = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
-    gradient.addColorStop(0, useFlatInnerFill ? options.innerFill : (innerFillTop || "#464a67"));
-    gradient.addColorStop(1, useFlatInnerFill ? options.innerFill : (innerFillBottom || "#3a3d53"));
-    roundedRect(
-      ctx,
-      rect.x + inset,
-      rect.y + inset,
-      rect.w - inset * 2,
-      rect.h - inset * 2,
-      innerRadius
-    );
-    ctx.fillStyle = gradient;
-    ctx.fill();
-    ctx.lineWidth = ui.panelBorder;
-    ctx.strokeStyle = borderColor;
-    ctx.stroke();
-    ctx.restore();
-
-    if (showInnerShadow) {
-      ctx.save();
-      roundedRect(
-        ctx,
-        rect.x + inset + 1.5,
-        rect.y + inset + 1.5,
-        rect.w - inset * 2 - 3,
-        rect.h - inset * 2 - 3,
-        Math.max(6, innerRadius - 2)
-      );
-      ctx.lineWidth = 1.8;
-      ctx.strokeStyle = innerShadowColor;
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
-
   drawPregameBlockTileInRect(ctx, colorKey, rect, options = {}) {
     const normalizedColor = normalizeBlockColorName(colorKey);
     const tileImage = this.getLoadedBlockTileImage(normalizedColor);
@@ -11415,7 +11381,7 @@ class Game {
       : 4.8;
     const shellHighlightCornerRadius = Number.isFinite(ui.shellHighlightCornerRadius)
       ? ui.shellHighlightCornerRadius
-      : 20;
+      : 32;
     const colorHighlightCornerRadius = Number.isFinite(ui.colorHighlightCornerRadius)
       ? ui.colorHighlightCornerRadius
       : 20;
@@ -11434,28 +11400,12 @@ class Game {
       }
     }
 
-    this.drawPregamePanelShell(ctx, this.preGameSectorPanelRect, {
-      outerFill: "#4D4E53",
-      innerFill: "#4D4E53",
-      borderColor: "#575970",
-      showInnerShadow: false,
-    });
-
     for (let index = 0; index < this.preGameSectorButtons.length; index += 1) {
       const entry = this.preGameSectorButtons[index];
       const rect = entry.rect;
       const isSelected = entry.sectorKey === this.pregameSelectedSectorKey;
       const assignedColor = normalizeBlockColorName(assignments[entry.sectorKey]);
       const hasAssignedColor = !!assignedColor;
-
-      if (isSelected) {
-        ctx.save();
-        roundedRect(ctx, rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, shellHighlightCornerRadius);
-        ctx.strokeStyle = highlightColor;
-        ctx.lineWidth = highlightStrokeWidth;
-        ctx.stroke();
-        ctx.restore();
-      }
 
       if (hasAssignedColor) {
         this.drawPregameBlockTileInRect(ctx, assignedColor, rect, {
@@ -11464,34 +11414,44 @@ class Game {
           glossAlpha: isSelected ? 0.2 : 0.12,
         });
       } else {
-        const emptyRadius = Math.max(10, Math.round(Math.min(rect.w, rect.h) * 0.26));
+        const plusImage = this.shellPanelPlusImage;
+        if (plusImage?.complete && plusImage.naturalWidth > 0 && plusImage.naturalHeight > 0) {
+          ctx.save();
+          ctx.imageSmoothingEnabled = true;
+          if ("imageSmoothingQuality" in ctx) {
+            ctx.imageSmoothingQuality = "high";
+          }
+          ctx.drawImage(plusImage, rect.x, rect.y, rect.w, rect.h);
+          ctx.restore();
+        } else {
+          const emptyRadius = Math.max(10, Math.round(Math.min(rect.w, rect.h) * 0.26));
+          ctx.save();
+          roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, emptyRadius);
+          ctx.fillStyle = "#33343A";
+          ctx.fill();
+          ctx.lineWidth = isSelected ? 2.6 : 2.1;
+          ctx.strokeStyle = "rgba(129, 136, 162, 0.9)";
+          ctx.stroke();
+          ctx.font = `800 ${Math.max(28, Math.round(rect.h * 0.78))}px ${OPEN_SANS_FONT_FAMILY}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "#ffffff";
+          ctx.shadowColor = "rgba(0, 0, 0, 0.28)";
+          ctx.shadowBlur = 3;
+          ctx.shadowOffsetY = 2;
+          ctx.fillText("+", rect.x + rect.w * 0.5, rect.y + rect.h * 0.5);
+          ctx.restore();
+        }
+      }
+
+      if (isSelected) {
         ctx.save();
-        roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, emptyRadius);
-        ctx.fillStyle = "#33343A";
-        ctx.fill();
-        ctx.lineWidth = isSelected ? 2.6 : 2.1;
-        ctx.strokeStyle = "rgba(129, 136, 162, 0.9)";
+        roundedRect(ctx, rect.x, rect.y, rect.w, rect.h, shellHighlightCornerRadius);
+        ctx.strokeStyle = highlightColor;
+        ctx.lineWidth = highlightStrokeWidth;
         ctx.stroke();
         ctx.restore();
       }
-
-      const label = `${index + 1}`;
-      const fontSize = Math.max(
-        28,
-        Math.round(rect.h * (label.length > 1 ? 0.58 : 0.78))
-      );
-      ctx.save();
-      ctx.font = `800 ${fontSize}px ${OPEN_SANS_FONT_FAMILY}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = hasAssignedColor ? "#fff" : "#989AA3";
-      ctx.shadowColor = "rgba(0, 0, 0, 0.28)";
-      ctx.shadowBlur = 3;
-      ctx.shadowOffsetY = 2;
-      const textX = rect.x + rect.w * 0.5;
-      const textY = rect.y + rect.h * 0.5;
-      ctx.fillText(label, textX, textY);
-      ctx.restore();
 
     }
 
