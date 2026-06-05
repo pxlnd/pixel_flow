@@ -6818,6 +6818,8 @@ class Game {
       completedCallbackSent: false,
       firstColor: null,
       secondColor: null,
+      firstLane: null,
+      secondLane: null,
       lastShownPointerStepTracked: null,
       trackedEvents: new Set(),
       travelHintMode: "hidden",
@@ -7307,25 +7309,101 @@ class Game {
     return fallback?.color || null;
   }
 
+  getLevelOneTutorialFrontCards() {
+    return this.getFrontLaneIds()
+      .map((lane) => this.getActiveFrontCardInLane(lane))
+      .filter((card) => card && !card.used && card.ammo > 0 && card.color && card.color !== "gray")
+      .sort((a, b) => (a.lane - b.lane) || (a.index - b.index));
+  }
+
+  refreshLevelOneTutorialTargets() {
+    if (!this.tutorial?.active) {
+      return false;
+    }
+    const frontCards = this.getLevelOneTutorialFrontCards();
+    if (frontCards.length === 0) {
+      return false;
+    }
+
+    let changed = false;
+    const firstStillValid = frontCards.some(
+      (card) => card.lane === this.tutorial.firstLane && card.color === this.tutorial.firstColor
+    );
+    if (!firstStillValid && this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
+      const firstCard = frontCards[0];
+      this.tutorial.firstLane = firstCard.lane;
+      this.tutorial.firstColor = firstCard.color;
+      changed = true;
+    } else if (!Number.isFinite(this.tutorial.firstLane) || !this.tutorial.firstColor || this.tutorial.firstColor === "gray") {
+      const firstCard = frontCards[0];
+      this.tutorial.firstLane = firstCard.lane;
+      this.tutorial.firstColor = firstCard.color;
+      changed = true;
+    }
+
+    const firstLane = this.getLevelOneTutorialFirstLane();
+    const hasAlternativeSecondLane = frontCards.some((card) => card.lane !== firstLane);
+    const secondStillValid = frontCards.some(
+      (card) => card.lane === this.tutorial.secondLane && card.color === this.tutorial.secondColor
+    );
+    if (
+      !secondStillValid
+      || !Number.isFinite(this.tutorial.secondLane)
+      || !this.tutorial.secondColor
+      || this.tutorial.secondColor === "gray"
+      || (hasAlternativeSecondLane && this.tutorial.secondLane === firstLane)
+    ) {
+      const secondCard = frontCards.find((card) => card.lane !== firstLane) || frontCards[1] || frontCards[0];
+      if (secondCard) {
+        this.tutorial.secondLane = secondCard.lane;
+        this.tutorial.secondColor = secondCard.color;
+        changed = true;
+      }
+    }
+
+    return changed;
+  }
+
+  getLevelOneTutorialFirstLane() {
+    if (Number.isFinite(this.tutorial?.firstLane)) {
+      return this.tutorial.firstLane;
+    }
+    const front = this.getLevelOneTutorialFrontCards()[0] || null;
+    return Number.isFinite(front?.lane) ? front.lane : 0;
+  }
+
+  getLevelOneTutorialSecondLane() {
+    if (Number.isFinite(this.tutorial?.secondLane)) {
+      return this.tutorial.secondLane;
+    }
+    const firstLane = this.getLevelOneTutorialFirstLane();
+    const front = this.getLevelOneTutorialFrontCards().find((card) => card.lane !== firstLane) || null;
+    return Number.isFinite(front?.lane) ? front.lane : firstLane;
+  }
+
   getLevelOneTutorialFirstColor() {
     if (this.tutorial?.firstColor && this.tutorial.firstColor !== "gray") {
       return this.tutorial.firstColor;
     }
-    return this.getLevelOneTutorialLaneColor(0);
+    return this.getLevelOneTutorialLaneColor(this.getLevelOneTutorialFirstLane());
   }
 
   getLevelOneTutorialSecondColor() {
     if (this.tutorial?.secondColor && this.tutorial.secondColor !== "gray") {
       return this.tutorial.secondColor;
     }
-    return this.getLevelOneTutorialLaneColor(1) || this.getLevelOneTutorialLaneColor(0);
+    return this.getLevelOneTutorialLaneColor(this.getLevelOneTutorialSecondLane())
+      || this.getLevelOneTutorialLaneColor(this.getLevelOneTutorialFirstLane());
   }
 
   enforceLevelOneTutorialQueue() {
     if (!this.isLevelOneTutorialEnabled() || !this.tutorial?.active) {
       return;
     }
+    this.refreshLevelOneTutorialTargets();
     const step = this.tutorial.step;
+    const firstLane = this.getLevelOneTutorialFirstLane();
+    const secondLane = this.getLevelOneTutorialSecondLane();
     const firstColor = this.getLevelOneTutorialFirstColor();
     const secondColor = this.getLevelOneTutorialSecondColor();
     let didSwap = false;
@@ -7348,10 +7426,12 @@ class Game {
     };
 
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard || step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenPausePoint) {
-      enforceLaneColor(0, firstColor);
-      enforceLaneColor(1, secondColor);
+      enforceLaneColor(firstLane, firstColor);
+      if (secondLane !== firstLane) {
+        enforceLaneColor(secondLane, secondColor);
+      }
     } else if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard) {
-      enforceLaneColor(1, secondColor);
+      enforceLaneColor(secondLane, secondColor);
     }
 
     if (didSwap) {
@@ -7368,11 +7448,10 @@ class Game {
     if (!this.isLevelOneTutorialEnabled()) {
       return;
     }
-    this.tutorial.firstColor = this.getLevelOneTutorialLaneColor(0);
-    this.tutorial.secondColor = this.getLevelOneTutorialLaneColor(1) || this.tutorial.firstColor;
     this.tutorial.active = true;
     this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard;
     this.tutorial.gameplayPaused = false;
+    this.refreshLevelOneTutorialTargets();
   }
 
   isTutorialGameplayPaused() {
@@ -7442,11 +7521,11 @@ class Game {
     }
     const step = this.tutorial.step;
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
-      const card = this.getTutorialTargetCard(this.getLevelOneTutorialFirstColor(), 0);
+      const card = this.getTutorialTargetCard(this.getLevelOneTutorialFirstColor(), this.getLevelOneTutorialFirstLane());
       return card ? { type: "card", card } : null;
     }
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard) {
-      const card = this.getTutorialTargetCard(this.getLevelOneTutorialSecondColor(), 1);
+      const card = this.getTutorialTargetCard(this.getLevelOneTutorialSecondColor(), this.getLevelOneTutorialSecondLane());
       return card ? { type: "card", card } : null;
     }
     return null;
@@ -7950,7 +8029,7 @@ class Game {
       this.isTutorialGameplayPaused()
       && this.tutorial?.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard
       && card.color === this.getLevelOneTutorialSecondColor()
-      && card.lane === 1;
+      && card.lane === this.getLevelOneTutorialSecondLane();
     if (!tutorialSecondTapBypassesSpawnBlock && !this.isSpawnAreaClear()) {
       return false;
     }
@@ -7987,16 +8066,18 @@ class Game {
       if (
         this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard
         && card.color === this.getLevelOneTutorialFirstColor()
-        && card.lane === 0
+        && card.lane === this.getLevelOneTutorialFirstLane()
       ) {
         this.tutorial.firstColor = card.color;
-        this.tutorial.secondColor = this.getLevelOneTutorialSecondColor();
+        this.tutorial.firstLane = card.lane;
         this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitGreenPausePoint;
         this.tutorial.firstTutorialUnitId = unit.id;
+        this.refreshLevelOneTutorialTargets();
+        this.tutorial.secondColor = this.getLevelOneTutorialSecondColor();
       } else if (
         this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard
         && card.color === this.getLevelOneTutorialSecondColor()
-        && card.lane === 1
+        && card.lane === this.getLevelOneTutorialSecondLane()
       ) {
         this.finishTutorial();
       }
