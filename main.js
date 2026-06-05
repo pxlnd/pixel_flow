@@ -11153,13 +11153,16 @@ class Game {
     const activeSectorMaterial = activeTab === PREGAME_PALETTE_TAB_COLOR
       ? this.getPregameSelectedMaterial()
       : "original";
+    const materialPreviewBaseColor = activeTab === PREGAME_PALETTE_TAB_MATERIAL
+      ? (this.getPregameSectorBaseColor(this.pregameSelectedSectorKey) || "white")
+      : null;
     for (let i = 0; i < palette.length; i += 1) {
       const paletteItem = palette[i];
       const isMaterialTab = activeTab === PREGAME_PALETTE_TAB_MATERIAL;
       const materialKey = isMaterialTab ? getPregameMaterialDefinition(paletteItem?.id).id : null;
-      const baseColor = isMaterialTab ? null : getPregameBaseColorFromColorKey(paletteItem);
+      const baseColor = isMaterialTab ? materialPreviewBaseColor : getPregameBaseColorFromColorKey(paletteItem);
       const colorKey = isMaterialTab
-        ? getPregameMaterialDefinition(materialKey).sampleColor
+        ? (composePregameMaterialColorKey(baseColor, materialKey) || getPregameMaterialDefinition(materialKey).sampleColor)
         : (composePregameMaterialColorKey(baseColor, activeSectorMaterial) || baseColor);
       const x = colorViewportRect.x + i * (metrics.colorButtonSize + metrics.colorButtonGap) - scrollOffset;
       colorButtons.push({
