@@ -16403,11 +16403,14 @@ function dispatchUnityNavigationUrl(url, options = {}) {
   if (!normalizedUrl) {
     return false;
   }
-  const { clearTrackQueue = false } = options;
+  const { clearTrackQueue = false, queued = false } = options;
   if (clearTrackQueue) {
     clearQueuedUnityTrackEvents();
   }
   suppressUnityScreenTapTrackEvent();
+  if (queued) {
+    return enqueueUnityTrackEventUrl(normalizedUrl);
+  }
   try {
     window.location.href = normalizedUrl;
     return true;
@@ -16601,7 +16604,7 @@ function dispatchUnityColoringCompletedEvent(gameInstance) {
     ? gameInstance.buildLevelColorData()
     : { LevelID: "", Width: 0, Height: 0, Cells: [] };
   const encodedData = encodeURIComponent(JSON.stringify(levelColorData));
-  return dispatchUnityNavigationUrl(`uniwebview://coloring_completed?data=${encodedData}`);
+  return dispatchUnityNavigationUrl(`uniwebview://coloring_completed?data=${encodedData}`, { queued: true });
 }
 
 function dispatchUnityTutorialTrackEvent(eventName, eventAction) {
@@ -16616,7 +16619,7 @@ function dispatchUnityTutorialTrackEvent(eventName, eventAction) {
 }
 
 function dispatchUnityTutorialCompletedEvent() {
-  return dispatchUnityNavigationUrl("uniwebview://tutorial_completed");
+  return dispatchUnityNavigationUrl("uniwebview://tutorial_completed", { queued: true });
 }
 
 function dispatchUnityLosePopupTrackEvent(eventAction) {
