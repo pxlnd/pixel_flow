@@ -253,6 +253,27 @@ function buildLevelMap(levelDefinitions) {
   return map;
 }
 
+function resolveLevelReferenceId(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  const rawLower = raw.toLowerCase();
+  const levels = Array.isArray(LEVEL_DEFINITIONS) ? LEVEL_DEFINITIONS : [];
+  const matchedLevel = levels.find((level) => {
+    const id = String(level?.id || "").trim();
+    const name = String(level?.name || "").trim();
+    const displayName = String(level?.displayName || "").trim();
+    return id === raw
+      || name === raw
+      || displayName === raw
+      || id.toLowerCase() === rawLower
+      || name.toLowerCase() === rawLower
+      || displayName.toLowerCase() === rawLower;
+  });
+  return matchedLevel ? String(matchedLevel.id || raw).trim() : raw;
+}
+
 function getLevelOverridesStoragePayload() {
   const levels = {};
   for (const [id, level] of LEVEL_OVERRIDES_MAP.entries()) {
@@ -433,11 +454,8 @@ const CARD_HITBOX_PADDING_X = 26;
 const CARD_HITBOX_PADDING_TOP = 26;
 const CARD_HITBOX_PADDING_BOTTOM = 22;
 const PARKED_UNIT_TAP_RADIUS = 86;
-const MAIN_TUTORIAL_LEVEL_ID = "2";
 const STAR_LEVEL_ID = "1";
 const STAR_LEVEL_NAME = "star";
-const CACTUS_PREGAME_TUTORIAL_LEVEL_ID = "2";
-const CACTUS_PREGAME_TUTORIAL_LEVEL_NAME = "cactus";
 const LEVEL_ONE_TUTORIAL_STEPS = {
   tapGreenCard: "tap-green-card",
   waitGreenPausePoint: "wait-green-pause-point",
@@ -445,69 +463,30 @@ const LEVEL_ONE_TUTORIAL_STEPS = {
   done: "done",
 };
 const LEVEL_ONE_TUTORIAL_TRACK_EVENTS = {
-  pointerGreenBird: "tutorial_pointer_greenbird",
-  launchGreenBird: "tutorial_launch_greenbird",
+  pointerGreenBird: "tutorial_pointer_first_bird",
+  launchGreenBird: "tutorial_launch_first_bird",
   halfwayPause: "tutorial_halfwaypause",
-  pointerBlackBird: "tutorial_pointer_blackbird",
-  launchBlackBird: "tutorial_launch_blackbird",
-  freeTutorial: "tutorial_freetutorial",
+  pointerBlackBird: "tutorial_pointer_second_bird",
+  launchBlackBird: "tutorial_launch_second_bird",
+  freeTutorial: "tutorial_freetutorialial",
   levelComplete: "tutorial_levelcomplete",
 };
 const LEVEL_ONE_GREEN_PAUSE_TRACK_PROGRESS = 0.7;
 const CACTUS_PREGAME_TUTORIAL_STEPS = {
-  tapBlackColor: "tap-black-color",
-  tapSecondSector: "tap-second-sector",
-  tapGreenColor: "tap-green-color",
-  tapThirdSector: "tap-third-sector",
-  tapOrangeColor: "tap-orange-color",
   tapStart: "tap-start",
   done: "done",
 };
-const CACTUS_PREGAME_TUTORIAL_SEQUENCE = [
-  {
-    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapBlackColor,
-    type: "color",
-    sectorIndex: 0,
-    colorKey: "black",
-    pointerEvent: "tutorial_pointer_blackcolor",
-    completedEvent: "tutorial_paint_blackcolor",
-  },
-  {
-    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapSecondSector,
-    type: "sector",
-    sectorIndex: 1,
-    pointerEvent: "tutorial_pointer_number2",
-    completedEvent: "tutorial_select_number2",
-  },
-  {
-    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapGreenColor,
-    type: "color",
-    sectorIndex: 1,
-    colorKey: "green",
-    pointerEvent: "tutorial_pointer_greencolor",
-    completedEvent: "tutorial_paint_greencolor",
-  },
-  {
-    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapThirdSector,
-    type: "sector",
-    sectorIndex: 2,
-    pointerEvent: "tutorial_pointer_number3",
-    completedEvent: "tutorial_select_number3",
-  },
-  {
-    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapOrangeColor,
-    type: "color",
-    sectorIndex: 2,
-    colorKey: "orange",
-    pointerEvent: "tutorial_pointer_orangecolor",
-    completedEvent: "tutorial_paint_orangecolor",
-  },
-  {
-    step: CACTUS_PREGAME_TUTORIAL_STEPS.tapStart,
-    type: "start",
-    pointerEvent: "tutorial_pointer_startbutton",
-    completedEvent: "tutorial_press_startbutton",
-  },
+const PREGAME_TUTORIAL_MAX_COLOR_COUNT = 9;
+const PREGAME_TUTORIAL_COLOR_ORDINALS = [
+  "first",
+  "second",
+  "third",
+  "fourth",
+  "fifth",
+  "sixth",
+  "seventh",
+  "eighth",
+  "ninth",
 ];
 const LEVEL_ONE_TRAVEL_HINT_TEXT = "Wait for shooter to travel";
 const LEVEL_ONE_TRAVEL_HINT_LETTER_ANIM_DURATION = 0.6;
@@ -3969,6 +3948,7 @@ class Game {
     this.queueCompletionTrackPending = false;
     this.queuedSpawnCardIndex = null;
     this.losePopupAppear = 1;
+    this.externalTutorialLevelId = normalizeExternalTutorialLevelId(pendingExternalTutorialLevelId);
     this.externalTutorialCompleted = normalizeExternalTutorialCompleted(pendingExternalTutorialCompleted);
     this.debugPanel = document.getElementById("debugPanel");
     this.debugHotspotBottomLeft = document.getElementById("debugHotspotBottomLeft");
@@ -6836,6 +6816,10 @@ class Game {
       firstTutorialUnitId: null,
       gameplayPaused: false,
       completedCallbackSent: false,
+      firstColor: null,
+      secondColor: null,
+      firstLane: null,
+      secondLane: null,
       lastShownPointerStepTracked: null,
       trackedEvents: new Set(),
       travelHintMode: "hidden",
@@ -6854,15 +6838,20 @@ class Game {
   }
 
   isLevelOneTutorialEnabled() {
-    return String(this.currentLevelId || "") === MAIN_TUTORIAL_LEVEL_ID
-      && !this.isColoringTutorialCompleted();
+    return this.isCurrentTutorialLevel() && !this.isColoringTutorialCompleted();
+  }
+
+  isCurrentTutorialLevel() {
+    const tutorialLevelId = resolveExternalTutorialLevelId(this);
+    if (tutorialLevelId === null) {
+      return false;
+    }
+    const levelId = String(this.currentLevelId || CURRENT_LEVEL?.id || "").trim();
+    return levelId === tutorialLevelId;
   }
 
   isCurrentCactusLevel() {
-    const levelId = String(this.currentLevelId || CURRENT_LEVEL?.id || "").trim();
-    const levelName = String(CURRENT_LEVEL?.name || "").trim().toLowerCase();
-    return levelId === CACTUS_PREGAME_TUTORIAL_LEVEL_ID
-      || levelName === CACTUS_PREGAME_TUTORIAL_LEVEL_NAME;
+    return this.isCurrentTutorialLevel();
   }
 
   isColoringTutorialCompleted() {
@@ -6870,13 +6859,10 @@ class Game {
   }
 
   isCactusPregameTutorialEnabled() {
-    return this.isCurrentCactusLevel() && !this.isColoringTutorialCompleted();
+    return this.isCurrentTutorialLevel() && !this.isColoringTutorialCompleted();
   }
 
-  disableCactusTutorialsForCompletedColoring() {
-    if (!this.isCurrentCactusLevel()) {
-      return false;
-    }
+  disableTutorials() {
     if (this.tutorial) {
       this.tutorial.active = false;
       this.tutorial.gameplayPaused = false;
@@ -6887,6 +6873,36 @@ class Game {
       this.pregameTutorial.active = false;
       this.pregameTutorial.step = CACTUS_PREGAME_TUTORIAL_STEPS.done;
       this.pregameTutorial.handTime = 0;
+    }
+    this.invalidate(true);
+    return true;
+  }
+
+  disableCactusTutorialsForCompletedColoring() {
+    if (!this.isCurrentTutorialLevel()) {
+      return false;
+    }
+    return this.disableTutorials();
+  }
+
+  applyExternalTutorialLevel(value) {
+    const normalized = normalizeExternalTutorialLevelId(value);
+    if (normalized === null) {
+      return false;
+    }
+    pendingExternalTutorialLevelId = normalized;
+    this.externalTutorialLevelId = normalized;
+    if (!this.isCurrentTutorialLevel() || this.isColoringTutorialCompleted()) {
+      clearQueuedUnityTutorialTrackEvents();
+      this.disableTutorials();
+      return true;
+    }
+    this.setupLevelOneTutorial();
+    this.enforceLevelOneTutorialQueue();
+    if (this.gameState === "pregame") {
+      this.setupCactusPregameTutorial();
+    } else if (this.gameState === "playing") {
+      this.tutorial.handTime = 0;
     }
     this.invalidate(true);
     return true;
@@ -6906,9 +6922,59 @@ class Game {
     return true;
   }
 
-  hasCactusPregameTutorialLayout() {
+  getPregameTutorialSectorKeys() {
     const sectorKeys = Array.isArray(this.pregameSectorKeys) ? this.pregameSectorKeys : [];
-    return sectorKeys[0] === "black" && sectorKeys[1] === "green" && sectorKeys[2] === "orange";
+    return sectorKeys
+      .map((sectorKey) => normalizeBlockColorName(sectorKey))
+      .filter(Boolean)
+      .slice(0, PREGAME_TUTORIAL_MAX_COLOR_COUNT);
+  }
+
+  createPregameTutorialStepConfig(type, sectorIndex, colorKey = null) {
+    const sectionNumber = sectorIndex + 1;
+    if (type === "sector") {
+      return {
+        step: `tap-sector-${sectionNumber}`,
+        type,
+        sectorIndex,
+        pointerEvent: `tutorial_pointer_number${sectionNumber}`,
+        completedEvent: `tutorial_select_number${sectionNumber}`,
+      };
+    }
+    const normalizedColor = normalizeBlockColorName(colorKey);
+    const colorOrdinal = PREGAME_TUTORIAL_COLOR_ORDINALS[sectorIndex] || String(sectionNumber);
+    return {
+      step: `tap-color-${sectionNumber}`,
+      type: "color",
+      sectorIndex,
+      colorKey: normalizedColor,
+      pointerEvent: `tutorial_pointer_${colorOrdinal}_color`,
+      completedEvent: `tutorial_paint_${colorOrdinal}_color`,
+    };
+  }
+
+  getPregameTutorialSequence() {
+    const sectorKeys = this.getPregameTutorialSectorKeys();
+    const sequence = [];
+    for (let index = 0; index < sectorKeys.length; index += 1) {
+      if (index > 0) {
+        sequence.push(this.createPregameTutorialStepConfig("sector", index));
+      }
+      sequence.push(this.createPregameTutorialStepConfig("color", index, sectorKeys[index]));
+    }
+    if (sequence.length > 0) {
+      sequence.push({
+        step: CACTUS_PREGAME_TUTORIAL_STEPS.tapStart,
+        type: "start",
+        pointerEvent: "tutorial_pointer_startbutton",
+        completedEvent: "tutorial_press_startbutton",
+      });
+    }
+    return sequence;
+  }
+
+  hasCactusPregameTutorialLayout() {
+    return this.getPregameTutorialSequence().length > 0;
   }
 
   setupCactusPregameTutorial() {
@@ -6916,11 +6982,16 @@ class Game {
     if (!this.isCactusPregameTutorialEnabled() || !this.hasCactusPregameTutorialLayout()) {
       return false;
     }
+    const sequence = this.getPregameTutorialSequence();
+    const firstStep = sequence[0] || null;
+    if (!firstStep) {
+      return false;
+    }
     this.pregameTutorial.active = true;
-    this.pregameTutorial.step = CACTUS_PREGAME_TUTORIAL_STEPS.tapBlackColor;
+    this.pregameTutorial.step = firstStep.step;
     this.pregameSelectedSectorKey = this.pregameSectorKeys[0] || null;
     this.pregameAutoSelectPending = false;
-    this.trackCactusPregameTutorialEventOnce("tutorial_level_intro", "completed");
+    this.trackCactusPregameTutorialEventOnce("tutor_level_intro", "completed");
     return true;
   }
 
@@ -6933,7 +7004,7 @@ class Game {
       return null;
     }
     const step = this.pregameTutorial.step;
-    return CACTUS_PREGAME_TUTORIAL_SEQUENCE.find((entry) => entry.step === step) || null;
+    return this.getPregameTutorialSequence().find((entry) => entry.step === step) || null;
   }
 
   trackCactusPregameTutorialEventOnce(eventName, eventAction = "completed") {
@@ -6992,10 +7063,11 @@ class Game {
     if (!this.pregameTutorial?.active) {
       return;
     }
-    const currentIndex = CACTUS_PREGAME_TUTORIAL_SEQUENCE.findIndex(
+    const sequence = this.getPregameTutorialSequence();
+    const currentIndex = sequence.findIndex(
       (entry) => entry.step === this.pregameTutorial.step
     );
-    const nextStep = CACTUS_PREGAME_TUTORIAL_SEQUENCE[currentIndex + 1]?.step
+    const nextStep = sequence[currentIndex + 1]?.step
       || CACTUS_PREGAME_TUTORIAL_STEPS.done;
     this.pregameTutorial.step = nextStep;
     this.pregameTutorial.handTime = 0;
@@ -7019,6 +7091,7 @@ class Game {
       return entry ? { ...config, rect: entry.rect, sectorKey: entry.sectorKey } : null;
     }
     if (config.type === "color") {
+      this.ensurePregameColorButtonVisible(config.colorKey);
       const entry = this.preGameColorButtons.find((button) => button.colorKey === config.colorKey) || null;
       return entry ? { ...config, rect: entry.rect } : null;
     }
@@ -7029,6 +7102,34 @@ class Game {
       return { ...config, rect: this.getPregameStartButtonHitRect() };
     }
     return null;
+  }
+
+  ensurePregameColorButtonVisible(colorKey) {
+    const normalizedColor = normalizeBlockColorName(colorKey);
+    if (!normalizedColor || this.preGameColorScrollMaxOffset <= 0.5) {
+      return false;
+    }
+    const viewport = this.preGameColorViewportRect;
+    const entry = this.preGameColorButtons.find((button) => button.colorKey === normalizedColor) || null;
+    if (!entry?.rect || !viewport?.w) {
+      return false;
+    }
+    const padding = 8;
+    let nextOffset = this.preGameColorScrollOffset;
+    if (entry.rect.x < viewport.x + padding) {
+      nextOffset -= (viewport.x + padding) - entry.rect.x;
+    } else if (entry.rect.x + entry.rect.w > viewport.x + viewport.w - padding) {
+      nextOffset += (entry.rect.x + entry.rect.w) - (viewport.x + viewport.w - padding);
+    } else {
+      return false;
+    }
+    const previousOffset = this.preGameColorScrollOffset;
+    this.clampPregameColorScrollOffset(nextOffset);
+    if (Math.abs(this.preGameColorScrollOffset - previousOffset) < 0.5) {
+      return false;
+    }
+    this.getPregameColorPanelRect();
+    return true;
   }
 
   isPointOnCactusPregameTutorialTarget(target, x, y) {
@@ -7199,13 +7300,117 @@ class Game {
     cardB.used = cardB.ammo <= 0;
   }
 
+  getLevelOneTutorialLaneColor(lane) {
+    const front = this.getActiveFrontCardInLane(lane);
+    if (front?.color && front.color !== "gray") {
+      return front.color;
+    }
+    const fallback = this.cards.find((card) => card && !card.used && card.ammo > 0 && card.color && card.color !== "gray");
+    return fallback?.color || null;
+  }
+
+  getLevelOneTutorialFrontCards() {
+    return this.getFrontLaneIds()
+      .map((lane) => this.getActiveFrontCardInLane(lane))
+      .filter((card) => card && !card.used && card.ammo > 0 && card.color && card.color !== "gray")
+      .sort((a, b) => (a.lane - b.lane) || (a.index - b.index));
+  }
+
+  refreshLevelOneTutorialTargets() {
+    if (!this.tutorial?.active) {
+      return false;
+    }
+    const frontCards = this.getLevelOneTutorialFrontCards();
+    if (frontCards.length === 0) {
+      return false;
+    }
+
+    let changed = false;
+    const firstStillValid = frontCards.some(
+      (card) => card.lane === this.tutorial.firstLane && card.color === this.tutorial.firstColor
+    );
+    if (!firstStillValid && this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
+      const firstCard = frontCards[0];
+      this.tutorial.firstLane = firstCard.lane;
+      this.tutorial.firstColor = firstCard.color;
+      changed = true;
+    } else if (!Number.isFinite(this.tutorial.firstLane) || !this.tutorial.firstColor || this.tutorial.firstColor === "gray") {
+      const firstCard = frontCards[0];
+      this.tutorial.firstLane = firstCard.lane;
+      this.tutorial.firstColor = firstCard.color;
+      changed = true;
+    }
+
+    const firstLane = this.getLevelOneTutorialFirstLane();
+    const hasAlternativeSecondLane = frontCards.some((card) => card.lane !== firstLane);
+    const secondStillValid = frontCards.some(
+      (card) => card.lane === this.tutorial.secondLane && card.color === this.tutorial.secondColor
+    );
+    if (
+      !secondStillValid
+      || !Number.isFinite(this.tutorial.secondLane)
+      || !this.tutorial.secondColor
+      || this.tutorial.secondColor === "gray"
+      || (hasAlternativeSecondLane && this.tutorial.secondLane === firstLane)
+    ) {
+      const secondCard = frontCards.find((card) => card.lane !== firstLane) || frontCards[1] || frontCards[0];
+      if (secondCard) {
+        this.tutorial.secondLane = secondCard.lane;
+        this.tutorial.secondColor = secondCard.color;
+        changed = true;
+      }
+    }
+
+    return changed;
+  }
+
+  getLevelOneTutorialFirstLane() {
+    if (Number.isFinite(this.tutorial?.firstLane)) {
+      return this.tutorial.firstLane;
+    }
+    const front = this.getLevelOneTutorialFrontCards()[0] || null;
+    return Number.isFinite(front?.lane) ? front.lane : 0;
+  }
+
+  getLevelOneTutorialSecondLane() {
+    if (Number.isFinite(this.tutorial?.secondLane)) {
+      return this.tutorial.secondLane;
+    }
+    const firstLane = this.getLevelOneTutorialFirstLane();
+    const front = this.getLevelOneTutorialFrontCards().find((card) => card.lane !== firstLane) || null;
+    return Number.isFinite(front?.lane) ? front.lane : firstLane;
+  }
+
+  getLevelOneTutorialFirstColor() {
+    if (this.tutorial?.firstColor && this.tutorial.firstColor !== "gray") {
+      return this.tutorial.firstColor;
+    }
+    return this.getLevelOneTutorialLaneColor(this.getLevelOneTutorialFirstLane());
+  }
+
+  getLevelOneTutorialSecondColor() {
+    if (this.tutorial?.secondColor && this.tutorial.secondColor !== "gray") {
+      return this.tutorial.secondColor;
+    }
+    return this.getLevelOneTutorialLaneColor(this.getLevelOneTutorialSecondLane())
+      || this.getLevelOneTutorialLaneColor(this.getLevelOneTutorialFirstLane());
+  }
+
   enforceLevelOneTutorialQueue() {
     if (!this.isLevelOneTutorialEnabled() || !this.tutorial?.active) {
       return;
     }
+    this.refreshLevelOneTutorialTargets();
     const step = this.tutorial.step;
+    const firstLane = this.getLevelOneTutorialFirstLane();
+    const secondLane = this.getLevelOneTutorialSecondLane();
+    const firstColor = this.getLevelOneTutorialFirstColor();
+    const secondColor = this.getLevelOneTutorialSecondColor();
     let didSwap = false;
     const enforceLaneColor = (lane, color) => {
+      if (!color) {
+        return;
+      }
       const front = this.getActiveFrontCardInLane(lane);
       if (!front || front.color === color) {
         return;
@@ -7221,10 +7426,12 @@ class Game {
     };
 
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard || step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenPausePoint) {
-      enforceLaneColor(0, "green");
-      enforceLaneColor(1, "black");
+      enforceLaneColor(firstLane, firstColor);
+      if (secondLane !== firstLane) {
+        enforceLaneColor(secondLane, secondColor);
+      }
     } else if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard) {
-      enforceLaneColor(1, "black");
+      enforceLaneColor(secondLane, secondColor);
     }
 
     if (didSwap) {
@@ -7244,6 +7451,7 @@ class Game {
     this.tutorial.active = true;
     this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard;
     this.tutorial.gameplayPaused = false;
+    this.refreshLevelOneTutorialTargets();
   }
 
   isTutorialGameplayPaused() {
@@ -7251,7 +7459,8 @@ class Game {
   }
 
   pauseTutorialAtFirstGreenHalfPath(unit) {
-    if (!this.tutorial?.active || !unit || unit.color !== "green") {
+    const firstColor = this.getLevelOneTutorialFirstColor();
+    if (!this.tutorial?.active || !unit || unit.color !== firstColor) {
       return false;
     }
     if (this.tutorial.step !== LEVEL_ONE_TUTORIAL_STEPS.waitGreenPausePoint) {
@@ -7312,11 +7521,11 @@ class Game {
     }
     const step = this.tutorial.step;
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard) {
-      const card = this.getTutorialTargetCard("green", 0);
+      const card = this.getTutorialTargetCard(this.getLevelOneTutorialFirstColor(), this.getLevelOneTutorialFirstLane());
       return card ? { type: "card", card } : null;
     }
     if (step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard) {
-      const card = this.getTutorialTargetCard("black", 1);
+      const card = this.getTutorialTargetCard(this.getLevelOneTutorialSecondColor(), this.getLevelOneTutorialSecondLane());
       return card ? { type: "card", card } : null;
     }
     return null;
@@ -7483,11 +7692,12 @@ class Game {
     this.tutorial.handTime += dt;
     this.enforceLevelOneTutorialQueue();
     if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.waitGreenPausePoint) {
-      const firstGreenUnit = this.getTutorialActiveUnitById(this.tutorial.firstTutorialUnitId, "green");
-      if (!firstGreenUnit) {
+      const firstColor = this.getLevelOneTutorialFirstColor();
+      const firstTutorialUnit = this.getTutorialActiveUnitById(this.tutorial.firstTutorialUnitId, firstColor);
+      if (!firstTutorialUnit) {
         this.pauseTutorialAtFirstGreenHalfPath({
           id: this.tutorial.firstTutorialUnitId,
-          color: "green",
+          color: firstColor,
         });
       }
       return;
@@ -7818,8 +8028,8 @@ class Game {
     const tutorialSecondTapBypassesSpawnBlock =
       this.isTutorialGameplayPaused()
       && this.tutorial?.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard
-      && card.color === "black"
-      && card.lane === 1;
+      && card.color === this.getLevelOneTutorialSecondColor()
+      && card.lane === this.getLevelOneTutorialSecondLane();
     if (!tutorialSecondTapBypassesSpawnBlock && !this.isSpawnAreaClear()) {
       return false;
     }
@@ -7853,13 +8063,21 @@ class Game {
     card.used = true;
     this.normalizeShooterQueues(this.cards);
     if (this.tutorial?.active) {
-      if (this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard && card.color === "green" && card.lane === 0) {
+      if (
+        this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapGreenCard
+        && card.color === this.getLevelOneTutorialFirstColor()
+        && card.lane === this.getLevelOneTutorialFirstLane()
+      ) {
+        this.tutorial.firstColor = card.color;
+        this.tutorial.firstLane = card.lane;
         this.tutorial.step = LEVEL_ONE_TUTORIAL_STEPS.waitGreenPausePoint;
         this.tutorial.firstTutorialUnitId = unit.id;
+        this.refreshLevelOneTutorialTargets();
+        this.tutorial.secondColor = this.getLevelOneTutorialSecondColor();
       } else if (
         this.tutorial.step === LEVEL_ONE_TUTORIAL_STEPS.tapBlackCard
-        && card.color === "black"
-        && card.lane === 1
+        && card.color === this.getLevelOneTutorialSecondColor()
+        && card.lane === this.getLevelOneTutorialSecondLane()
       ) {
         this.finishTutorial();
       }
@@ -9961,9 +10179,6 @@ class Game {
           this.preGameStartButtonAppearProgress = 0;
           this.preGameStartButtonBounceTime = 0;
           this.preGameStartButtonWasAvailable = true;
-          if (this.isCactusPregameTutorialEnabled()) {
-            this.trackCactusPregameTutorialEventOnce("tutorial_show_startbutton", "completed");
-          }
         }
         const appearDuration = Math.max(0.001, Number(PREGAME_START_BUTTON_UI.appearDuration) || 0.24);
         this.preGameStartButtonAppearProgress = Math.min(
@@ -11716,6 +11931,9 @@ class Game {
     this.drawBackground(ctx);
     this.drawWagonLayer(ctx);
     this.drawPregameLevelImageOnField(ctx);
+    if (!this.pregameStartTransitionActive && this.isCactusPregameTutorialActive()) {
+      this.getCactusPregameTutorialTapTarget();
+    }
     if (!this.pregameStartTransitionActive) {
       this.drawPregameColorPanel(ctx);
     }
@@ -15864,6 +16082,7 @@ let pendingExternalSubscriptionStatus = null;
 let pendingExternalTimeOutCoinsCost = null;
 let pendingExternalSoundsActive = null;
 let pendingExternalTutorialCompleted = null;
+let pendingExternalTutorialLevelId = null;
 const EXTERNAL_COINS_STORAGE_KEY = "pixelflow.external.coins.v1";
 const EXTERNAL_HEARTS_STORAGE_KEY = "pixelflow.external.hearts.v1";
 const EXTERNAL_MAX_LIVES_STORAGE_KEY = "pixelflow.external.max_lives.v1";
@@ -16042,6 +16261,22 @@ function normalizeExternalTutorialCompleted(value) {
   return null;
 }
 
+function normalizeExternalTutorialLevelId(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  let normalizedRaw = raw;
+  if (
+    normalizedRaw.length >= 2 &&
+    ((normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'")) ||
+      (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")))
+  ) {
+    normalizedRaw = normalizedRaw.slice(1, -1).trim();
+  }
+  return normalizedRaw.length > 0 ? normalizedRaw : null;
+}
+
 function persistExternalSubscriptionStatus(value) {
   if (typeof window === "undefined" || !window.localStorage) {
     return false;
@@ -16193,6 +16428,18 @@ function resolveExternalTutorialCompleted(gameInstance) {
   return false;
 }
 
+function resolveExternalTutorialLevelId(gameInstance) {
+  const fromGame = normalizeExternalTutorialLevelId(gameInstance?.externalTutorialLevelId);
+  if (fromGame !== null) {
+    return resolveLevelReferenceId(fromGame);
+  }
+  const fromPending = normalizeExternalTutorialLevelId(pendingExternalTutorialLevelId);
+  if (fromPending !== null) {
+    return resolveLevelReferenceId(fromPending);
+  }
+  return null;
+}
+
 function resolveExternalTimeOutCoinsCost(gameInstance) {
   const fromGame = normalizeExternalTimeOutCoinsCost(gameInstance?.externalTimeOutCoinsCost);
   if (fromGame !== null) {
@@ -16237,11 +16484,14 @@ function dispatchUnityNavigationUrl(url, options = {}) {
   if (!normalizedUrl) {
     return false;
   }
-  const { clearTrackQueue = false } = options;
+  const { clearTrackQueue = false, queued = false } = options;
   if (clearTrackQueue) {
     clearQueuedUnityTrackEvents();
   }
   suppressUnityScreenTapTrackEvent();
+  if (queued) {
+    return enqueueUnityTrackEventUrl(normalizedUrl);
+  }
   try {
     window.location.href = normalizedUrl;
     return true;
@@ -16435,7 +16685,7 @@ function dispatchUnityColoringCompletedEvent(gameInstance) {
     ? gameInstance.buildLevelColorData()
     : { LevelID: "", Width: 0, Height: 0, Cells: [] };
   const encodedData = encodeURIComponent(JSON.stringify(levelColorData));
-  return dispatchUnityNavigationUrl(`uniwebview://coloring_completed?data=${encodedData}`);
+  return dispatchUnityNavigationUrl(`uniwebview://coloring_completed?data=${encodedData}`, { queued: true });
 }
 
 function dispatchUnityTutorialTrackEvent(eventName, eventAction) {
@@ -16450,7 +16700,7 @@ function dispatchUnityTutorialTrackEvent(eventName, eventAction) {
 }
 
 function dispatchUnityTutorialCompletedEvent() {
-  return dispatchUnityNavigationUrl("uniwebview://tutorial_completed");
+  return dispatchUnityNavigationUrl("uniwebview://tutorial_completed", { queued: true });
 }
 
 function dispatchUnityLosePopupTrackEvent(eventAction) {
@@ -16535,6 +16785,14 @@ if (typeof window !== "undefined") {
     }
     return true;
   };
+  window.setTutorialLevel = (tutorialLevelId) => {
+    const normalized = normalizeExternalTutorialLevelId(tutorialLevelId);
+    if (normalized === null) {
+      return false;
+    }
+    pendingExternalTutorialLevelId = normalized;
+    return true;
+  };
   window.rewardResult = () => false;
 }
 
@@ -16555,6 +16813,7 @@ async function bootstrapGame() {
   game.externalMaxLivesCount = resolveExternalMaxLivesCount(game);
   game.externalLivesTimer = resolveExternalLivesTimer(game);
   game.externalSubscriptionStatus = resolveExternalSubscriptionStatus(game);
+  game.externalTutorialLevelId = resolveExternalTutorialLevelId(game);
   game.externalTutorialCompleted = resolveExternalTutorialCompleted(game);
 
   const resolveExternalLevelSelection = (value) => {
@@ -16766,6 +17025,7 @@ async function bootstrapGame() {
     return game.setSoundsActive(normalized);
   };
   window.setTutorialCompleted = (tutorialCompleted) => game.applyExternalTutorialCompleted(tutorialCompleted);
+  window.setTutorialLevel = (tutorialLevelId) => game.applyExternalTutorialLevel(tutorialLevelId);
   window.rewardResult = (result) => {
     const normalized = String(result ?? "").trim().toLowerCase();
     if (normalized !== "true") {
@@ -16806,6 +17066,9 @@ async function bootstrapGame() {
   }
   if (pendingExternalSoundsActive !== null && pendingExternalSoundsActive !== undefined) {
     window.setSounds(pendingExternalSoundsActive);
+  }
+  if (pendingExternalTutorialLevelId !== null && pendingExternalTutorialLevelId !== undefined) {
+    window.setTutorialLevel(pendingExternalTutorialLevelId);
   }
   if (pendingExternalTutorialCompleted !== null && pendingExternalTutorialCompleted !== undefined) {
     window.setTutorialCompleted(pendingExternalTutorialCompleted);
