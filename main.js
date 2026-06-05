@@ -591,10 +591,15 @@ const LEVEL_TITLE_FONT_FAMILY = OPEN_SANS_FONT_FAMILY;
 const TIMER_PANEL_UI = {
   y: 36,
   w: 256,
-  h: 95,
+  h: 80,
   label: "Level",
   textColor: "#335b90",
   textStroke: "rgba(255, 255, 255, 0.92)",
+  frameSizeRatio: 0.96,
+  frameCenterOffsetXRatio: -0.26,
+  frameCenterYRatio: 0.52,
+  frameRotationDeg: -12,
+  textLeftInsetRatio: 0.58,
 };
 const COINS_UI = {
   panelY: 36,
@@ -3831,6 +3836,9 @@ class Game {
     this.timerPanelImage = new Image();
     this.timerPanelImage.src = getThemeAsset("timerPanel", "ui/timer_panel.png");
     this.timerPanelImage.decoding = "async";
+    this.titleFrameImage = new Image();
+    this.titleFrameImage.src = "ui/frame.png";
+    this.titleFrameImage.decoding = "async";
     this.restartButtonImage = new Image();
     this.restartButtonImage.src = getThemeAsset("restartButton", "ui/restart_button.png");
     this.restartButtonImage.decoding = "async";
@@ -4216,6 +4224,9 @@ class Game {
     this.timerPanelImage.onload = () => {
       this.invalidate(false);
     };
+    this.titleFrameImage.onload = () => {
+      this.invalidate(false);
+    };
     this.restartButtonImage.onload = () => {
       this.invalidate(false);
     };
@@ -4370,6 +4381,7 @@ class Game {
       this.woodImage,
       this.slotCellImage,
       this.timerPanelImage,
+      this.titleFrameImage,
       this.backButtonImage,
       this.loseTopCoinsPanelImage,
       this.preGameTabOnImage,
@@ -13286,7 +13298,6 @@ class Game {
     const panelW = clamp(TIMER_PANEL_UI.w, minPanelW, maxPanelW);
     const panelX = (this.width - panelW) * 0.5;
     const panelY = TIMER_PANEL_UI.y;
-    const textX = panelX + panelW * 0.5;
     const textY = panelY + panelH * 0.5 + 4;
     this.topTimerPanelRect = { x: panelX, y: panelY, w: panelW, h: panelH };
 
@@ -13301,12 +13312,36 @@ class Game {
     ctx.drawImage(this.timerPanelImage, panelX, panelY, panelW, panelH);
     ctx.restore();
 
+    const frameImage = this.titleFrameImage;
+    const hasTitleFrame = frameImage?.complete && frameImage.naturalWidth > 0 && frameImage.naturalHeight > 0;
+    if (hasTitleFrame) {
+      const frameSize = Math.max(1, panelH * (Number(TIMER_PANEL_UI.frameSizeRatio) * 1.2 || 0.96));
+      const frameCenterX = panelX + 32 + panelH * (Number(TIMER_PANEL_UI.frameCenterOffsetXRatio) || -0.26);
+      const frameCenterY = panelY + panelH * (Number(TIMER_PANEL_UI.frameCenterYRatio) || 0.52);
+      const frameRotation = ((Number(TIMER_PANEL_UI.frameRotationDeg) || 0) * Math.PI) / 180;
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      if ("imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.shadowColor = "rgba(0, 0, 0, 0.24)";
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 3;
+      ctx.translate(frameCenterX, frameCenterY);
+      ctx.rotate(frameRotation);
+      ctx.drawImage(frameImage, -frameSize * 0.5, -frameSize * 0.5, frameSize, frameSize);
+      ctx.restore();
+    }
+
     ctx.save();
-    const maxTextWidth = Math.max(40, panelW - textPaddingX * 2);
+    const textLeftInset = hasTitleFrame
+      ? Math.max(textPaddingX, Math.round(panelH * (Number(TIMER_PANEL_UI.textLeftInsetRatio) || 0.58)))
+      : textPaddingX;
+    const maxTextWidth = Math.max(40, panelW - textLeftInset - textPaddingX);
     let textFontSize = TOP_PANEL_FONT_SIZE;
     if (measuredTextW > maxTextWidth) {
       const fontScale = maxTextWidth / Math.max(1, measuredTextW);
-      textFontSize = Math.max(8, TOP_PANEL_FONT_SIZE * fontScale);
+      textFontSize = Math.max(8, TOP_PANEL_FONT_SIZE * fontScale * 0.9);
     }
     ctx.font = getTopPanelFont(textFontSize);
     if ("letterSpacing" in ctx) {
@@ -13317,8 +13352,9 @@ class Game {
     ctx.lineWidth = Math.max(2, textFontSize * 0.11);
     ctx.strokeStyle = TIMER_PANEL_UI.textStroke;
     ctx.fillStyle = TIMER_PANEL_UI.textColor;
-    ctx.strokeText(label, textX, textY);
-    ctx.fillText(label, textX, textY);
+    const adjustedTextX = panelX + textLeftInset + maxTextWidth * 0.5 + 10;
+    ctx.strokeText(label, adjustedTextX, textY);
+    ctx.fillText(label, adjustedTextX, textY);
     ctx.restore();
   }
 
