@@ -7128,7 +7128,7 @@ class Game {
     this.pregameTutorial.step = firstStep.step;
     this.pregameSelectedSectorKey = this.pregameSectorKeys[0] || null;
     this.pregameAutoSelectPending = false;
-    this.trackCactusPregameTutorialEventOnce("tutor_level_intro", "completed");
+    this.trackCactusPregameTutorialEventOnce("tutorial_level_intro", "completed");
     return true;
   }
 
@@ -10316,6 +10316,9 @@ class Game {
           this.preGameStartButtonAppearProgress = 0;
           this.preGameStartButtonBounceTime = 0;
           this.preGameStartButtonWasAvailable = true;
+          if (this.isCactusPregameTutorialActive()) {
+            this.trackCactusPregameTutorialEventOnce("tutorial_show_startbutton", "completed");
+          }
         }
         const appearDuration = Math.max(0.001, Number(PREGAME_START_BUTTON_UI.appearDuration) || 0.24);
         this.preGameStartButtonAppearProgress = Math.min(
