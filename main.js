@@ -7126,7 +7126,7 @@ class Game {
     }
     this.pregameTutorial.active = true;
     this.pregameTutorial.step = firstStep.step;
-    this.pregameSelectedSectorKey = this.pregameSectorKeys[0] || null;
+    this.setPregameSelectedSector(this.pregameSectorKeys[0] || null, { syncMaterial: true });
     this.pregameAutoSelectPending = false;
     this.trackCactusPregameTutorialEventOnce("tutorial_level_intro", "completed");
     return true;
@@ -7282,7 +7282,7 @@ class Game {
     if (target.type === "sector") {
       const sectorKey = this.pregameSectorKeys[target.sectorIndex] || target.sectorKey || null;
       if (sectorKey) {
-        this.pregameSelectedSectorKey = sectorKey;
+        this.setPregameSelectedSector(sectorKey, { syncMaterial: true });
         this.pregameAutoSelectPending = false;
         this.trackPregameSectionSelected(sectorKey);
         this.trackCactusPregameTutorialEventOnce(target.completedEvent, "completed");
@@ -7294,7 +7294,7 @@ class Game {
     if (target.type === "color") {
       const sectorKey = this.pregameSectorKeys[target.sectorIndex] || null;
       if (sectorKey && this.pregameSelectedSectorKey !== sectorKey) {
-        this.pregameSelectedSectorKey = sectorKey;
+        this.setPregameSelectedSector(sectorKey, { syncMaterial: true });
         this.pregameAutoSelectPending = false;
       }
       this.trackPregameColorSelected(target.colorKey);
@@ -10302,7 +10302,7 @@ class Game {
           && !this.pregameSelectedSectorKey
           && this.pregameFigureAppearTime >= PREGAME_FIGURE_APPEAR_DURATION
         ) {
-          this.pregameSelectedSectorKey = this.pregameSectorKeys[0] || null;
+          this.setPregameSelectedSector(this.pregameSectorKeys[0] || null, { syncMaterial: true });
           this.pregameAutoSelectPending = false;
         }
       }
@@ -10852,6 +10852,25 @@ class Game {
 
   getPregameSelectedMaterial() {
     return getPregameMaterialDefinition(this.pregameSelectedMaterialKey).id;
+  }
+
+  syncPregameSelectedMaterialToSector(sectorKey = this.pregameSelectedSectorKey) {
+    const nextMaterial = this.getPregameSectorMaterial(sectorKey);
+    const previousMaterial = this.getPregameSelectedMaterial();
+    this.pregameSelectedMaterialKey = nextMaterial;
+    return previousMaterial !== nextMaterial;
+  }
+
+  setPregameSelectedSector(sectorKey, options = {}) {
+    const normalizedSectorKey = normalizeBlockColorName(sectorKey);
+    const nextSectorKey = normalizedSectorKey || null;
+    const previousSectorKey = this.pregameSelectedSectorKey;
+    const shouldSyncMaterial = options.syncMaterial !== false;
+    this.pregameSelectedSectorKey = nextSectorKey;
+    const materialChanged = shouldSyncMaterial
+      ? this.syncPregameSelectedMaterialToSector(nextSectorKey)
+      : false;
+    return previousSectorKey !== nextSectorKey || materialChanged;
   }
 
   syncPregameSectorColorAssignment(sectorKey) {
@@ -11732,6 +11751,9 @@ class Game {
       return false;
     }
     this.pregameActivePaletteTab = normalizedTab;
+    if (normalizedTab === PREGAME_PALETTE_TAB_MATERIAL) {
+      this.syncPregameSelectedMaterialToSector();
+    }
     this.preGameColorDragState = {
       active: false,
       pointerId: null,
@@ -11849,8 +11871,7 @@ class Game {
         continue;
       }
       this.trackPregameSectionSelected(entry.sectorKey);
-      if (this.pregameSelectedSectorKey !== entry.sectorKey) {
-        this.pregameSelectedSectorKey = entry.sectorKey;
+      if (this.setPregameSelectedSector(entry.sectorKey)) {
         this.pregameAutoSelectPending = false;
         this.invalidate(true);
       }
